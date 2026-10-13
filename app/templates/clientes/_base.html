@@ -17,7 +17,10 @@
     <a class="nav-link {% if request.resolver_match.url_name|slice:':4' == 'plan' %}active{% endif %}" href="{% url 'panel:planes' %}">Planes</a>
     <a class="nav-link {% if request.resolver_match.url_name == 'auditoria' %}active{% endif %}" href="{% url 'panel:auditoria' %}">Auditoría</a>
   </div>
-  <form method="post" action="{% url 'panel:logout' %}">{% csrf_token %}<button class="btn btn-sm btn-outline-secondary">Salir</button></form>
+  <div class="navbar-nav align-items-center">
+    <a class="nav-link {% if request.resolver_match.url_name == 'password' %}active{% endif %}" href="{% url 'panel:password' %}"><i class="bi bi-person-circle me-1"></i>{{ request.user.get_username }}</a>
+    <form method="post" action="{% url 'panel:logout' %}" class="ms-2">{% csrf_token %}<button class="btn btn-sm btn-outline-secondary">Salir</button></form>
+  </div>
 </nav>
 <main class="container py-4" style="max-width:1100px">
   {% for m in messages %}<div class="alert alert-{% if m.tags == 'error' %}danger{% else %}{{ m.tags }}{% endif %} py-2 small">{{ m }}</div>{% endfor %}

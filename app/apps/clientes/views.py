@@ -11,6 +11,7 @@ import logging
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import views as auth_views
+from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.mixins import UserPassesTestMixin
 from django.core.exceptions import ValidationError
 from django.db.models import Sum
@@ -88,6 +89,24 @@ class PanelLogoutView(View):
         from django.contrib.auth import logout
         logout(request)
         return redirect('panel:login')
+
+
+class _PanelPasswordForm(PasswordChangeForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for campo in self.fields.values():
+            campo.widget.attrs.setdefault('class', 'form-control')
+
+
+class PanelPasswordView(PanelMixin, auth_views.PasswordChangeView):
+    """Cambio de contraseña del superusuario del panel (plataforma)."""
+    template_name = 'clientes/password.html'
+    form_class = _PanelPasswordForm
+    success_url = reverse_lazy('panel:clientes')
+
+    def form_valid(self, form):
+        messages.success(self.request, 'Contraseña actualizada.')
+        return super().form_valid(form)
 
 
 class ClienteListView(PanelMixin, View):
