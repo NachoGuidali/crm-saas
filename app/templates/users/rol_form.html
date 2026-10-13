@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Rol{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-shield-lock"></i> {{ rol|default:"Nuevo rol" }}</h1></div>
+<form method="post" class="card" style="max-width:820px"><div class="card-body">{% csrf_token %}
+  <div class="row g-2 mb-3"><div class="col-md-5"><label class="form-label">Nombre</label>{{ form.nombre }}{{ form.nombre.errors }}</div><div class="col-md-7"><label class="form-label">Descripción</label>{{ form.descripcion }}</div></div>
+  {% for grupo, items in grupos %}<div class="perm-grupo"><div class="section-title">{{ grupo }}</div>
+    {% for slug, label in items %}<label class="d-flex gap-2 small mb-1"><input type="checkbox" class="form-check-input" name="permisos" value="{{ slug }}" {% if slug in seleccionados %}checked{% endif %}> {{ label }}</label>{% endfor %}</div>{% endfor %}
+  <div class="d-flex gap-2"><button class="btn btn-primary">Guardar</button>{% if rol %}<button name="eliminar" value="1" class="btn btn-outline-danger" onclick="return confirm('¿Eliminar el rol?')">Eliminar</button>{% endif %}<a href="{% url 'users:roles' %}" class="btn btn-outline-secondary">Volver</a></div>
+</div></form>
+{% endblock %}

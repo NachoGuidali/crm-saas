@@ -1,0 +1,5 @@
+{% if embudos|length > 1 %}
+<select class="form-select form-select-sm" style="width:auto" onchange="location.search='embudo='+this.value">
+  {% for e in embudos %}<option value="{{ e.pk }}" {% if e.pk == embudo.pk %}selected{% endif %}>{{ e.nombre }}</option>{% endfor %}
+</select>
+{% endif %}

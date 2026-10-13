@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% load crm_extras %}
+{% block title %}Columnas de la importación{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-table"></i> ¿Qué hay en cada columna?</h1><span class="sub">{{ lote.nombre_archivo }} → {{ lote.embudo }}</span></div>
+<form method="post">{% csrf_token %}
+<div class="card mb-3"><div class="table-responsive"><table class="table table-sm mb-0">
+  <thead><tr><th style="width:230px">Columna del archivo</th><th style="width:230px">Campo del CRM</th><th>Ejemplos</th></tr></thead>
+  <tbody>{% for col in columnas %}<tr>
+    <td class="fw-semibold">{{ col }}</td>
+    <td><select name="col__{{ col }}" class="form-select form-select-sm">{% for k, v in campos %}<option value="{{ k }}" {% if lote.mapeo|get_item:col == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></td>
+    <td class="small muted">{% for f in filas|slice:":3" %}{{ f|get_item:col|default_if_none:"" }}{% if not forloop.last %} · {% endif %}{% endfor %}</td>
+  </tr>{% endfor %}</tbody>
+</table></div></div>
+<div class="card mb-3"><div class="card-body row g-3">
+  <div class="col-md-4"><label class="form-label">Etapa de ingreso</label><select name="etapa" class="form-select"><option value="">Etapa inicial del embudo</option>{% for e in etapas %}<option value="{{ e.pk }}">{{ e.nombre }}</option>{% endfor %}</select></div>
+  <div class="col-md-4"><label class="form-label">Asignación</label>
+    <select name="agente_fijo" class="form-select" id="agenteFijo"><option value="">Automática según el embudo</option>{% for a in agentes %}<option value="{{ a.pk }}">Todo a {{ a.display_name }}</option>{% endfor %}</select>
+    <input type="hidden" name="asignar" value="1" id="asignar">
+    <label class="small mt-1 d-flex gap-1"><input type="checkbox" class="form-check-input" id="sinAsignar"> Dejar sin asignar</label></div>
+  <div class="col-md-4"><label class="form-label">Pauta de toda la base <span class="muted">(opcional)</span></label>
+    <select name="pauta" class="form-select"><option value="">Ninguna / por columna</option>{% for p in pautas %}<option value="{{ p.pk }}">{{ p }}</option>{% endfor %}</select>
+    <div class="form-text">Si el archivo trae una columna "Pauta / origen de campaña", se usa la de cada fila.</div></div>
+  <div class="col-md-4"><label class="form-label">Automatizaciones</label>
+    <label class="d-flex gap-2 small"><input type="checkbox" name="automatizaciones" value="1" class="form-check-input" checked> Ejecutar las acciones de la etapa (ej: mensaje de bienvenida)</label>
+    <div class="form-text">Los envíos se espacian solos según el ritmo anti-bloqueo de cada línea.</div></div>
+</div></div>
+<button class="btn btn-primary"><i class="bi bi-cloud-upload"></i> Importar</button>
+<a href="{% url 'crm:importaciones' %}" class="btn btn-outline-secondary">Cancelar</a>
+</form>
+<script>document.getElementById('sinAsignar').addEventListener('change', e => { document.getElementById('asignar').value = e.target.checked ? '0' : '1'; document.getElementById('agenteFijo').disabled = e.target.checked; });</script>
+{% endblock %}

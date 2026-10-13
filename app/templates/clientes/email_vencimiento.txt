@@ -1,0 +1,14 @@
+{% autoescape off %}Hola{% if cliente.contacto_nombre %} {{ cliente.contacto_nombre }}{% endif %},
+
+Te recordamos que la suscripción de {{ cliente.nombre }} a {{ CRM_NOMBRE }} vence el {{ vencimiento|date:"d/m/Y" }}.
+{% if cliente.precio %}
+Importe mensual: {{ moneda }} {{ cliente.precio }}
+{% endif %}{% if datos_pago %}
+Datos para el pago:
+{{ datos_pago }}
+{% endif %}
+Si no registramos el pago, el acceso se suspende {{ dias_gracia }} días después del vencimiento. Si ya pagaste, ignorá este mensaje.
+
+Gracias,
+{{ CRM_NOMBRE }}
+{% endautoescape %}

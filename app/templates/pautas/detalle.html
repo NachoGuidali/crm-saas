@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% load crm_extras %}
+{% block title %}{{ pauta }}{% endblock %}
+{% block extra_css %}<style>.viz-root { --series-1: #3987e5; --series-2: #d95926; --viz-grid: rgba(255,255,255,.06); --viz-text: #8B95A8; }
+.leyenda { display:flex; gap:14px; font-size:12px; color:var(--text2); } .leyenda i { display:inline-block; width:12px; height:3px; border-radius:2px; vertical-align:middle; margin-right:5px; }</style>{% endblock %}
+{% block content %}
+<div class="page-head viz-root">
+  <h1><i class="bi bi-megaphone"></i> {{ pauta }} <span class="sub">{{ pauta.get_plataforma_display }}{% if pauta.inicio %} · {{ pauta.inicio|date:"d/m/Y" }}{% if pauta.fin %} → {{ pauta.fin|date:"d/m/Y" }}{% endif %}{% endif %}{% if not pauta.activa %} · inactiva{% endif %}</span></h1>
+  <div class="toolbar">
+    <a href="{% url 'crm:oportunidades' %}{{ filtro_url }}" class="btn btn-primary btn-sm"><i class="bi bi-list-check"></i> Ver las {{ f.leads }} tarjetas</a>
+    {% if puede_editar %}<a href="{% url 'pautas:editar' pauta.pk %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil"></i> Editar</a>{% endif %}
+    <a href="{% url 'pautas:analisis' %}?p={{ p }}&desde={{ desde|date:'Y-m-d' }}&hasta={{ hasta|date:'Y-m-d' }}" class="btn btn-outline-secondary btn-sm">Todas las pautas</a>
+  </div>
+</div>
+<form class="toolbar mb-3" method="get">
+  <div class="btn-group btn-group-sm">
+    <a class="btn btn-outline-secondary {% if p == '7d' %}active{% endif %}" href="?p=7d">7 días</a>
+    <a class="btn btn-outline-secondary {% if p == 'mes' %}active{% endif %}" href="?p=mes">Este mes</a>
+    <a class="btn btn-outline-secondary {% if p == '30d' %}active{% endif %}" href="?p=30d">30 días</a>
+  </div>
+  <input type="hidden" name="p" value="custom">
+  <input type="date" name="desde" value="{{ desde|date:'Y-m-d' }}" class="form-control form-control-sm">
+  <input type="date" name="hasta" value="{{ hasta|date:'Y-m-d' }}" class="form-control form-control-sm">
+  <button class="btn btn-outline-secondary btn-sm">Aplicar</button>
+  <span class="small muted">Leads ingresados del {{ desde|date:"d/m/Y" }} al {{ hasta|date:"d/m/Y" }}</span>
+</form>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi"><div class="v">{{ f.inversion|pesos }}</div><div class="l">Inversión del período</div></div></div>
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi"><div class="v">{{ f.leads }}</div><div class="l">Leads</div>{% if f.repetidos %}<div class="d">+{{ f.repetidos }} repetidos</div>{% endif %}</div></div>
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi"><div class="v">{{ f.cpl|pesos }}</div><div class="l">Costo por lead</div></div></div>
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi"><div class="v">{{ f.contactabilidad }}%</div><div class="l">Contactados</div><div class="d">{{ f.efectivos }} de {{ f.leads }}</div></div></div>
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi"><div class="v">{{ f.ventas }}</div><div class="l">Clientes (ventas)</div><div class="d">{{ f.conversion }}% de conversión</div></div></div>
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi"><div class="v">{{ f.cpa|pesos }}</div><div class="l">Costo por cliente</div>{% if f.meses_recupero %}<div class="d">se recupera en {{ f.meses_recupero|floatformat:1 }} meses de cuota</div>{% endif %}</div></div>
+</div>
+
+<div class="row g-3 mb-3 viz-root">
+  <div class="col-lg-7"><div class="card h-100"><div class="card-header d-flex justify-content-between align-items-center"><span>Leads y ventas por día de ingreso</span>
+    <span class="leyenda"><span><i style="background:var(--series-1)"></i>Leads</span><span><i style="background:var(--series-2)"></i>Ventas</span></span></div>
+    <div class="card-body"><div class="chart-box"><canvas id="chPauta" role="img" aria-label="Leads y ventas por día"></canvas></div>
+    <details class="mt-2 small"><summary class="muted">Ver como tabla</summary><table class="table table-sm mt-2"><thead><tr><th>Día</th><th class="text-end">Leads</th><th class="text-end">Ventas</th></tr></thead><tbody id="tablaPauta"></tbody></table></details></div></div></div>
+  <div class="col-lg-5"><div class="card h-100"><div class="card-header">¿Dónde están hoy esos leads? (por etapa)</div><div class="card-body">
+    {% for e in etapas %}{% ifchanged e.embudo %}{% if etapas|length > 7 %}<div class="section-title mt-2">{{ e.embudo }}</div>{% endif %}{% endifchanged %}
+    <div class="bar-row"><span class="lbl">{{ e.etapa.nombre }}</span><div class="track"><div class="fill" data-v="{{ e.n }}" data-grupo="etapas"></div></div><span class="num">{{ e.n }}</span></div>{% empty %}<div class="small muted">Sin leads en el período.</div>{% endfor %}
+    <div class="d-flex gap-2 flex-wrap mt-2">{% for nombre, n, k in estados %}<span class="chip {% if k == 'ganada' %}ok{% elif k == 'perdida' %}danger{% elif k == 'pausada' %}warn{% endif %}">{{ nombre }}: {{ n }}</span>{% endfor %}</div>
+  </div></div></div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-4"><div class="card h-100"><div class="card-header">Cierres por tipificación</div><div class="card-body">
+    {% for m in motivos %}<div class="bar-row"><span class="lbl" title="{{ m.tipificacion__categoria }}">{% if m.tipificacion__resultado == 'venta' %}<i class="bi bi-trophy text-success"></i>{% endif %} {{ m.tipificacion__nombre }}</span><div class="track"><div class="fill" data-v="{{ m.n }}" data-grupo="motivos"></div></div><span class="num">{{ m.n }}</span></div>{% empty %}<div class="small muted">Todavía no hay cierres.</div>{% endfor %}
+  </div></div></div>
+  <div class="col-lg-4"><div class="card h-100"><div class="card-header">Por agente</div><div class="table-responsive"><table class="table table-sm mb-0">
+    <thead><tr><th>Agente</th><th class="text-end">Leads</th><th class="text-end">Ventas</th><th class="text-end">Conv.</th></tr></thead>
+    <tbody>{% for a in agentes %}<tr><td>{{ a.nombre }}</td><td class="text-end">{{ a.leads }}</td><td class="text-end">{{ a.ventas }}</td><td class="text-end">{{ a.conversion }}%</td></tr>{% empty %}<tr><td colspan="4" class="small muted">—</td></tr>{% endfor %}</tbody>
+  </table></div></div></div>
+  <div class="col-lg-4"><div class="card h-100"><div class="card-header d-flex justify-content-between"><span>Inversión cargada</span><span>{{ inversion_total|pesos }} total</span></div><div class="card-body">
+    {% if puede_editar %}<form method="post" class="row g-2 mb-3">{% csrf_token %}
+      <div class="col-6"><input name="monto" class="form-control form-control-sm" placeholder="Monto $" required inputmode="decimal"></div>
+      <div class="col-6"><input type="date" name="fecha" class="form-control form-control-sm" value="{% now 'Y-m-d' %}" title="Fecha o primer día del período"></div>
+      <div class="col-9"><input name="nota" class="form-control form-control-sm" placeholder="Nota (ej: septiembre, campaña 2)"></div>
+      <div class="col-3"><button class="btn btn-sm btn-primary w-100">Cargar</button></div>
+    </form>{% endif %}
+    {% for i in inversiones %}<div class="d-flex justify-content-between align-items-center py-1 border-bottom small" style="border-color:var(--border)!important">
+      <span>{{ i.fecha|date:"d/m/Y" }} · <b>{{ i.monto|pesos }}</b>{% if i.nota %} <span class="muted">· {{ i.nota }}</span>{% endif %}</span>
+      {% if puede_editar %}<form method="post">{% csrf_token %}<button name="eliminar_inversion" value="{{ i.pk }}" class="btn btn-xs btn-outline-danger" onclick="return confirm('¿Eliminar esta carga?')"><i class="bi bi-x"></i></button></form>{% endif %}</div>
+    {% empty %}<div class="small muted">Sin inversión cargada: el costo por lead y por cliente aparece cuando se carga.</div>{% endfor %}
+    {% if pauta.claves %}<div class="small muted mt-3">También llega como: {% for c in pauta.claves %}<code>{{ c }}</code>{% if not forloop.last %}, {% endif %}{% endfor %}</div>{% endif %}
+  </div></div></div>
+</div>
+{{ serie|json_script:"serie-pauta" }}
+{% endblock %}
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  const grupos = {};
+  document.querySelectorAll('.fill[data-grupo]').forEach(el => (grupos[el.dataset.grupo] = grupos[el.dataset.grupo] || []).push(el));
+  Object.values(grupos).forEach(els => { const m = Math.max(1, ...els.map(e => +e.dataset.v)); els.forEach(e => e.style.width = (+e.dataset.v * 100 / m) + '%'); });
+  const s = JSON.parse(document.getElementById('serie-pauta').textContent);
+  document.getElementById('tablaPauta').innerHTML = s.labels.map((l, i) => `<tr><td>${l}</td><td class="text-end">${s.leads[i]}</td><td class="text-end">${s.ventas[i]}</td></tr>`).join('');
+  const css = getComputedStyle(document.querySelector('.viz-root'));
+  const c1 = css.getPropertyValue('--series-1').trim(), c2 = css.getPropertyValue('--series-2').trim();
+  new Chart(document.getElementById('chPauta'), {
+    type: 'line',
+    data: {labels: s.labels, datasets: [
+      {label: 'Leads', data: s.leads, borderColor: c1, backgroundColor: c1, borderWidth: 2, pointRadius: 0, pointHoverRadius: 5, tension: .25},
+      {label: 'Ventas', data: s.ventas, borderColor: c2, backgroundColor: c2, borderWidth: 2, pointRadius: 0, pointHoverRadius: 5, tension: .25}]},
+    options: {maintainAspectRatio: false, interaction: {mode: 'index', intersect: false},
+      plugins: {legend: {display: false}, tooltip: {backgroundColor: '#1E2736', borderColor: 'rgba(255,255,255,.12)', borderWidth: 1, padding: 10}},
+      scales: {x: {grid: {display: false}, ticks: {color: css.getPropertyValue('--viz-text').trim(), maxRotation: 0, autoSkipPadding: 14}},
+               y: {beginAtZero: true, grid: {color: css.getPropertyValue('--viz-grid').trim()}, border: {display: false}, ticks: {color: css.getPropertyValue('--viz-text').trim(), precision: 0}}}}
+  });
+})();
+</script>
+{% endblock %}

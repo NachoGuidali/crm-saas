@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% load crm_extras %}
+{% block title %}Contactos{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1><i class="bi bi-person-lines-fill"></i> Contactos <span class="sub">{{ page.paginator.count|miles }}</span></h1>
+  <a href="{% url 'crm:oportunidad_nueva' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Nuevo prospecto</a>
+</div>
+<form class="toolbar mb-3" method="get">
+  <input type="search" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Nombre, teléfono, email, DNI…" style="min-width:260px">
+  <select name="etiqueta" class="form-select form-select-sm"><option value="">Etiqueta</option>{% for e in etiquetas %}<option value="{{ e.pk }}" {% if filtros.etiqueta == e.pk|stringformat:'s' %}selected{% endif %}>{{ e }}</option>{% endfor %}</select>
+  <label class="small d-flex gap-1 align-items-center"><input type="checkbox" class="form-check-input" name="no_contactar" value="1" {% if filtros.no_contactar %}checked{% endif %}> No contactar</label>
+  <button class="btn btn-outline-secondary btn-sm">Buscar</button>
+</form>
+<div class="card"><div class="table-responsive"><table class="table table-hover table-sm mb-0">
+  <thead><tr><th>Nombre</th><th>Teléfono</th><th>Email</th><th>Atención</th><th>Oportunidades en curso</th><th>Alta</th></tr></thead>
+  <tbody>{% for c in page %}<tr>
+    <td><a class="fw-semibold text-decoration-none" href="{% url 'crm:contacto_detalle' c.pk %}?ficha=contacto">{{ c.nombre }}</a>
+      {% if c.no_contactar %}<span class="chip danger">No contactar</span>{% endif %}{% for e in c.etiquetas.all %} <span class="chip">{{ e }}</span>{% endfor %}</td>
+    <td class="text-nowrap">{{ c.telefono|telefono }}</td><td>{{ c.email }}</td>
+    <td class="small">{{ c.fecha_atencion|date:"d/m/Y" }}</td>
+    <td class="small">{% for o in c.activas %}<a href="{% url 'crm:oportunidad_detalle' o.pk %}">{{ o.embudo }} · {{ o.etapa }}</a> <span class="muted">({{ o.agente.display_name|default:"sin agente" }})</span><br>{% empty %}<span class="muted">—</span>{% endfor %}</td>
+    <td class="small">{{ c.created_at|date:"d/m/y" }}</td>
+  </tr>{% empty %}<tr><td colspan="6" class="text-center muted py-4">Sin contactos.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+{% include "_paginacion.html" %}
+{% endblock %}

@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% load humanize crm_extras %}
+{% block title %}Dashboard{% endblock %}
+{% block extra_css %}
+<style>
+  /* Paleta categórica (modo oscuro) en orden fijo: slot 1 azul, slot 2 naranja. Magnitudes: un solo tono. */
+  .viz-root { --series-1: #3987e5; --series-2: #d95926; --viz-grid: rgba(255,255,255,.06); --viz-text: #8B95A8; }
+  .leyenda { display: flex; gap: 14px; font-size: 12px; color: var(--text2); }
+  .leyenda i { display: inline-block; width: 12px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-head viz-root">
+  <h1><i class="bi bi-bar-chart-line"></i> Dashboard <span class="sub">{{ embudo|default:"Todos los embudos" }} · {{ desde|date:"d/m" }} al {{ hasta|date:"d/m/Y" }}</span></h1>
+  <form class="toolbar" method="get">
+    {% include "crm/_filtros_embudo.html" %}
+    <div class="btn-group btn-group-sm">
+      <a class="btn btn-outline-secondary {% if p == 'hoy' %}active{% endif %}" href="?p=hoy">Hoy</a>
+      <a class="btn btn-outline-secondary {% if p == '7d' %}active{% endif %}" href="?p=7d">7 días</a>
+      <a class="btn btn-outline-secondary {% if p == 'mes' %}active{% endif %}" href="?p=mes">Este mes</a>
+      <a class="btn btn-outline-secondary {% if p == '30d' %}active{% endif %}" href="?p=30d">30 días</a>
+    </div>
+    <input type="hidden" name="p" value="custom">
+    <input type="date" name="desde" value="{{ desde|date:'Y-m-d' }}" class="form-control form-control-sm">
+    <input type="date" name="hasta" value="{{ hasta|date:'Y-m-d' }}" class="form-control form-control-sm">
+    <button class="btn btn-outline-secondary btn-sm">Aplicar</button>
+  </form>
+</div>
+
+{% include "reportes/_autorefresh.html" %}
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi"><div class="v">{{ unicos.unicos|intcomma }}</div><div class="l">Leads únicos</div><div class="d">{{ unicos.nuevos }} nuevos · {{ unicos.reingresos }} reingresaron</div></div></div>
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi"><div class="v">{{ m.contactabilidad }}%</div><div class="l">Contactabilidad</div><div class="d">{{ m.gestionados }}% gestionados</div></div></div>
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi"><div class="v">{{ m.ventas|intcomma }}</div><div class="l">Ventas</div>{% if m.valor_ventas %}<div class="d">$ {{ m.valor_ventas|floatformat:0|intcomma }} en cuotas</div>{% endif %}</div></div>
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi"><div class="v">{{ m.conversion }}%</div><div class="l">Conversión (ventas / cierres)</div><div class="d">{{ m.perdidas }} no ventas</div></div></div>
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi"><div class="v">{% if m.tiempo_contacto_h is not None %}{{ m.tiempo_contacto_h }} h{% else %}—{% endif %}</div><div class="l">Tiempo promedio a contacto efectivo</div></div></div>
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi"><div class="v">{{ m.llamadas|intcomma }}</div><div class="l">Llamadas</div><div class="d">{{ m.minutos|intcomma }} min · {{ m.llamadas_perdidas }} perdidas</div></div></div>
+</div>
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3"><div class="kpi"><div class="v">{{ m.en_curso|intcomma }}</div><div class="l">En curso ahora</div></div></div>
+  <div class="col-6 col-md-3"><div class="kpi {% if m.sin_asignar %}alerta{% endif %}"><div class="v">{{ m.sin_asignar }}</div><div class="l">Sin asignar</div></div></div>
+  <div class="col-6 col-md-3"><div class="kpi {% if m.estancados %}alerta{% endif %}"><div class="v">{{ m.estancados }}</div><div class="l"><a href="{% url 'crm:oportunidades' %}?embudo={{ embudo.pk }}&estancados=1">Estancados</a></div></div></div>
+  <div class="col-6 col-md-3"><div class="kpi {% if m.tareas_vencidas %}alerta{% endif %}"><div class="v">{{ m.tareas_vencidas }}</div><div class="l">Tareas vencidas del equipo</div></div></div>
+</div>
+
+{% if proy %}
+<div class="card mb-3"><div class="card-body d-flex flex-wrap gap-4 align-items-center">
+  <div><div class="small muted">Ventas del mes</div><div class="fs-4 fw-bold">{{ proy.ventas_mes }}</div></div>
+  <div><div class="small muted">Al ritmo actual, a fin de mes</div><div class="fs-4 fw-bold">≈ {{ proy.ritmo_fin_de_mes }}</div></div>
+  <div><div class="small muted">Ventas esperadas del pipeline en curso</div><div class="fs-4 fw-bold">≈ {{ proy.pipeline_esperadas }}</div></div>
+  <details class="small ms-auto"><summary class="muted">Cómo se calcula</summary>
+    <div class="mt-2">Pipeline: en curso por etapa × % que terminó en venta de los cerrados en los últimos {{ proy.dias_historia }} días que pasaron por esa etapa.
+    <table class="table table-sm mt-1 mb-0"><tbody>{% for d in proy.detalle %}<tr><td>{{ d.etapa }}</td><td class="text-end">{{ d.en_curso }} en curso</td><td class="text-end">{{ d.tasa }}%</td><td class="text-end">≈ {{ d.esperadas }}</td></tr>{% endfor %}</tbody></table></div></details>
+</div></div>
+{% endif %}
+{% if sla %}
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3"><div class="kpi {% if sla.vencidos_ahora %}alerta{% endif %}"><div class="v"><a href="{% url 'crm:oportunidades' %}?embudo={{ embudo.pk|default:'todos' }}&sla=vencido{% if agente %}&agente={{ agente.pk }}{% endif %}">{{ sla.vencidos_ahora }}</a></div><div class="l">Fuera de SLA ahora (sin contactar)</div></div></div>
+  <div class="col-6 col-md-3"><div class="kpi"><div class="v">{{ sla.pct }}%</div><div class="l">Contactados dentro del SLA{% if sla.minutos %} ({{ sla.minutos }} min){% endif %}</div><div class="d">{{ sla.dentro }} a tiempo · {{ sla.fuera }} fuera</div></div></div>
+  <div class="col-6 col-md-3"><div class="kpi"><div class="v">{% if sla.promedio_min is not None %}{{ sla.promedio_min }} min{% else %}—{% endif %}</div><div class="l">Promedio hasta la primera gestión</div></div></div>
+  <div class="col-6 col-md-3"><div class="kpi"><div class="v">{{ sla.pendientes }}</div><div class="l">Asignados, todavía en plazo</div></div></div>
+</div>
+{% endif %}
+<div class="row g-3 mb-3 viz-root">
+  <div class="col-lg-7"><div class="card h-100"><div class="card-header d-flex justify-content-between align-items-center">
+      <span>Ingresos y ventas por día</span>
+      <span class="leyenda"><span><i style="background:var(--series-1)"></i>Ingresos</span><span><i style="background:var(--series-2)"></i>Ventas</span></span></div>
+    <div class="card-body"><div class="chart-box"><canvas id="chSerie" role="img" aria-label="Ingresos y ventas por día"></canvas></div>
+      <details class="mt-2 small"><summary class="muted">Ver como tabla</summary>
+        <table class="table table-sm mt-2"><thead><tr><th>Día</th><th class="text-end">Ingresos</th><th class="text-end">Ventas</th></tr></thead><tbody id="tablaSerie"></tbody></table></details>
+    </div></div></div>
+  <div class="col-lg-5"><div class="card h-100"><div class="card-header">Embudo actual (en curso por etapa)</div><div class="card-body">
+    {% for e in etapas %}<div class="bar-row"><span class="lbl">{{ e.nombre }}</span><div class="track"><div class="fill" data-v="{{ e.n }}"></div></div><span class="num">{{ e.n }}</span></div>{% empty %}<div class="muted small">Sin datos.</div>{% endfor %}
+  </div></div></div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-5">{% include "reportes/_conversion.html" %}</div>
+  <div class="col-lg-7">{% include "reportes/_pipeline.html" %}</div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-4"><div class="card h-100"><div class="card-header">Ventas por tipo de cierre</div><div class="card-body">
+    {% for t in tip_venta %}<div class="bar-row"><span class="lbl" title="{{ t.tipificacion__nombre }}">{{ t.tipificacion__nombre }}</span><div class="track"><div class="fill" data-v="{{ t.n }}" data-grupo="venta"></div></div><span class="num">{{ t.n }}</span></div>{% empty %}<div class="muted small">Sin ventas en el período.</div>{% endfor %}
+  </div></div></div>
+  <div class="col-lg-4"><div class="card h-100"><div class="card-header">No venta por categoría</div><div class="card-body">
+    {% for cat, n in categorias %}<div class="bar-row"><span class="lbl">{{ cat }}</span><div class="track"><div class="fill" data-v="{{ n }}" data-grupo="cat"></div></div><span class="num">{{ n }}</span></div>{% empty %}<div class="muted small">Sin cierres negativos en el período.</div>{% endfor %}
+    {% if postergados %}<div class="small muted mt-2"><i class="bi bi-pause-circle"></i> {{ postergados }} postergados (no cuentan como pérdida)</div>{% endif %}
+  </div></div></div>
+  <div class="col-lg-4"><div class="card h-100"><div class="card-header">Motivos de no venta</div><div class="card-body">
+    {% for t in tip_no|slice:":8" %}<div class="bar-row"><span class="lbl" title="{{ t.tipificacion__categoria }}">{{ t.tipificacion__nombre }}</span><div class="track"><div class="fill" data-v="{{ t.n }}" data-grupo="motivo"></div></div><span class="num">{{ t.n }}</span></div>{% empty %}<div class="muted small">—</div>{% endfor %}
+  </div></div></div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8"><div class="card"><div class="card-header d-flex justify-content-between align-items-center">Ranking de agentes
+      {% if 'reportes' in perms_crm %}<a href="{% url 'reportes:ranking_csv' %}?{{ request.GET.urlencode }}" class="small"><i class="bi bi-download"></i> CSV</a>{% endif %}</div>
+    <div class="table-responsive"><table class="table table-sm table-hover mb-0">
+      <thead><tr><th>Agente</th><th class="text-end">Asignados</th><th class="text-end">Contactos efectivos</th><th class="text-end">Ventas</th><th class="text-end">No ventas</th><th class="text-end">Conversión</th><th class="text-end">En curso</th><th class="text-end">Llamadas</th><th class="text-end">Min.</th></tr></thead>
+      <tbody>{% for f in ranking %}<tr><td><span class="avatar-xs">{{ f.u.iniciales }}</span> {{ f.u.display_name }}</td><td class="text-end">{{ f.asignados }}</td><td class="text-end">{{ f.efectivos }}</td>
+        <td class="text-end fw-semibold">{{ f.ventas }}</td><td class="text-end">{{ f.perdidas }}</td><td class="text-end">{{ f.conversion }}%</td><td class="text-end">{{ f.abiertas }}</td><td class="text-end">{{ f.llamadas }}</td><td class="text-end">{{ f.minutos }}</td></tr>
+      {% empty %}<tr><td colspan="9" class="muted text-center py-3">Sin actividad en el período.</td></tr>{% endfor %}</tbody>
+    </table></div></div></div>
+  <div class="col-lg-4"><div class="card h-100"><div class="card-header">Origen de los ingresos</div><div class="card-body">
+    {% for o in origenes %}<div class="bar-row"><span class="lbl">{{ o.nombre }}</span><div class="track"><div class="fill" data-v="{{ o.n }}" data-grupo="origen"></div></div><span class="num">{{ o.n }}</span></div>{% empty %}<div class="muted small">—</div>{% endfor %}
+  </div></div></div>
+</div>
+<div class="card mt-3"><div class="card-header d-flex justify-content-between align-items-center">Actividad por vendedora <span class="muted small ms-2 me-auto">· todos los embudos, en el período</span>
+    {% if 'reportes' in perms_crm %}<a href="{% url 'reportes:actividad_csv' %}?{{ request.GET.urlencode }}" class="small"><i class="bi bi-download"></i> CSV</a>{% endif %}</div>
+  <div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-variant-numeric:tabular-nums">
+    <thead><tr><th>Vendedora</th>{% for k, t in columnas_actividad %}<th class="text-end small">{{ t }}</th>{% endfor %}</tr></thead>
+    <tbody>{% for f in actividad %}<tr><td class="text-nowrap"><a href="{% url 'reportes:mis_numeros' %}?agente={{ f.u.pk }}&{{ request.GET.urlencode }}">{{ f.u.display_name }}</a></td>{% for k, t in columnas_actividad %}<td class="text-end">{{ f|get_item:k|default:"·" }}</td>{% endfor %}</tr>
+    {% empty %}<tr><td colspan="17" class="muted text-center py-3">Sin actividad en el período.</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+{% if resultados %}
+<div class="card mt-3"><div class="card-header d-flex align-items-center">Resultado de las llamadas atendidas <span class="muted small ms-2 me-auto">· por vendedora, en el período</span>
+    {% if resultados.sin %}<a href="{% url 'telefonia:llamadas' %}?resultado=sin" class="small text-danger"><i class="bi bi-exclamation-triangle"></i> {{ resultados.sin }} sin calificar</a>{% endif %}</div>
+  <div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-variant-numeric:tabular-nums">
+    <thead><tr><th>Vendedora</th>{% for r in resultados.resultados %}<th class="text-end small">{{ r.nombre }}</th>{% endfor %}<th class="text-end small text-danger">Sin calificar</th><th class="text-end small">Total</th></tr></thead>
+    <tbody>{% for f in resultados.filas %}<tr><td class="text-nowrap">{{ f.u.display_name }}</td>{% for c in f.celdas %}<td class="text-end">{{ c|default:"·" }}</td>{% endfor %}
+      <td class="text-end">{% if f.sin %}<a class="text-danger fw-semibold" href="{% url 'telefonia:llamadas' %}?resultado=sin&agente={{ f.u.pk }}">{{ f.sin }}</a>{% else %}·{% endif %}</td><td class="text-end fw-semibold">{{ f.total }}</td></tr>{% endfor %}
+      <tr class="fw-semibold"><td>Total</td>{% for t in resultados.totales %}<td class="text-end">{{ t }}</td>{% endfor %}<td class="text-end">{{ resultados.sin }}</td><td class="text-end">{{ resultados.total }}</td></tr></tbody>
+  </table></div></div>
+{% endif %}
+<div class="card mt-3"><div class="card-header">Telefonía por vendedora <span class="muted small">· tiempo conectado, habla y after call work</span></div>
+  <div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-variant-numeric:tabular-nums">
+    <thead><tr><th>Vendedora</th><th class="text-end">Conectada</th><th class="text-end">Llamadas</th><th class="text-end">Salientes</th><th class="text-end">Entrantes</th><th class="text-end">Atendidas</th><th class="text-end">Habla</th><th class="text-end">Prom. por llamada</th><th class="text-end" title="Tiempo entre que corta y su próxima acción en el CRM (tipificar, nota, mover, llamar), hasta 15 min">After call work prom.</th><th class="text-end" title="Tiempo hablando / tiempo conectada">Ocupación</th></tr></thead>
+    <tbody>{% for f in call_center %}<tr><td>{{ f.u.display_name }}</td><td class="text-end">{{ f.conectado_h }} h</td><td class="text-end">{{ f.llamadas }}</td><td class="text-end">{{ f.salientes }}</td><td class="text-end">{{ f.entrantes }}</td><td class="text-end">{{ f.atendidas }}</td>
+      <td class="text-end">{{ f.habla_min }} min</td><td class="text-end">{{ f.promedio_habla|duracion }}</td><td class="text-end">{% if f.acw_prom is not None %}{{ f.acw_prom|duracion }}{% else %}·{% endif %}</td><td class="text-end">{% if f.ocupacion is not None %}{{ f.ocupacion }}%{% else %}·{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="10" class="muted text-center py-3">Sin datos en el período.</td></tr>{% endfor %}</tbody>
+  </table></div>
+  <div class="card-body pt-2"><div class="form-text">"Conectada" = tiempo con el CRM abierto (se mide desde hoy en adelante). After call work: desde que termina la llamada hasta su próxima acción en el CRM, con un tope de 15 min.</div></div>
+</div>
+{{ serie|json_script:"serie-data" }}
+{% endblock %}
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  // Barras HTML: largo proporcional al máximo de su grupo
+  const grupos = {};
+  document.querySelectorAll('.fill[data-v]').forEach(el => { const g = el.dataset.grupo || el.closest('.card').querySelector('.card-header').textContent; (grupos[g] = grupos[g] || []).push(el); });
+  Object.values(grupos).forEach(els => { const max = Math.max(1, ...els.map(e => +e.dataset.v)); els.forEach(e => e.style.width = (+e.dataset.v * 100 / max) + '%'); });
+
+  const s = JSON.parse(document.getElementById('serie-data').textContent);
+  document.getElementById('tablaSerie').innerHTML = s.labels.map((l, i) => `<tr><td>${l}</td><td class="text-end">${s.ingresos[i]}</td><td class="text-end">${s.ventas[i]}</td></tr>`).join('');
+  const css = getComputedStyle(document.querySelector('.viz-root'));
+  const c1 = css.getPropertyValue('--series-1').trim(), c2 = css.getPropertyValue('--series-2').trim();
+  const grid = css.getPropertyValue('--viz-grid').trim(), txt = css.getPropertyValue('--viz-text').trim();
+  new Chart(document.getElementById('chSerie'), {
+    type: 'line',
+    data: {labels: s.labels, datasets: [
+      {label: 'Ingresos', data: s.ingresos, borderColor: c1, backgroundColor: c1, borderWidth: 2, pointRadius: 0, pointHoverRadius: 5, tension: .25},
+      {label: 'Ventas', data: s.ventas, borderColor: c2, backgroundColor: c2, borderWidth: 2, pointRadius: 0, pointHoverRadius: 5, tension: .25},
+    ]},
+    options: {
+      maintainAspectRatio: false, interaction: {mode: 'index', intersect: false},
+      plugins: {legend: {display: false}, tooltip: {backgroundColor: '#1E2736', borderColor: 'rgba(255,255,255,.12)', borderWidth: 1, titleColor: '#E8ECF4', bodyColor: '#E8ECF4', padding: 10}},
+      scales: {x: {grid: {display: false}, ticks: {color: txt, maxRotation: 0, autoSkipPadding: 14}},
+               y: {beginAtZero: true, grid: {color: grid}, border: {display: false}, ticks: {color: txt, precision: 0}}},
+    },
+  });
+})();
+</script>
+{% endblock %}

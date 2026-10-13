@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Importación{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-cloud-check"></i> {{ lote.fuente|default:lote.nombre_archivo }}</h1>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'crm:oportunidades' %}?embudo={{ lote.embudo_id }}&lote={{ lote.pk }}"><i class="bi bi-list"></i> Ver los prospectos de esta base</a></div>
+<div class="card mb-3"><div class="card-body">
+  <div class="d-flex justify-content-between small mb-1"><span id="estado">{{ lote.get_estado_display }}</span><span><span id="proc">{{ lote.procesados }}</span> / <span id="total">{{ lote.total }}</span></span></div>
+  <div class="progress"><div class="progress-bar" id="barra" style="width:{{ lote.porcentaje }}%"></div></div>
+  <div class="row g-3 mt-2">
+    <div class="col-6 col-md-3"><div class="kpi"><div class="v" id="creados">{{ lote.creados }}</div><div class="l">Prospectos nuevos</div></div></div>
+    <div class="col-6 col-md-3"><div class="kpi"><div class="v" id="existentes">{{ lote.ya_existentes }}</div><div class="l">Ya existían (no se duplicaron)</div></div></div>
+    <div class="col-6 col-md-3"><div class="kpi"><div class="v">{{ lote.contactos_nuevos }}</div><div class="l">Contactos nuevos</div></div></div>
+    <div class="col-6 col-md-3"><div class="kpi {% if lote.errores %}alerta{% endif %}"><div class="v" id="errores">{{ lote.errores }}</div><div class="l">Filas con error</div></div></div>
+  </div>
+</div></div>
+{% if lote.errores_detalle %}
+<div class="card"><div class="card-header">Filas con error</div><div class="table-responsive"><table class="table table-sm mb-0">
+  <thead><tr><th>Fila</th><th>Error</th><th>Datos</th></tr></thead>
+  <tbody>{% for e in lote.errores_detalle %}<tr><td>{{ e.fila }}</td><td class="text-danger small">{{ e.error }}</td><td class="small muted">{% for k, v in e.datos.items %}{{ k }}: {{ v }}{% if not forloop.last %} · {% endif %}{% endfor %}</td></tr>{% endfor %}</tbody>
+</table></div></div>
+{% endif %}
+{% if resumen.leads %}
+<div class="card mt-3"><div class="card-header d-flex align-items-center">Resultados de esta base <span class="muted small ms-2 me-auto">· desde que se importó</span>
+  <a class="small" href="{% url 'crm:oportunidades' %}?embudo=todos&lote={{ lote.pk }}">Ver las oportunidades</a></div>
+  <div class="card-body"><div class="row g-3 text-center" style="font-variant-numeric:tabular-nums">
+    <div class="col-6 col-md"><div class="fs-5 fw-semibold">{{ resumen.leads }}</div><div class="small muted">Oportunidades</div></div>
+    <div class="col-6 col-md"><div class="fs-5 fw-semibold">{{ resumen.efectivos }}</div><div class="small muted">Contactados</div></div>
+    <div class="col-6 col-md"><div class="fs-5 fw-semibold">{{ resumen.ventas }}</div><div class="small muted">Ventas</div></div>
+    <div class="col-6 col-md"><div class="fs-5 fw-semibold">{{ resumen.perdidas }}</div><div class="small muted">No venta</div></div>
+    <div class="col-6 col-md"><div class="fs-5 fw-semibold">{{ resumen.en_curso }}</div><div class="small muted">En curso</div></div>
+    <div class="col-6 col-md"><div class="fs-5 fw-semibold">{{ gestion.llamadas|default:0 }}</div><div class="small muted">Llamadas ({{ gestion.atendidas|default:0 }} atendidas)</div></div>
+    <div class="col-6 col-md"><div class="fs-5 fw-semibold">{{ gestion.minutos|default:0 }}</div><div class="small muted">Minutos</div></div>
+    <div class="col-6 col-md"><div class="fs-5 fw-semibold">{{ gestion.whatsapp|default:0 }}</div><div class="small muted">WhatsApp enviados</div></div>
+    <div class="col-6 col-md"><div class="fs-5 fw-semibold">{{ gestion.emails|default:0 }}</div><div class="small muted">Emails</div></div>
+  </div></div></div>
+{% endif %}
+{% if lote.estado == 'pendiente' or lote.estado == 'procesando' %}
+<script>
+(function poll() {
+  setTimeout(async () => {
+    const d = await CRM.api('?json=1', {silencioso: true});
+    document.getElementById('proc').textContent = d.procesados; document.getElementById('total').textContent = d.total;
+    document.getElementById('barra').style.width = d.porcentaje + '%';
+    ['creados', 'errores'].forEach(k => document.getElementById(k).textContent = d[k]);
+    document.getElementById('existentes').textContent = d.ya_existentes;
+    if (d.estado === 'completado' || d.estado === 'error') location.reload(); else poll();
+  }, 1500);
+})();
+</script>
+{% endif %}
+{% endblock %}

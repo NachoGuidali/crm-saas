@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+{% load crm_extras %}
+{% block title %}{{ contacto.nombre }}{% endblock %}
+{% block content %}
+<div class="ficha-head">
+  <div class="d-flex justify-content-between gap-3 flex-wrap">
+    <div style="min-width:0">
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <h1 class="nombre">{{ contacto.nombre }}</h1>
+        <span class="badge bg-{{ op.get_estado_badge }}">{{ op.get_estado_display }}</span>
+        {% if op.tipificacion %}<span class="chip">{{ op.tipificacion.categoria }}{% if op.tipificacion.categoria %}: {% endif %}{{ op.tipificacion }}</span>{% endif %}
+        {% if op.prioritaria %}<span class="chip danger" title="{{ op.prioridad_motivo }}">🔥 Prioridad{% if op.prioridad_motivo %}: {{ op.prioridad_motivo|truncatechars:40 }}{% endif %}</span>{% endif %}
+        {% if op.vencida_at and op.activa %}<span class="chip warn" title="Pasó el plazo de la ficha el {{ op.vencida_at|date:'d/m H:i' }}"><i class="bi bi-hourglass-bottom"></i> Ficha vencida</span>{% endif %}
+        {% if contacto.no_contactar %}<span class="chip danger"><i class="bi bi-slash-circle"></i> No contactar</span>{% endif %}
+        {% if contacto.telefono_invalido %}<span class="chip danger">Teléfono inválido</span>{% endif %}
+        {% for e in contacto.etiquetas.all %}<span class="chip" style="border-color:{{ e.color }};color:{{ e.color }}">{{ e }}</span>{% endfor %}
+      </div>
+      <div class="datos">
+        {% if contacto.telefono %}<span><i class="bi bi-telephone"></i> <span class="copiable" data-valor="{{ contacto.telefono }}" title="Copiar">{{ contacto.telefono|telefono }}</span></span>{% endif %}
+        {% if contacto.email %}<a href="mailto:{{ contacto.email }}"><i class="bi bi-envelope"></i> {{ contacto.email }}</a>{% endif %}
+        {% if contacto.fecha_atencion %}<span><i class="bi bi-hospital"></i> Atendido el {{ contacto.fecha_atencion|date:"d/m/Y" }}{% if contacto.especialidad_atencion %} · {{ contacto.especialidad_atencion }}{% endif %}</span>{% endif %}
+        <span><i class="bi bi-funnel"></i> {{ op.embudo }}</span>
+        <span><i class="bi bi-box-arrow-in-right"></i> {{ op.get_origen_display }}{% if op.pauta %} · <i class="bi bi-megaphone"></i> {{ op.pauta }}{% endif %}{% if op.fuente %} · {{ op.fuente }}{% endif %}</span>
+      </div>
+    </div>
+    <div class="d-flex flex-column align-items-end gap-2">
+      <div class="ficha-acciones">
+        {% if contacto.telefono %}
+        <button class="btn btn-primary btn-sm" data-llamar data-op="{{ op.pk }}"><i class="bi bi-telephone"></i> Llamar</button>
+        {% endif %}
+        {% if contacto.telefono %}<a class="btn btn-success btn-sm" href="#whatsapp" onclick="document.querySelector('[data-bs-target=\'#tabWa\']').click()"><i class="bi bi-whatsapp"></i> WhatsApp</a>{% endif %}
+        {% if contacto.email %}<button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modalEmail"><i class="bi bi-envelope"></i> Email</button>{% endif %}
+        {% if sms_activo and contacto.telefono %}<button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modalSms"><i class="bi bi-phone"></i> SMS</button>{% endif %}
+        {% if op.activa %}<button class="btn btn-sm {% if op.prioritaria %}btn-danger{% else %}btn-outline-danger{% endif %}" data-accion="{% url 'crm:oportunidad_accion' op.pk 'prioridad' %}" title="{% if op.prioritaria %}Quitar la prioridad{% else %}Marcar como prioridad: aparece primero en Mi día, el tablero y el discador{% endif %}">🔥</button>{% endif %}
+        {% if op.estado == 'abierta' %}
+        <div class="btn-group btn-group-sm">
+          <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-telephone-x"></i> Intento sin éxito</button>
+          <ul class="dropdown-menu">
+            {% url 'crm:oportunidad_accion' op.pk 'intento' as url_intento %}
+            <li><a class="dropdown-item" href="#" data-accion="{{ url_intento }}" data-payload='{"resultado":"sin_respuesta","canal":"llamada"}'>No atiende</a></li>
+            <li><a class="dropdown-item" href="#" data-accion="{{ url_intento }}" data-payload='{"resultado":"ocupado","canal":"llamada"}'>Ocupado</a></li>
+            <li><a class="dropdown-item" href="#" data-accion="{{ url_intento }}" data-payload='{"resultado":"buzon","canal":"llamada"}'>Buzón de voz</a></li>
+            <li><a class="dropdown-item" href="#" data-accion="{{ url_intento }}" data-payload='{"resultado":"sin_respuesta","canal":"whatsapp"}'>WhatsApp sin respuesta</a></li>
+          </ul>
+        </div>
+        <button class="btn btn-outline-warning btn-sm" data-bs-toggle="modal" data-bs-target="#modalPausa"><i class="bi bi-pause-circle"></i> Pausar</button>
+        {% elif op.estado == 'pausada' %}
+        <button class="btn btn-outline-warning btn-sm" data-accion="{% url 'crm:oportunidad_accion' op.pk 'reanudar' %}"><i class="bi bi-play-circle"></i> Reactivar</button>
+        {% endif %}
+        {% if op.activa %}
+          {% with g=op.embudo.etapa_ganado p=op.embudo.etapa_perdido %}
+          {% if g %}<button class="btn btn-outline-success btn-sm" onclick="CRM.abrirCierre({op:{{ op.pk }},etapa:{{ g.pk }},tipo:'ganado',nombre:'{{ contacto.nombre|escapejs }}'})"><i class="bi bi-trophy"></i> Venta</button>{% endif %}
+          {% if p %}<button class="btn btn-outline-danger btn-sm" onclick="CRM.abrirCierre({op:{{ op.pk }},etapa:{{ p.pk }},tipo:'perdido',nombre:'{{ contacto.nombre|escapejs }}'})"><i class="bi bi-x-octagon"></i> No venta</button>{% endif %}
+          {% endwith %}
+        {% endif %}
+        {% if request.GET.desde == 'cola' or not user.ve_todo %}<a href="{% url 'crm:siguiente' %}" class="btn btn-outline-primary btn-sm" title="Ir al próximo prospecto de tu cola">Siguiente <i class="bi bi-arrow-right"></i></a>{% endif %}
+      </div>
+      <div class="d-flex align-items-center gap-2 small">
+        <span class="muted">Agente:</span>
+        {% if 'reasignar' in perms_crm %}
+        <select class="form-select form-select-sm" style="width:auto" id="selAgente">
+          <option value="">— Sin asignar —</option>
+          {% for a in agentes %}<option value="{{ a.pk }}" {% if a.pk == op.agente_id %}selected{% endif %}>{{ a.display_name }}</option>{% endfor %}
+        </select>
+        {% else %}<b>{{ op.agente.display_name|default:"Sin asignar" }}</b>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="stepper">
+    {% for e in etapas %}
+    <button class="step {% if e.pk == op.etapa_id %}actual{% elif e.orden < op.etapa.orden and not e.es_cierre %}hecho{% endif %} {{ e.tipo }}" style="--c:{{ e.color }}"
+            data-etapa="{{ e.pk }}" data-tipo="{{ e.tipo }}" title="{{ e.descripcion }}">{{ e.nombre }}</button>
+    {% endfor %}
+  </div>
+  {% if op.estado == 'pausada' %}
+  <div class="alert alert-warning py-2 mt-3 mb-0 small"><i class="bi bi-pause-circle"></i> Pausada{% if op.proximo_contacto_at %} hasta el <b>{{ op.proximo_contacto_at|date:"d/m/Y H:i" }}</b> (se reactiva sola){% endif %}.{% if op.motivo_pausa %} {{ op.motivo_pausa }}{% endif %}</div>
+  {% endif %}
+  {% if op.llego_max_intentos and op.estado == 'abierta' %}
+  <div class="alert alert-warning py-2 mt-3 mb-0 small"><i class="bi bi-exclamation-triangle"></i> Lleva {{ op.intentos_contacto }} intentos sin contacto efectivo (el estándar del embudo es {{ op.embudo.max_intentos_sin_respuesta }}). ¿Lo cerrás como <b>Sin respuesta</b>?</div>
+  {% endif %}
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">Oportunidad</div>
+      <div class="card-body">
+        <dl class="kv">
+          <dt>Etapa</dt><dd><span class="dot" style="background:{{ op.etapa.color }}"></span> {{ op.etapa }} <span class="muted">· {{ op.dias_en_etapa }} días</span></dd>
+          <dt>Ingresos</dt><dd>{% if op.ingresos > 1 %}<b>{{ op.ingresos }} veces</b> <span class="muted">(primer ingreso + {{ op.ingresos|add:"-1" }} reingreso{{ op.ingresos|add:"-1"|pluralize }})</span>{% else %}1 vez{% endif %}</dd>
+          <dt>Intentos</dt><dd>{{ op.intentos_contacto }}{% if op.ultimo_intento_at %} <span class="muted">· último {{ op.ultimo_intento_at|date:"d/m H:i" }}</span>{% endif %}</dd>
+          <dt>Contacto efectivo</dt><dd>{{ op.contacto_efectivo_at|date:"d/m/Y H:i"|default:"—" }}</dd>
+          <dt>Ingresó</dt><dd>{{ op.created_at|date:"d/m/Y H:i" }}</dd>
+          <dt>Asignada</dt><dd>{{ op.asignada_at|date:"d/m/Y H:i"|default:"—" }}</dd>
+          <dt>Última actividad</dt><dd>{{ op.ultima_actividad_at|timesince }}</dd>
+          <dt>Valor / cuota</dt><dd>
+            <form data-ajax action="{% url 'crm:oportunidad_accion' op.pk 'valor' %}" class="d-flex gap-1">
+              <input type="number" step="0.01" name="valor" value="{{ op.valor|default_if_none:''|stringformat:'s' }}" class="form-control form-control-sm" style="max-width:130px">
+              <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-check"></i></button>
+            </form></dd>
+          <dt>Pauta</dt><dd>{% if 'pautas' in perms_crm %}<select class="form-select form-select-sm" id="selPauta" style="max-width:220px"><option value="">— Sin pauta —</option>{% for p in pautas %}<option value="{{ p.pk }}" {% if p.pk == op.pauta_id %}selected{% endif %}>{{ p }}</option>{% endfor %}</select>{% elif op.pauta %}<a href="{% url 'pautas:detalle' op.pauta_id %}">{{ op.pauta }}</a>{% else %}—{% endif %}
+            {% if op.origen_pauta and op.origen_pauta != op.pauta.nombre %}<div class="small muted">Origen recibido: {{ op.origen_pauta }}</div>{% endif %}</dd>
+          {% if op.lote %}<dt>Base</dt><dd><a href="{% url 'crm:importacion_detalle' op.lote_id %}">{{ op.lote.fuente|default:op.lote.nombre_archivo }}</a></dd>{% endif %}
+          {% if op.cerrada_at %}<dt>Cerrada</dt><dd>{{ op.cerrada_at|date:"d/m/Y H:i" }} · {{ op.cerrada_por.display_name|default:"" }}</dd>{% endif %}
+          {% if op.nota_cierre %}<dt>Nota de cierre</dt><dd>{{ op.nota_cierre }}</dd>{% endif %}
+        </dl>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">Tareas <button class="btn btn-xs btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#nuevaTarea"><i class="bi bi-plus"></i> Agendar</button></div>
+      <div class="card-body">
+        <form data-ajax action="{% url 'crm:oportunidad_accion' op.pk 'tarea' %}" id="nuevaTarea" class="collapse mb-3">
+          <div class="row g-2">
+            <div class="col-5">{{ tarea_form.tipo }}</div>
+            <div class="col-7"><input type="datetime-local" name="vence_at" class="form-control" required></div>
+            <div class="col-12"><input name="titulo" class="form-control" placeholder="¿Qué hay que hacer?" required value="Llamar a {{ contacto.nombre }}"></div>
+            <div class="col-6">{{ tarea_form.prioridad }}</div>
+            {% if tarea_form.asignado_a %}<div class="col-6">{{ tarea_form.asignado_a }}</div>{% endif %}
+            <div class="col-12 text-end"><button class="btn btn-sm btn-primary">Agendar</button></div>
+          </div>
+        </form>
+        {% for t in tareas %}
+        <div class="d-flex gap-2 align-items-start mb-2">
+          <i class="bi bi-{{ t.icono }} mt-1 {% if t.vencida %}text-danger{% endif %}"></i>
+          <div class="flex-grow-1 small">
+            <div class="fw-semibold">{{ t.titulo }}</div>
+            <div class="{% if t.vencida %}text-danger{% else %}muted{% endif %}">{{ t.vence_at|date:"d/m H:i" }}{% if t.asignado_a != user %} · {{ t.asignado_a.display_name }}{% endif %}{% if t.prioridad == 'alta' %} · <b>alta</b>{% endif %}</div>
+          </div>
+          <button class="btn btn-xs btn-outline-success" data-accion="{% url 'crm:tarea_accion' t.pk 'completar' %}" data-recargar="1" title="Completar"><i class="bi bi-check2"></i></button>
+        </div>
+        {% empty %}<div class="muted small">Sin tareas pendientes.</div>{% endfor %}
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">Datos del contacto <button class="btn btn-xs btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#editContacto"><i class="bi bi-pencil"></i> Editar</button></div>
+      <div class="card-body">
+        <dl class="kv" id="verContacto">
+          <dt>Teléfono</dt><dd>{{ contacto.telefono|telefono|default:"—" }}</dd>
+          {% if contacto.telefono_alternativo %}<dt>Alternativo</dt><dd>{{ contacto.telefono_alternativo|telefono }}</dd>{% endif %}
+          <dt>Email</dt><dd>{{ contacto.email|default:"—" }}</dd>
+          <dt>DNI</dt><dd>{{ contacto.dni|default:"—" }}</dd>
+          <dt>Localidad</dt><dd>{{ contacto.localidad|default:"—" }}{% if contacto.provincia %}, {{ contacto.provincia }}{% endif %}</dd>
+          {% for etiqueta, valor, campo in datos_extra %}<dt>{{ etiqueta }}</dt><dd>{{ valor|default:"—" }}</dd>{% endfor %}
+        </dl>
+        {% if documentos %}<div class="section-title mt-3"><i class="bi bi-paperclip"></i> Documentos</div>
+        {% for campo, lista in documentos %}<div class="mb-2">
+          <div class="small fw-semibold">{{ campo.nombre }}</div>
+          {% for a in lista %}<form method="post" action="{% url 'crm:contacto_archivo' contacto.pk %}" class="d-flex align-items-center gap-2 small">{% csrf_token %}
+            <input type="hidden" name="campo" value="{{ campo.slug }}"><input type="hidden" name="oportunidad" value="{{ op.pk }}"><input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <a href="{{ a.url }}" target="_blank" class="text-truncate"><i class="bi bi-file-earmark"></i> {{ a.nombre }}</a>
+            <span class="muted text-nowrap" style="font-size:11px">{{ a.fecha }}{% if a.origen %} · {{ a.origen }}{% endif %}</span>
+            <button name="quitar" value="{{ forloop.counter0 }}" class="btn btn-link btn-sm p-0 text-danger ms-auto" title="Quitar" onclick="return confirm('¿Quitar el archivo?')"><i class="bi bi-x"></i></button>
+          </form>{% empty %}<div class="small muted">Sin archivos.</div>{% endfor %}
+          <form method="post" enctype="multipart/form-data" action="{% url 'crm:contacto_archivo' contacto.pk %}" class="mt-1">{% csrf_token %}
+            <input type="hidden" name="campo" value="{{ campo.slug }}"><input type="hidden" name="oportunidad" value="{{ op.pk }}"><input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <label class="btn btn-xs btn-outline-secondary mb-0"><i class="bi bi-upload"></i> Subir<input type="file" name="archivo" multiple class="d-none" onchange="this.form.submit()"></label>
+          </form>
+        </div>{% endfor %}
+        <div class="form-text">También podés guardar acá lo que el cliente manda por WhatsApp: botón <i class="bi bi-paperclip"></i> en el mensaje.</div>{% endif %}
+        <form method="post" action="{% url 'crm:contacto_editar' contacto.pk %}" id="editContacto" class="collapse">{% csrf_token %}<input type="hidden" name="oportunidad" value="{{ op.pk }}">
+          <input type="hidden" name="next" value="{{ request.path }}">
+          {% for f in contacto_form.campos_base %}<div class="mb-2"><label class="form-label">{{ f.label }}</label>{{ f }}</div>{% endfor %}
+          {% if contacto_form.campos_personalizados_bound %}<div class="section-title mt-3">Campos personalizados</div>
+          {% for f in contacto_form.campos_personalizados_bound %}<div class="mb-2"><label class="form-label">{{ f.label }}</label>{{ f }}{% if f.help_text %}<div class="form-text">{{ f.help_text }}</div>{% endif %}</div>{% endfor %}{% endif %}
+          <button class="btn btn-sm btn-primary">Guardar</button>
+        </form>
+      </div>
+    </div>
+
+    {% if otras %}
+    <div class="card mb-3">
+      <div class="card-header">Otras oportunidades</div>
+      <div class="card-body p-0">
+        {% for o in otras %}<a href="{% url 'crm:oportunidad_detalle' o.pk %}" class="d-flex justify-content-between px-3 py-2 border-bottom text-decoration-none small" style="color:var(--text)">
+          <span>{{ o.embudo }} · {{ o.etapa }}</span><span class="badge bg-{{ o.get_estado_badge }}">{{ o.get_estado_display }}</span></a>{% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if ejecuciones %}
+    <div class="card">
+      <div class="card-header">Automatizaciones</div>
+      <div class="card-body small">
+        {% for e in ejecuciones %}<div class="mb-1"><span class="chip {% if e.estado == 'ejecutada' %}ok{% elif e.estado == 'error' %}danger{% elif e.estado == 'programada' %}info{% endif %}">{{ e.get_estado_display }}</span> {{ e.accion }} <span class="muted">· {{ e.programada_para|date:"d/m H:i" }}</span>{% if e.detalle %}<div class="muted" style="font-size:11px">{{ e.detalle }}</div>{% endif %}</div>{% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header p-0 border-0">
+        <ul class="nav nav-tabs px-2 pt-2" role="tablist">
+          <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabAct"><i class="bi bi-clock-history"></i> Actividad</button></li>
+          <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabWa"><i class="bi bi-whatsapp"></i> WhatsApp</button></li>
+          <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabLlam"><i class="bi bi-telephone"></i> Llamadas ({{ llamadas|length }})</button></li>
+          <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabHist"><i class="bi bi-signpost-split"></i> Etapas</button></li>
+        </ul>
+      </div>
+      <div class="tab-content">
+        <div class="tab-pane fade show active card-pad" id="tabAct">
+          {% url 'crm:oportunidad_accion' op.pk 'nota' as nota_url %}
+          {% include "crm/_timeline.html" with nota_url=nota_url mostrar_embudo=True %}
+        </div>
+        <div class="tab-pane fade" id="tabWa">{% include "crm/_chat.html" %}</div>
+        <div class="tab-pane fade card-pad" id="tabLlam">{% include "telefonia/_tabla_llamadas.html" with llamadas=llamadas %}</div>
+        <div class="tab-pane fade card-pad" id="tabHist">
+          <table class="table table-sm">
+            <thead><tr><th>Fecha</th><th>De</th><th>A</th><th>Por</th><th>Tiempo en la anterior</th></tr></thead>
+            <tbody>{% for h in historial %}<tr><td>{{ h.created_at|date:"d/m/Y H:i" }}</td><td>{{ h.etapa_anterior|default:"—" }}</td><td>{{ h.etapa_nueva }}</td><td>{{ h.usuario.display_name|default:"Sistema" }}</td><td>{% if h.segundos_en_etapa_anterior %}{{ h.segundos_en_etapa_anterior|duracion }}{% endif %}</td></tr>{% endfor %}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalPausa" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <form data-ajax action="{% url 'crm:oportunidad_accion' op.pk 'pausar' %}">
+      <div class="modal-header"><h5 class="modal-title"><i class="bi bi-pause-circle"></i> Pausar prospecto</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <p class="small muted">Mientras está pausado no recibe mensajes automáticos, no entra al discador ni genera recordatorios.</p>
+        <label class="form-label">Motivo</label><input name="motivo" class="form-control mb-2" placeholder="Ej: está de viaje, pidió que lo llamemos el mes que viene">
+        <label class="form-label">Reactivar automáticamente el</label><input type="datetime-local" name="hasta" class="form-control">
+        <div class="form-text">Vacío = queda pausado hasta que alguien lo reactive.</div>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-warning">Pausar</button></div>
+    </form>
+  </div></div>
+</div>
+<div class="modal fade" id="modalEmail" tabindex="-1">
+  <div class="modal-dialog modal-lg"><div class="modal-content">
+    <form data-ajax action="{% url 'crm:oportunidad_accion' op.pk 'email' %}">
+      <div class="modal-header"><h5 class="modal-title"><i class="bi bi-envelope"></i> Email a {{ contacto.nombre }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="small muted mb-2">Para: <b>{{ contacto.email }}</b> · las respuestas llegan a tu email{% if not user.email %} (cargalo en tu perfil){% endif %}.</div>
+        {% if plantillas_email %}<label class="form-label">Plantilla</label>
+        <select name="plantilla" class="form-select mb-2" id="selPlantillaEmail"><option value="">Sin plantilla (escribir)</option>{% for p in plantillas_email %}<option value="{{ p.pk }}">{{ p.nombre }}</option>{% endfor %}</select>
+        {{ plantillas_email|json_script:"plantillas-email" }}{% endif %}
+        <label class="form-label">Asunto</label><input name="asunto" class="form-control mb-2" required>
+        <label class="form-label">Mensaje</label><textarea name="cuerpo" rows="8" class="form-control" required placeholder="Hola {primer_nombre}, …"></textarea>
+        <div class="form-text">Variables: {nombre} {primer_nombre} {agente}. Se registra en el historial y se mide si lo abre o hace clic en los links.</div>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-primary"><i class="bi bi-send"></i> Enviar</button></div>
+    </form>
+  </div></div>
+</div>
+<script>
+(function () {
+  const sel = document.getElementById('selPlantillaEmail');
+  if (!sel) return;
+  const datos = JSON.parse(document.getElementById('plantillas-email').textContent);
+  sel.addEventListener('change', () => {
+    const p = datos.find(x => String(x.pk) === sel.value);
+    const f = sel.form;
+    if (p) { f.asunto.value = p.asunto; f.cuerpo.value = p.cuerpo; }
+  });
+})();
+</script>
+<div class="modal fade" id="modalSms" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <form data-ajax action="{% url 'crm:oportunidad_accion' op.pk 'sms' %}">
+      <div class="modal-header"><h5 class="modal-title"><i class="bi bi-phone"></i> SMS a {{ contacto.telefono }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body"><textarea name="texto" rows="4" maxlength="480" class="form-control" required placeholder="Hola {primer_nombre}, …"></textarea>
+        <div class="form-text">Hasta 160 caracteres es 1 SMS; más largo se cobra como varios.</div></div>
+      <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-primary">Enviar</button></div>
+    </form>
+  </div></div>
+</div>
+{% include "crm/_tipificaciones_json.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  const opId = {{ op.pk }}, nombre = '{{ contacto.nombre|escapejs }}';
+  document.querySelectorAll('.step').forEach(s => s.addEventListener('click', async () => {
+    if (s.classList.contains('actual')) return;
+    if (s.dataset.tipo !== 'normal') { CRM.abrirCierre({op: opId, etapa: s.dataset.etapa, tipo: s.dataset.tipo, nombre}); return; }
+    try { const r = await CRM.mover(opId, {etapa: s.dataset.etapa}); CRM.toast(r.mensaje); setTimeout(() => location.reload(), 300); } catch (e) {}
+  }));
+  const selP = document.getElementById('selPauta');
+  if (selP) selP.addEventListener('change', async () => {
+    try { const r = await CRM.api(`/oportunidades/${opId}/pauta/`, {data: {pauta: selP.value}}); CRM.toast(r.mensaje); } catch (e) {}
+  });
+  const sel = document.getElementById('selAgente');
+  if (sel) sel.addEventListener('change', async () => {
+    if (!sel.value) return;
+    try { const r = await CRM.api(`/oportunidades/${opId}/reasignar/`, {data: {agente: sel.value}}); CRM.toast(r.mensaje); } catch (e) {}
+  });
+  if (location.hash === '#whatsapp') document.querySelector('[data-bs-target="#tabWa"]').click();
+  document.querySelector('[data-bs-target="#tabWa"]').addEventListener('shown.bs.tab', () => { const m = document.getElementById('chatMsgs'); m.scrollTop = m.scrollHeight; });
+  // Al terminar una llamada de esta ficha, recargar para ver la actividad y el intento registrado
+  const enResultado = () => document.getElementById('modalResultado')?.classList.contains('show');
+  document.addEventListener('crm:llamada-fin', () => setTimeout(() => { if (!enResultado()) location.reload(); }, 3000));
+  document.addEventListener('crm:llamada-calificada', () => setTimeout(() => location.reload(), 500));
+})();
+</script>
+{% endblock %}

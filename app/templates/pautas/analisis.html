@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% load crm_extras %}
+{% block title %}Análisis de pautas{% endblock %}
+{% block extra_css %}<style>.viz-root { --series-1: #3987e5; --series-2: #d95926; }</style>{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1><i class="bi bi-megaphone"></i> Análisis de pautas <span class="sub">leads ingresados del {{ desde|date:"d/m" }} al {{ hasta|date:"d/m/Y" }}</span></h1>
+  <div class="toolbar">
+    {% if puede_editar %}<a href="{% url 'pautas:nueva' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Nueva pauta</a>{% endif %}
+  </div>
+</div>
+<form class="toolbar mb-3" method="get">
+  <select name="embudo" class="form-select form-select-sm" onchange="this.form.submit()"><option value="">Todos los embudos</option>{% for e in embudos %}<option value="{{ e.pk }}" {% if embudo.pk == e.pk %}selected{% endif %}>{{ e }}</option>{% endfor %}</select>
+  <div class="btn-group btn-group-sm">
+    <a class="btn btn-outline-secondary {% if p == '7d' %}active{% endif %}" href="?p=7d&embudo={{ embudo.pk|default:'' }}">7 días</a>
+    <a class="btn btn-outline-secondary {% if p == 'mes' %}active{% endif %}" href="?p=mes&embudo={{ embudo.pk|default:'' }}">Este mes</a>
+    <a class="btn btn-outline-secondary {% if p == '30d' %}active{% endif %}" href="?p=30d&embudo={{ embudo.pk|default:'' }}">30 días</a>
+  </div>
+  <input type="hidden" name="p" value="custom">
+  <input type="date" name="desde" value="{{ desde|date:'Y-m-d' }}" class="form-control form-control-sm">
+  <input type="date" name="hasta" value="{{ hasta|date:'Y-m-d' }}" class="form-control form-control-sm">
+  <button class="btn btn-outline-secondary btn-sm">Aplicar</button>
+</form>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3 col-xl"><div class="kpi"><div class="v">{{ totales.inversion|pesos }}</div><div class="l">Inversión del período</div></div></div>
+  <div class="col-6 col-md-3 col-xl"><div class="kpi"><div class="v">{{ totales.leads }}</div><div class="l">Leads ingresados</div><div class="d">{{ totales.repetidos }} repetidos (ya existían)</div></div></div>
+  <div class="col-6 col-md-3 col-xl"><div class="kpi"><div class="v">{{ totales.cpl|pesos }}</div><div class="l">Costo por lead (pautas pagas)</div></div></div>
+  <div class="col-6 col-md-3 col-xl"><div class="kpi"><div class="v">{{ totales.ventas }}</div><div class="l">Clientes (ventas)</div><div class="d">{{ totales.conversion }}% de los leads</div></div></div>
+  <div class="col-6 col-md-3 col-xl"><div class="kpi"><div class="v">{{ totales.cpa|pesos }}</div><div class="l">Costo por cliente</div></div></div>
+</div>
+
+<div class="card mb-3"><div class="table-responsive"><table class="table table-sm table-hover mb-0">
+  <thead><tr><th>Pauta</th><th class="text-end">Inversión</th><th class="text-end">Leads</th><th class="text-end">Costo x lead</th>
+    <th class="text-end">Contactados</th><th class="text-end">En curso</th><th class="text-end">Ventas</th><th class="text-end">Conversión</th>
+    <th class="text-end">Costo x cliente</th><th class="text-end" title="Suma de las cuotas mensuales vendidas">Cuotas vendidas</th><th class="text-end" title="Inversión / cuotas mensuales vendidas">Recupero</th></tr></thead>
+  <tbody>{% for f in filas %}<tr>
+    <td>{% if f.pauta %}<a href="{% url 'pautas:detalle' f.pauta.pk %}?p={{ p }}&desde={{ desde|date:'Y-m-d' }}&hasta={{ hasta|date:'Y-m-d' }}" class="fw-semibold">{{ f.pauta }}</a>
+        <div class="small muted">{{ f.pauta.get_plataforma_display }}{% if not f.pauta.activa %} · inactiva{% endif %}</div>
+      {% else %}<span class="muted">Sin pauta</span><div class="small muted">carga manual, base, llamadas…</div>{% endif %}</td>
+    <td class="text-end">{% if f.pauta and f.inversion %}{{ f.inversion|pesos }}{% else %}—{% endif %}</td>
+    <td class="text-end">{{ f.leads }}{% if f.repetidos %}<div class="small muted">+{{ f.repetidos }} rep.</div>{% endif %}</td>
+    <td class="text-end">{{ f.cpl|pesos }}</td>
+    <td class="text-end">{{ f.efectivos }} <span class="small muted">({{ f.contactabilidad }}%)</span></td>
+    <td class="text-end">{{ f.en_curso }}</td>
+    <td class="text-end fw-semibold">{{ f.ventas }}</td>
+    <td class="text-end">{{ f.conversion }}%</td>
+    <td class="text-end fw-semibold">{{ f.cpa|pesos }}</td>
+    <td class="text-end">{% if f.valor %}{{ f.valor|pesos }}{% else %}—{% endif %}</td>
+    <td class="text-end">{% if f.meses_recupero %}{{ f.meses_recupero|floatformat:1 }} meses{% else %}—{% endif %}</td>
+  </tr>{% empty %}<tr><td colspan="11"><div class="empty-state"><div class="empty-icon"><i class="bi bi-megaphone"></i></div>Todavía no hay pautas.{% if puede_editar %} <a href="{% url 'pautas:nueva' %}">Crear la primera</a>{% endif %}</div></td></tr>{% endfor %}</tbody>
+</table></div></div>
+
+<div class="card mb-3"><div class="card-header">Gestión por pauta <span class="muted small">· lo que se hizo en el período con los leads de cada pauta</span></div>
+  <div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-variant-numeric:tabular-nums">
+  <thead><tr><th>Pauta</th><th class="text-end">Leads</th><th class="text-end">Llamadas</th><th class="text-end">Atendidas</th><th class="text-end">Minutos</th>
+    <th class="text-end" title="Llamadas por lead: cuántas vueltas se le dio a la base">Llamadas x lead</th><th class="text-end">WhatsApp enviados</th><th class="text-end">Emails</th><th class="text-end">Ventas</th></tr></thead>
+  <tbody>{% for f in filas %}{% if f.leads or f.gestion %}<tr>
+    <td>{% if f.pauta %}{{ f.pauta }}{% else %}<span class="muted">Sin pauta</span>{% endif %}</td>
+    <td class="text-end">{{ f.leads }}</td><td class="text-end">{{ f.gestion.llamadas|default:"·" }}</td><td class="text-end">{{ f.gestion.atendidas|default:"·" }}</td>
+    <td class="text-end">{{ f.gestion.minutos|default:"·" }}</td><td class="text-end">{{ f.vueltas|default:"·" }}</td>
+    <td class="text-end">{{ f.gestion.whatsapp|default:"·" }}</td><td class="text-end">{{ f.gestion.emails|default:"·" }}</td><td class="text-end fw-semibold">{{ f.ventas }}</td>
+  </tr>{% endif %}{% endfor %}</tbody></table></div></div>
+
+<div class="row g-3">
+  <div class="col-lg-6"><div class="card h-100 viz-root"><div class="card-header">Costo por cliente, por pauta</div><div class="card-body">
+    {% for f in filas %}{% if f.cpa %}<div class="bar-row"><span class="lbl" title="{{ f.pauta }}">{{ f.pauta }}</span><div class="track"><div class="fill" data-v="{{ f.cpa|stringformat:'s' }}" data-max="{{ max_cpa|stringformat:'s' }}"></div></div><span class="num" style="min-width:90px">{{ f.cpa|pesos }}</span></div>{% endif %}{% empty %}{% endfor %}
+    <div class="small muted mt-2">Más corta = más barato conseguir un cliente. Solo pautas con inversión y al menos una venta.</div>
+  </div></div></div>
+  <div class="col-lg-6"><div class="card h-100"><div class="card-header">Orígenes que llegaron sin pauta creada</div><div class="card-body">
+    {% for o in sin_pauta %}<div class="d-flex justify-content-between align-items-center py-1 border-bottom" style="border-color:var(--border)!important">
+      <span><code>{{ o.origen_pauta }}</code> <span class="small muted">· {{ o.n }} lead{{ o.n|pluralize:"s" }}</span></span>
+      <span class="d-flex gap-1"><a class="btn btn-xs btn-outline-secondary" href="{% url 'crm:oportunidades' %}?embudo=todos&origen_pauta={{ o.origen_pauta|urlencode }}">Ver</a>
+      {% if puede_editar %}<a class="btn btn-xs btn-outline-primary" href="{% url 'pautas:nueva' %}?nombre={{ o.origen_pauta|urlencode }}">Crear pauta</a>{% endif %}</span></div>
+    {% empty %}<div class="small muted">Todos los orígenes recibidos tienen su pauta.</div>{% endfor %}
+    <div class="small muted mt-2">Si el nombre ya corresponde a una pauta existente, agregalo en esa pauta como "También llega como".</div>
+  </div></div></div>
+</div>
+<div class="small muted mt-3">Las métricas son de los leads que <b>ingresaron</b> en el período (aunque la venta se haya cerrado después). La inversión se toma por la fecha de cada carga. Cada lead cuenta para la pauta por la que entró por primera vez; si vuelve a entrar por otra, suma como "repetido" de esa pauta.</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+document.querySelectorAll('.fill[data-max]').forEach(el => { const m = parseFloat(el.dataset.max) || 1; el.style.width = (parseFloat(el.dataset.v) * 100 / m) + '%'; });
+</script>
+{% endblock %}

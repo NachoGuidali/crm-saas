@@ -1,0 +1,265 @@
+{% load static crm_extras %}<!DOCTYPE html>
+<html lang="es" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}{{ CRM_NOMBRE }}{% endblock %} · {{ CRM_NOMBRE }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="{% static 'css/main.css' %}">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  {% block extra_css %}{% endblock %}
+</head>
+<body data-auth="{% if user.is_authenticated %}1{% else %}0{% endif %}" data-interno="{% if tiene_interno_anura %}1{% else %}0{% endif %}">
+{% if user.is_authenticated %}
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">{{ CRM_NOMBRE|slice:":1" }}V</div>
+      <div><div class="logo-text">{{ CRM_NOMBRE }}</div><div class="logo-sub">{{ CRM_SUBTITULO }}</div></div>
+    </div>
+    <nav class="sidebar-nav">
+      {% with seccion=request.resolver_match.namespace url_name=request.resolver_match.url_name %}
+      <div class="nav-section">Trabajo diario</div>
+      <a href="{% url 'crm:mi_dia' %}" class="nav-item {% if url_name == 'mi_dia' %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-sunrise"></i></span> Mi día
+      </a>
+      <a href="{% url 'reportes:mis_numeros' %}" class="nav-item {% if url_name == 'mis_numeros' %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-person-lines-fill"></i></span> Mis números
+      </a>
+      <a href="{% url 'crm:tablero' %}" class="nav-item {% if url_name == 'tablero' %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-kanban"></i></span> Tablero
+      </a>
+      <a href="{% url 'crm:oportunidades' %}" class="nav-item {% if url_name == 'oportunidades' or url_name == 'oportunidad_detalle' %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-list-check"></i></span> Oportunidades
+      </a>
+      <a href="{% url 'crm:contactos' %}" class="nav-item {% if url_name == 'contactos' or url_name == 'contacto_detalle' %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-person-lines-fill"></i></span> Contactos
+      </a>
+      <a href="{% url 'crm:tareas' %}" class="nav-item {% if url_name == 'tareas' %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-calendar-check"></i></span> Tareas
+        <span class="nav-badge warning" data-badge="badgeTareas" {% if not tareas_hoy %}style="display:none"{% endif %}>{{ tareas_hoy }}</span>
+      </a>
+      <a href="{% url 'whatsapp:inbox' %}" class="nav-item {% if seccion == 'whatsapp' and url_name == 'inbox' %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-whatsapp"></i></span> WhatsApp
+        <span class="nav-badge info" data-badge="badgeWa" {% if not wa_no_leidos %}style="display:none"{% endif %}>{{ wa_no_leidos }}</span>
+      </a>
+      <a href="{% url 'telefonia:llamadas' %}" class="nav-item {% if url_name == 'llamadas' %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-telephone"></i></span> Llamadas
+      </a>
+      <a href="{% url 'telefonia:campanias' %}" class="nav-item {% if url_name == 'campanias' or url_name == 'campania' %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-telephone-forward"></i></span> Discador
+      </a>
+
+      {% if 'supervision' in perms_crm or 'reportes' in perms_crm or 'importar' in perms_crm or 'pautas' in perms_crm or 'difusiones' in perms_crm %}
+      <div class="nav-section">Gestión</div>
+      {% endif %}
+      {% if 'reportes' in perms_crm or 'supervision' in perms_crm %}
+      <a href="{% url 'reportes:dashboard' %}" class="nav-item {% if seccion == 'reportes' %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-bar-chart-line"></i></span> Dashboard
+      </a>
+      {% if 'difusiones' in perms_crm %}
+      <a href="{% url 'automatizaciones:difusiones' %}" class="nav-item {% if 'difusion' in url_name %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-broadcast"></i></span> Difusiones
+      </a>
+      {% endif %}
+      {% if 'reportes' in perms_crm or 'automatizaciones' in perms_crm %}
+      <a href="{% url 'reportes:calidad_envios' %}" class="nav-item {% if url_name == 'calidad_envios' %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-send-check"></i></span> Calidad de envíos
+      </a>
+      {% endif %}
+      {% endif %}
+      {% if 'pautas' in perms_crm or 'reportes' in perms_crm %}
+      <a href="{% url 'pautas:analisis' %}" class="nav-item {% if seccion == 'pautas' %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-megaphone"></i></span> Análisis de pautas
+      </a>
+      {% endif %}
+      {% if 'supervision' in perms_crm %}
+      <a href="{% url 'crm:supervision' %}" class="nav-item {% if url_name == 'supervision' %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-binoculars"></i></span> Supervisión
+      </a>
+      {% endif %}
+      {% if 'importar' in perms_crm %}
+      <a href="{% url 'crm:importaciones' %}" class="nav-item {% if 'importacion' in url_name %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-cloud-upload"></i></span> Importar base
+      </a>
+      {% endif %}
+
+      {% if 'embudos' in perms_crm or 'campos' in perms_crm or 'automatizaciones' in perms_crm or 'plantillas' in perms_crm or 'lineas_whatsapp' in perms_crm or 'telefonia' in perms_crm or 'usuarios' in perms_crm or 'integraciones' in perms_crm %}
+      <div class="nav-section">Configuración</div>
+      {% endif %}
+      {% if 'embudos' in perms_crm %}
+      <a href="{% url 'crm:embudos' %}" class="nav-item {% if 'embudo' in url_name %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-funnel"></i></span> Embudos y tipificaciones
+      </a>
+      {% endif %}
+      {% if 'campos' in perms_crm %}
+      <a href="{% url 'crm:campos' %}" class="nav-item {% if 'campo' in url_name %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-ui-checks-grid"></i></span> Campos personalizados
+      </a>
+      {% endif %}
+      {% if 'embudos' in perms_crm %}
+      <a href="{% url 'crm:etiquetas' %}" class="nav-item {% if url_name == 'etiquetas' %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-tags"></i></span> Etiquetas
+      </a>
+      {% endif %}
+      {% if 'embudos' in perms_crm %}
+      <a href="{% url 'crm:puntaje' %}" class="nav-item {% if url_name == 'puntaje' %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-star-half"></i></span> Puntaje de leads
+      </a>
+      {% endif %}
+      {% if 'automatizaciones' in perms_crm %}
+      <a href="{% url 'automatizaciones:lista' %}" class="nav-item {% if seccion == 'automatizaciones' %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-lightning-charge"></i></span> Automatizaciones
+      </a>
+      {% endif %}
+      {% if 'automatizaciones' in perms_crm or 'difusiones' in perms_crm or 'plantillas' in perms_crm %}
+      <a href="{% url 'automatizaciones:plantillas_email' %}" class="nav-item {% if 'plantilla_email' in url_name or 'plantillas_email' in url_name %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-envelope-paper"></i></span> Plantillas de email
+      </a>
+      {% endif %}
+      {% if 'integraciones' in perms_crm %}
+      <a href="{% url 'automatizaciones:config_email' %}" class="nav-item {% if url_name == 'config_email' %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-envelope-at"></i></span> Configuración de email
+      </a>
+      {% endif %}
+      {% if 'plantillas' in perms_crm %}
+      <a href="{% url 'whatsapp:plantillas' %}" class="nav-item {% if 'plantilla' in url_name %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-chat-square-text"></i></span> Plantillas WA
+      </a>
+      {% endif %}
+      {% if 'lineas_whatsapp' in perms_crm %}
+      <a href="{% url 'whatsapp:lineas' %}" class="nav-item {% if 'linea' in url_name %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-phone"></i></span> Líneas WhatsApp
+      </a>
+      {% endif %}
+      {% if 'telefonia' in perms_crm %}
+      <a href="{% url 'telefonia:config' %}" class="nav-item {% if seccion == 'telefonia' and url_name == 'config' %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-headset"></i></span> Telefonía Anura
+      </a>
+      {% endif %}
+      {% if 'usuarios' in perms_crm %}
+      <a href="{% url 'users:lista' %}" class="nav-item {% if seccion == 'users' and url_name in 'lista nuevo editar' %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-people"></i></span> Usuarios
+      </a>
+      {% endif %}
+      {% if user.is_admin %}
+      <a href="{% url 'users:roles' %}" class="nav-item {% if 'rol' in url_name %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-shield-lock"></i></span> Roles y permisos
+      </a>
+      <a href="{% url 'users:auditoria' %}" class="nav-item {% if url_name == 'auditoria' %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-clipboard-check"></i></span> Auditoría
+      </a>
+      {% endif %}
+      {% if 'integraciones' in perms_crm %}
+      <a href="{% url 'integraciones:lista' %}" class="nav-item {% if seccion == 'integraciones' %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-plug"></i></span> Integraciones API
+      </a>
+      {% endif %}
+      {% endwith %}
+    </nav>
+    <div class="sidebar-bottom">
+      <a href="{% url 'users:perfil' %}" class="avatar-sm" title="Mi perfil">
+        {% if user.avatar %}<img src="{{ user.avatar.url }}" style="width:30px;height:30px;border-radius:50%;object-fit:cover" alt="">{% else %}{{ user.iniciales }}{% endif %}
+      </a>
+      <div style="overflow:hidden;flex:1">
+        <div class="user-name">{{ user.display_name }}</div>
+        <div class="user-role">{{ user.get_rol_display_full }}</div>
+      </div>
+      <form method="post" action="{% url 'users:logout' %}" target="_top">{% csrf_token %}
+        <button class="icon-btn" title="Cerrar sesión" style="background:transparent;border:none;color:var(--text3)"><i class="bi bi-box-arrow-right"></i></button>
+      </form>
+    </div>
+  </aside>
+
+  <div class="main-area">
+    <div class="topbar">
+      <button class="topbar-hamburger" id="sidebarToggle" aria-label="Menú"><i class="bi bi-list"></i></button>
+      <div class="buscador">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text bg-transparent border-secondary"><i class="bi bi-search"></i></span>
+          <input id="buscadorGlobal" type="search" class="form-control bg-transparent border-secondary" placeholder="Buscar por nombre, teléfono o email  (Ctrl+K)" autocomplete="off">
+        </div>
+        <div class="res" id="buscadorRes"></div>
+      </div>
+      <div class="topbar-actions ms-auto">
+        <a href="{% url 'crm:oportunidad_nueva' %}" class="btn btn-primary btn-sm d-none d-md-inline-flex align-items-center gap-1"><i class="bi bi-plus-lg"></i> Prospecto</a>
+        <form method="post" action="{% url 'users:perfil' %}" class="d-none d-lg-block">{% csrf_token %}
+          <input type="hidden" name="disponible" value="{% if user.disponible %}0{% else %}1{% endif %}">
+          <button class="disponible-toggle {% if user.disponible %}si{% else %}no{% endif %}" title="Recibir o no prospectos nuevos">
+            <i class="bi bi-circle-fill" style="font-size:7px;vertical-align:middle"></i> {% if user.disponible %}Disponible{% else %}No disponible{% endif %}
+          </button>
+        </form>
+        <a href="{% url 'whatsapp:inbox' %}" class="topbar-icon-btn" title="WhatsApp">
+          <i class="bi bi-whatsapp"></i><span class="badge-dot" data-badge="badgeWa" style="background:var(--green);{% if not wa_no_leidos %}display:none{% endif %}"></span>
+        </a>
+        <div class="dropdown">
+          <button class="topbar-icon-btn" id="notifBtn" data-bs-toggle="dropdown" aria-label="Notificaciones">
+            <i class="bi bi-bell"></i><span class="badge-dot" data-badge="badgeNotif" {% if not notif_no_leidas %}style="display:none"{% endif %}></span>
+          </button>
+          <div class="dropdown-menu dropdown-menu-end p-0" style="width:340px">
+            <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom">
+              <b class="small">Notificaciones</b><a href="#" id="notifLeerTodas" class="small">Marcar leídas</a>
+            </div>
+            <div id="notifLista" style="max-height:380px;overflow-y:auto"><div class="p-3 small muted">Cargando…</div></div>
+            <a class="dropdown-item text-center small py-2 border-top" href="{% url 'users:notificaciones' %}">Ver todas</a>
+          </div>
+        </div>
+        <div class="dropdown">
+          <div class="topbar-user dropdown-toggle" data-bs-toggle="dropdown" role="button">
+            <div class="u-initials">{{ user.iniciales }}</div><span class="d-none d-md-inline">{{ user.first_name|default:user.username }}</span>
+          </div>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item" href="{% url 'users:perfil' %}"><i class="bi bi-person me-2"></i>Mi perfil</a></li>
+            <li><a class="dropdown-item" href="{% url 'users:password_change' %}"><i class="bi bi-key me-2"></i>Cambiar contraseña</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><form method="post" action="{% url 'users:logout' %}" target="_top">{% csrf_token %}<button class="dropdown-item text-danger"><i class="bi bi-box-arrow-right me-2"></i>Cerrar sesión</button></form></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="content-area">
+      {% if aviso_suscripcion %}
+      <div class="alert {% if aviso_suscripcion.vencido %}alert-danger{% else %}alert-warning{% endif %} py-2 small mb-3">
+        <i class="bi bi-exclamation-triangle me-1"></i>
+        {% if aviso_suscripcion.prueba %}Tu período de prueba{% else %}Tu suscripción{% endif %}
+        {% if aviso_suscripcion.vencido %}venció el{% else %}vence el{% endif %} <strong>{{ aviso_suscripcion.vencimiento|date:"d/m/Y" }}</strong>.
+        {% if aviso_suscripcion.vencido %}Regularizá el pago para no perder el acceso.{% endif %}
+        {% if aviso_suscripcion.datos_pago %}<span class="d-block mt-1">Datos para el pago: {{ aviso_suscripcion.datos_pago }}</span>{% endif %}
+      </div>
+      {% endif %}
+      {% if messages %}
+      <div class="mb-3">{% for m in messages %}
+        <div class="alert alert-{% if m.tags == 'error' %}danger{% else %}{{ m.tags|default:'info' }}{% endif %} alert-dismissible fade show py-2">{{ m }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+      {% endfor %}</div>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+</div>
+
+<!-- Widget de llamada: vive en el layout, así sigue visible aunque el agente cambie de pantalla -->
+<div id="callWidget" role="status" aria-live="polite">
+  <div class="pulse"><i class="bi bi-telephone-fill"></i></div>
+  <div class="flex-grow-1"><div class="quien"></div><div class="est"></div><div class="hint muted" style="font-size:11px;display:none">Para cortar, colgá desde tu teléfono</div></div>
+  <button class="btn btn-outline-secondary btn-sm ir-anura" title="Ir a la pestaña de Anura" style="display:none"><i class="bi bi-headset"></i> Ir a Anura</button>
+  <button class="btn btn-outline-warning btn-sm descartar" title="Anura no avisó nada de esta llamada: cerrar el aviso" style="display:none">Descartar</button>
+  <button class="btn btn-danger btn-sm cortar" title="Cortar"><i class="bi bi-telephone-x"></i></button>
+  <button class="btn btn-sm btn-link text-secondary cerrar p-0" title="Ocultar"><i class="bi bi-x-lg"></i></button>
+</div>
+{% include "crm/_modal_cierre.html" %}
+{% include "telefonia/_modal_resultado.html" %}
+{% else %}
+{% block auth_content %}{% endblock %}
+{% endif %}
+<div id="toasts"></div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{% static 'js/app.js' %}"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

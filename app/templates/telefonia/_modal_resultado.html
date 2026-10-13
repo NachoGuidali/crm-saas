@@ -1,0 +1,26 @@
+{# Resultado de la gestión: obligatorio al terminar una llamada atendida (no se puede cerrar sin cargarlo) #}
+<div class="modal fade" id="modalResultado" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div><h5 class="modal-title"><i class="bi bi-clipboard-check"></i> Resultado de la gestión</h5>
+          <div class="small muted quien"></div></div>
+      </div>
+      <div class="modal-body">
+        <label class="form-label">¿Cómo terminó la llamada?</label>
+        <div class="opciones d-grid gap-1"></div>
+        <div class="fecha-wrap mt-3" style="display:none">
+          <label class="form-label">¿Cuándo volver a llamar?</label>
+          <input type="datetime-local" name="fecha" class="form-control">
+        </div>
+        <div class="mt-3"><label class="form-label">Nota <span class="muted">opcional</span></label>
+          <textarea name="nota" rows="2" class="form-control" placeholder="Qué se habló, qué quedó pendiente…"></textarea></div>
+        <div class="form-text mt-2">Hasta cargar el resultado no podés seguir con la próxima llamada. Para cerrar la venta o la no venta, usá los botones de la ficha después.</div>
+      </div>
+      <div class="modal-footer">
+        <a class="btn btn-outline-secondary btn-sm me-auto ver-ficha" href="#">Ver la ficha</a>
+        <button type="button" class="btn btn-primary guardar" disabled>Guardar resultado</button>
+      </div>
+    </div>
+  </div>
+</div>

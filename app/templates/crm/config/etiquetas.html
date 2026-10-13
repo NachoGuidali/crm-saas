@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Etiquetas{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-tags"></i> Etiquetas</h1></div>
+<div class="row"><div class="col-lg-6"><div class="card"><div class="card-body">
+  <form method="post" class="d-flex gap-2 mb-3">{% csrf_token %}{{ form.nombre }}{{ form.color }}<button class="btn btn-primary text-nowrap">Agregar</button></form>
+  {% for e in etiquetas %}<div class="d-flex justify-content-between align-items-center py-1"><span class="chip" style="border-color:{{ e.color }};color:{{ e.color }}">{{ e }}</span><span class="small muted">{{ e.n }} contactos</span>
+    {% if 'embudos' in perms_crm %}<form method="post">{% csrf_token %}<button name="eliminar" value="{{ e.pk }}" class="btn btn-xs btn-outline-danger"><i class="bi bi-trash"></i></button></form>{% endif %}</div>{% endfor %}
+  {% if not etiquetas %}<div class="small muted">Todavía no hay etiquetas.</div>{% endif %}
+</div></div></div>
+<div class="col-lg-6"><div class="card"><div class="card-header">Para qué sirven</div><div class="card-body small">
+  <ul class="mb-0 ps-3">
+    <li><b>Ponerlas:</b> en la ficha (editar contacto), en Oportunidades seleccionando varias → "Agregar etiqueta", o solas con una automatización ("Poner una etiqueta", por ejemplo al reingresar).</li>
+    <li><b>Al cerrar una venta:</b> en el embudo → "Etiqueta al cerrar como venta" (ej. "Socio").</li>
+    <li><b>Filtrar:</b> Oportunidades → Más filtros → Etiqueta.</li>
+    <li><b>Automatizaciones:</b> en Condiciones, "solo si tiene" o "nunca si tiene" una etiqueta (ej. que a los socios no les lleguen mensajes de venta).</li>
+  </ul>
+</div></div></div></div>
+{% endblock %}

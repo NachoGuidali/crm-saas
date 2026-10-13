@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% load crm_extras %}
+{% block title %}Calidad de envíos{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1><i class="bi bi-send-check"></i> Calidad de envíos <span class="sub">{{ desde|date:"d/m" }} al {{ hasta|date:"d/m/Y" }}</span></h1>
+  <form class="toolbar" method="get">
+    <div class="btn-group btn-group-sm">
+      <a class="btn btn-outline-secondary {% if p == '7d' %}active{% endif %}" href="?p=7d">7 días</a>
+      <a class="btn btn-outline-secondary {% if p == 'mes' %}active{% endif %}" href="?p=mes">Este mes</a>
+      <a class="btn btn-outline-secondary {% if p == '30d' %}active{% endif %}" href="?p=30d">30 días</a>
+    </div>
+    <input type="hidden" name="p" value="{{ p }}">
+    <label class="small muted">Respuesta dentro de</label>
+    <select name="horas" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+      {% for h in "24,48,72,168"|split_pares_simple %}<option value="{{ h }}" {% if c.horas_respuesta|stringformat:"s" == h %}selected{% endif %}>{{ h }} h</option>{% endfor %}
+    </select>
+  </form>
+</div>
+<p class="small muted">Por cada envío: si se entregó, si se leyó, si el cliente <b>respondió dentro de {{ c.horas_respuesta }} h</b> y si su tarjeta <b>cambió de etapa en los {{ c.dias_avance }} días</b> siguientes. Sirve para comparar mensajes y quedarse con los que funcionan.</p>
+
+<div class="card mb-3"><div class="card-header">WhatsApp por automatización</div>
+  {% include "reportes/_tabla_envios.html" with filas=c.automatizaciones detalle=True %}</div>
+<div class="card mb-3"><div class="card-header">WhatsApp por plantilla <span class="muted small">· automáticos y manuales</span></div>
+  {% include "reportes/_tabla_envios.html" with filas=c.plantillas %}</div>
+<div class="card"><div class="card-header">Emails automáticos</div>
+  <div class="table-responsive"><table class="table table-sm mb-0" style="font-variant-numeric:tabular-nums">
+    <thead><tr><th>Automatización</th><th class="text-end">Enviados</th><th class="text-end">Abiertos</th><th class="text-end">Con clic</th></tr></thead>
+    <tbody>{% for r in c.emails %}<tr><td>{{ r.nombre }}</td><td class="text-end">{{ r.n }}</td><td class="text-end">{{ r.abiertos }} <span class="muted">({{ r.pct_abiertos }}%)</span></td><td class="text-end">{{ r.clics }} <span class="muted">({{ r.pct_clics }}%)</span></td></tr>
+    {% empty %}<tr><td colspan="4" class="muted text-center py-3">Sin emails automáticos en el período.</td></tr>{% endfor %}</tbody>
+  </table></div>
+  <div class="card-body pt-2"><div class="form-text">Las aperturas son aproximadas: algunos programas de correo bloquean las imágenes (no cuentan) o las descargan solas (cuentan de más). Los clics son exactos.</div></div>
+</div>
+{% endblock %}

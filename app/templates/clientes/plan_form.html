@@ -1,0 +1,18 @@
+{% extends "clientes/_base.html" %}
+{% block title %}{% if plan %}{{ plan.nombre }}{% else %}Nuevo plan{% endif %}{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">{% if plan %}{{ plan.nombre }}{% else %}Nuevo plan{% endif %}</h1>
+<div class="card card-body" style="max-width:520px">
+<form method="post" novalidate>{% csrf_token %}
+  {% include "clientes/_campo.html" with f=form.nombre %}
+  {% include "clientes/_campo.html" with f=form.precio_mensual %}
+  {% include "clientes/_campo.html" with f=form.max_usuarios %}
+  {% include "clientes/_campo.html" with f=form.max_lineas_whatsapp %}
+  {% include "clientes/_campo.html" with f=form.max_wa_dia %}
+  <div class="form-check mb-3">{{ form.activo }} <label class="form-check-label small" for="{{ form.activo.id_for_label }}">{{ form.activo.label }}</label>
+    <div class="form-text">{{ form.activo.help_text }}</div></div>
+  <button class="btn btn-primary">Guardar</button>
+  <a href="{% url 'panel:planes' %}" class="btn btn-link">Cancelar</a>
+</form>
+</div>
+{% endblock %}

@@ -1,0 +1,11 @@
+<div class="card h-100"><div class="card-header">Conversión por etapa <span class="muted small">· de los que ingresaron en el período</span></div><div class="card-body">
+  {% for e in conversion %}
+  <div class="bar-row" title="{{ e.n }} de los ingresados llegaron a {{ e.nombre }}">
+    <span class="lbl">{{ e.nombre }}</span>
+    <div class="track"><div class="fill" style="width:{{ e.pct_total }}%;{% if e.venta %}background:#22C97A{% endif %}"></div></div>
+    <span class="num">{{ e.n }}</span>
+    <span class="num muted" style="min-width:64px" title="% que pasó desde la etapa anterior">{% if not forloop.first %}{{ e.pct_anterior }}% ↓{% endif %}</span>
+  </div>
+  {% empty %}<div class="muted small">Elegí un embudo para ver la conversión por etapa.</div>{% endfor %}
+  {% if conversion %}<div class="form-text mt-2">La barra es el % sobre el total ingresado; a la derecha, el % que pasó desde la etapa anterior. "Llegó" = estuvo alguna vez en esa etapa o en una posterior.</div>{% endif %}
+</div></div>

@@ -1,0 +1,1 @@
+{% if bienvenida %}Te dieron acceso a {{ crm_nombre }}{% else %}Recuperá tu contraseña de {{ crm_nombre }}{% endif %}

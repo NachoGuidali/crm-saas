@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% load crm_extras %}
+{% block title %}WhatsApp{% endblock %}
+{% block content %}
+<div class="inbox {% if conv %}con-chat{% endif %}">
+  <div class="inbox-lista">
+    <form class="filtros" method="get" id="filtrosInbox">
+      <div class="btn-group btn-group-sm w-100">
+        <a class="btn btn-outline-secondary {% if bandeja == 'mias' %}active{% endif %}" href="?bandeja=mias">Míos</a>
+        <a class="btn btn-outline-secondary {% if bandeja == 'sin_asignar' %}active{% endif %}" href="?bandeja=sin_asignar">Sin asignar</a>
+        {% if user.ve_todo %}<a class="btn btn-outline-secondary {% if bandeja == 'todas' %}active{% endif %}" href="?bandeja=todas">Todos</a>{% endif %}
+      </div>
+      <input type="hidden" name="bandeja" value="{{ bandeja }}">
+      <input type="search" name="q" value="{{ filtros.q }}" class="form-control form-control-sm" placeholder="Buscar nombre o número…">
+      <div class="d-flex gap-2">
+        {% if lineas|length > 1 %}<select name="linea" class="form-select form-select-sm" onchange="this.form.submit()"><option value="">Todas las líneas</option>{% for l in lineas %}<option value="{{ l.pk }}" {% if filtros.linea == l.pk|stringformat:'s' %}selected{% endif %}>{{ l.nombre }}</option>{% endfor %}</select>{% endif %}
+        <label class="small d-flex gap-1 align-items-center text-nowrap"><input type="checkbox" class="form-check-input" name="no_leidos" value="1" {% if filtros.no_leidos %}checked{% endif %} onchange="this.form.submit()"> No leídos</label>
+        <label class="small d-flex gap-1 align-items-center text-nowrap"><input type="checkbox" class="form-check-input" name="archivadas" value="1" {% if filtros.archivadas %}checked{% endif %} onchange="this.form.submit()"> Archivados</label>
+      </div>
+    </form>
+    <div class="items" id="listaConvs">{% include "whatsapp/_lista.html" with conv_id=conv.pk %}</div>
+  </div>
+
+  <div class="inbox-chat">
+    {% if conv %}
+    <div class="cab">
+      <a href="?bandeja={{ bandeja }}" class="btn btn-sm btn-link d-md-none p-0"><i class="bi bi-arrow-left"></i></a>
+      <div class="flex-grow-1" style="min-width:0">
+        <div class="fw-semibold">{% if op %}<a href="{% url 'crm:oportunidad_detalle' op.pk %}">{{ conv.nombre_mostrar }}</a>{% elif conv.contacto %}<a href="{% url 'crm:contacto_detalle' conv.contacto_id %}?ficha=contacto">{{ conv.nombre_mostrar }}</a>{% else %}{{ conv.nombre_mostrar }}{% endif %}</div>
+        <div class="small muted">{{ conv.telefono|telefono }} · {{ conv.linea.nombre }} ({{ conv.linea.get_proveedor_display|truncatechars:16 }}){% if conv.linea.es_oficial and conv.ventana_restante %} · ventana 24 h: quedan {{ conv.ventana_restante|duracion_td }}{% endif %}</div>
+      </div>
+      {% if conv.contacto %}<button class="btn btn-sm btn-outline-primary" data-llamar data-contacto="{{ conv.contacto_id }}"><i class="bi bi-telephone"></i></button>{% endif %}
+      <div class="dropdown">
+        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          {% if not conv.agente %}<li><a class="dropdown-item" href="#" data-accion="{% url 'whatsapp:conv_accion' conv.pk 'tomar' %}" data-recargar="1"><i class="bi bi-hand-index me-2"></i>Tomar el chat</a></li>{% endif %}
+          {% if conv.estado != 'cerrada' %}<li><a class="dropdown-item" href="#" data-accion="{% url 'whatsapp:conv_accion' conv.pk 'cerrar' %}" data-recargar="1"><i class="bi bi-check2-circle me-2"></i>Marcar resuelto</a></li>{% else %}<li><a class="dropdown-item" href="#" data-accion="{% url 'whatsapp:conv_accion' conv.pk 'reabrir' %}" data-recargar="1">Reabrir</a></li>{% endif %}
+          <li><a class="dropdown-item" href="#" data-accion="{% url 'whatsapp:conv_accion' conv.pk 'no_leido' %}"><i class="bi bi-envelope me-2"></i>Marcar no leído</a></li>
+          {% if conv.archivada %}<li><a class="dropdown-item" href="#" data-accion="{% url 'whatsapp:conv_accion' conv.pk 'desarchivar' %}" data-recargar="1">Desarchivar</a></li>{% else %}<li><a class="dropdown-item" href="#" data-accion="{% url 'whatsapp:conv_accion' conv.pk 'archivar' %}" data-recargar="1"><i class="bi bi-archive me-2"></i>Archivar</a></li>{% endif %}
+        </ul>
+      </div>
+    </div>
+    {% with contacto=conv.contacto conversaciones=None %}
+    <div class="flex-grow-1 d-flex flex-column" style="min-height:0">
+      <div class="chat" style="height:100%" id="chatPanel" data-conv="{{ conv.pk }}" data-contacto="{{ conv.contacto_id|default:'' }}">
+        <div class="chat-msgs" id="chatMsgs">{% include "whatsapp/_mensajes.html" %}</div>
+        <div class="chat-input position-relative">
+          <div class="ventana-aviso" id="avisoVentana" style="{% if conv.ventana_abierta %}display:none{% endif %}"><i class="bi bi-clock-history"></i> Pasaron más de 24 h del último mensaje del cliente: en esta línea oficial solo se puede mandar una <b>plantilla</b>.</div>
+          <div class="rr-menu" id="rrMenu"></div>
+          <form id="chatForm" class="d-flex gap-2 align-items-end" enctype="multipart/form-data">
+            <div class="dropdown"><button type="button" class="btn btn-outline-secondary btn-icon" data-bs-toggle="dropdown" title="Plantillas"><i class="bi bi-chat-square-text"></i></button>
+              <div class="dropdown-menu" style="max-height:300px;overflow-y:auto;width:320px">{% for p in plantillas %}<a class="dropdown-item small" href="#" data-plantilla="{{ p.pk }}" style="white-space:normal"><b>{{ p.nombre }}</b><br><span class="muted">{{ p.cuerpo|truncatechars:90 }}</span></a>{% empty %}<span class="dropdown-item small muted">Sin plantillas</span>{% endfor %}</div></div>
+            <button type="button" class="btn btn-outline-secondary btn-icon btn-voz" title="Grabar nota de voz" style="display:none"><i class="bi bi-mic"></i></button><label class="btn btn-outline-secondary btn-icon mb-0" title="Adjuntar"><i class="bi bi-paperclip"></i><input type="file" name="archivo" hidden></label>
+            <textarea name="texto" rows="1" class="form-control" placeholder="Escribí un mensaje… (Enter envía, / respuestas rápidas)"></textarea>
+            <button class="btn btn-success btn-icon"><i class="bi bi-send"></i></button>
+          </form><div class="grabando" style="display:none"><span class="rec-dot"></span> Grabando <b class="rec-t">0:00</b><button type="button" class="btn btn-sm btn-link text-danger rec-cancel" title="Cancelar"><i class="bi bi-trash"></i></button><button type="button" class="btn btn-success btn-icon rec-send" title="Enviar nota de voz"><i class="bi bi-send"></i></button></div>
+          <div class="small muted mt-1" id="adjuntoNombre"></div>
+        </div>
+      </div>
+    </div>
+    {% endwith %}
+    {% else %}
+    <div class="m-auto text-center muted"><i class="bi bi-whatsapp" style="font-size:3rem;opacity:.3"></i><div>Elegí una conversación</div></div>
+    {% endif %}
+  </div>
+
+  <div class="inbox-lado">
+    {% if conv %}
+      {% if op %}
+      <div class="section-title">Oportunidad</div>
+      <div class="mb-2"><a href="{% url 'crm:oportunidad_detalle' op.pk %}" class="fw-semibold">{{ op.embudo }}</a></div>
+      <label class="form-label">Etapa</label>
+      <select class="form-select form-select-sm mb-2" id="selEtapaInbox" data-op="{{ op.pk }}">
+        {% for e in etapas %}<option value="{{ e.pk }}" data-tipo="{{ e.tipo }}" {% if e.pk == op.etapa_id %}selected{% endif %}>{{ e.nombre }}</option>{% endfor %}
+      </select>
+      <dl class="kv small mb-2"><dt>Estado</dt><dd>{{ op.get_estado_display }}</dd><dt>Agente</dt><dd>{{ op.agente.display_name|default:"—" }}</dd><dt>Intentos</dt><dd>{{ op.intentos_contacto }}</dd></dl>
+      {% elif conv.contacto %}
+      <div class="small muted mb-2">El contacto no tiene una oportunidad en curso.</div>
+      <a href="{% url 'crm:contacto_detalle' conv.contacto_id %}?ficha=contacto" class="btn btn-sm btn-outline-primary mb-2">Ver contacto</a>
+      {% else %}
+      <a href="{% url 'crm:oportunidad_nueva' %}?tel={{ conv.telefono|urlencode }}" class="btn btn-sm btn-outline-primary mb-2">Crear prospecto</a>
+      {% endif %}
+      {% if agentes %}
+      <div class="section-title mt-3">Asignar chat</div>
+      <select class="form-select form-select-sm" id="selAgenteChat"><option value="">—</option>{% for a in agentes %}<option value="{{ a.pk }}" {% if a.pk == conv.agente_id %}selected{% endif %}>{{ a.display_name }}</option>{% endfor %}</select>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+{% include "crm/_tipificaciones_json.html" %}
+{% endblock %}
+{% block extra_js %}
+{% if conv %}{% include "whatsapp/_chat_js.html" with contacto=conv.contacto op=op %}{% endif %}
+<script>
+(function () {
+  // Lista: polling liviano (solo trae HTML si hubo novedades)
+  let v = '{{ version }}';
+  const lista = document.getElementById('listaConvs');
+  setInterval(async () => {
+    if (document.hidden) return;
+    const params = new URLSearchParams(location.search); params.set('v', v);
+    try {
+      const d = await CRM.api('{% url "whatsapp:lista" %}?' + params.toString(), {silencioso: true});
+      v = d.v;
+      if (d.cambios) lista.innerHTML = d.html;
+    } catch (e) {}
+  }, 4000);
+  const selA = document.getElementById('selAgenteChat');
+  if (selA) selA.addEventListener('change', async () => { if (selA.value) { await CRM.api('{% if conv %}{% url "whatsapp:conv_accion" conv.pk "asignar" %}{% endif %}', {data: {agente: selA.value}}); CRM.toast('Chat asignado'); } });
+  const selE = document.getElementById('selEtapaInbox');
+  if (selE) {
+    const inicial = selE.value;
+    selE.addEventListener('change', async () => {
+      const opt = selE.selectedOptions[0];
+      if (opt.dataset.tipo !== 'normal') {
+        CRM.abrirCierre({op: selE.dataset.op, etapa: selE.value, tipo: opt.dataset.tipo, onCancel: () => { selE.value = inicial; }, onOk: () => location.reload()});
+        return;
+      }
+      try { const r = await CRM.mover(selE.dataset.op, {etapa: selE.value}); CRM.toast(r.mensaje); } catch (e) { selE.value = inicial; }
+    });
+  }
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Historial de automatizaciones{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-clock-history"></i> Historial de automatizaciones</h1>
+  <form><select name="estado" class="form-select form-select-sm" onchange="this.form.submit()"><option value="">Todas</option>{% for k, v in estados %}<option value="{{ k }}" {% if filtros.estado == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></form></div>
+<div class="card"><div class="table-responsive"><table class="table table-sm mb-0">
+  <thead><tr><th>Automatización</th><th>Prospecto</th><th>Estado</th><th>Programada</th><th>Ejecutada</th><th>Detalle</th></tr></thead>
+  <tbody>{% for e in page %}<tr>
+    <td>{{ e.accion }}</td><td><a href="{% url 'crm:oportunidad_detalle' e.oportunidad_id %}">{{ e.oportunidad.contacto.nombre }}</a></td>
+    <td><span class="chip {% if e.estado == 'ejecutada' %}ok{% elif e.estado == 'error' %}danger{% elif e.estado == 'programada' %}info{% endif %}">{{ e.get_estado_display }}</span></td>
+    <td class="small">{{ e.programada_para|date:"d/m H:i" }}</td><td class="small">{{ e.ejecutada_at|date:"d/m H:i" }}</td><td class="small muted">{{ e.detalle }}</td>
+  </tr>{% empty %}<tr><td colspan="6" class="muted text-center py-3">Sin ejecuciones.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+{% include "_paginacion.html" %}
+{% endblock %}

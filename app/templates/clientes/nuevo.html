@@ -1,0 +1,29 @@
+{% extends "clientes/_base.html" %}
+{% block title %}Nuevo cliente{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Nuevo cliente</h1>
+<form method="post" novalidate>{% csrf_token %}
+<div class="row g-4">
+  <div class="col-md-6"><div class="card card-body">
+    <h2 class="h6 mb-3">Empresa</h2>
+    {% include "clientes/_campo.html" with f=form.nombre %}
+    <div class="mb-3"><label class="form-label small">{{ form.subdominio.label }}</label>
+      <div class="input-group">{{ form.subdominio }}<span class="input-group-text small">.{{ SAAS_DOMINIO }}</span></div>
+      {% for e in form.subdominio.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>
+    {% include "clientes/_campo.html" with f=form.plan %}
+    {% include "clientes/_campo.html" with f=form.estado %}
+    {% include "clientes/_campo.html" with f=form.contacto_telefono %}
+  </div></div>
+  <div class="col-md-6"><div class="card card-body">
+    <h2 class="h6 mb-3">Administrador del CRM</h2>
+    {% include "clientes/_campo.html" with f=form.admin_nombre %}
+    {% include "clientes/_campo.html" with f=form.admin_email %}
+    {% include "clientes/_campo.html" with f=form.admin_usuario %}
+    {% include "clientes/_campo.html" with f=form.admin_password %}
+  </div></div>
+</div>
+<p class="small text-secondary mt-3">Al crear el cliente se arma su base de datos aislada con un embudo de ventas inicial. Puede tardar unos segundos.</p>
+<button class="btn btn-primary">Crear cliente</button>
+<a href="{% url 'panel:clientes' %}" class="btn btn-link">Cancelar</a>
+</form>
+{% endblock %}

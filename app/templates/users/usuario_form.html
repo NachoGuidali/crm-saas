@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}{{ obj|default:"Nuevo usuario" }}{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-person-gear"></i> {{ obj.display_name|default:"Nuevo usuario" }}</h1></div>
+<div class="row g-3">
+<div class="col-lg-7"><form method="post" enctype="multipart/form-data" class="card"><div class="card-body">{% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert alert-danger py-2">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+  <div class="row g-2">
+    <div class="col-md-6"><label class="form-label">Nombre</label>{{ form.first_name }}</div>
+    <div class="col-md-6"><label class="form-label">Apellido</label>{{ form.last_name }}</div>
+    <div class="col-md-6"><label class="form-label">Usuario</label>{{ form.username }}{{ form.username.errors }}</div>
+    <div class="col-md-6"><label class="form-label">Email</label>{{ form.email }}{{ form.email.errors }}<div class="form-text">Se usa para recuperar la contraseña.</div></div>
+    <div class="col-md-6"><label class="form-label">Rol base</label>{{ form.rol }}{{ form.rol.errors }}</div>
+    <div class="col-md-6"><label class="form-label">Rol personalizado</label>{{ form.rol_custom }}<div class="form-text">{{ form.rol_custom.help_text }}</div></div>
+    <div class="col-md-6"><label class="form-label">Teléfono</label>{{ form.telefono }}</div>
+    <div class="col-md-6"><label class="form-label">Interno de Anura</label><input name="interno_anura" value="{{ interno.interno|default:'' }}" class="form-control" placeholder="Para llamar desde el CRM"></div>
+    <div class="col-md-6"><label class="form-label">Alias en Anura <span class="muted">(opcional)</span></label><input name="alias_anura" value="{{ interno.alias|default:'' }}" class="form-control" placeholder="ej: ras_201, 5401">
+      <div class="form-text">Si Anura nombra este teléfono de otra forma en los avisos. Varios separados por coma.</div></div>
+    <div class="col-12 small"><label class="d-flex gap-2">{{ form.is_active }} {{ form.is_active.label }}</label><label class="d-flex gap-2">{{ form.disponible }} {{ form.disponible.label }}</label></div>
+    <div class="col-12"><label class="form-label">Foto</label>{{ form.avatar }}</div>
+    {% if form.modo_password %}
+    <div class="col-12 mt-2"><div class="section-title">Acceso</div>
+      {% for r in form.modo_password %}<label class="d-flex gap-2 small">{{ r.tag }} {{ r.choice_label }}</label>{% endfor %}
+      <div class="mt-2" id="pwdTemp">{{ form.password_temporal }}{{ form.password_temporal.errors }}<div class="form-text">{{ form.password_temporal.help_text }}</div></div></div>
+    {% endif %}
+    <div class="col-12 mt-2"><div class="section-title">Embudos en los que trabaja</div><input type="hidden" name="embudos_enviados" value="1">
+      <div class="checks-grid">{% for e in embudos %}<label><input type="checkbox" class="form-check-input" name="embudos" value="{{ e.pk }}" {% if e.pk in embudos_sel %}checked{% endif %}> {{ e }}</label>{% endfor %}</div></div>
+    <div class="col-12 mt-2"><div class="section-title">Líneas de WhatsApp</div><input type="hidden" name="lineas_enviadas" value="1">
+      <div class="checks-grid">{% for l in lineas %}<label><input type="checkbox" class="form-check-input" name="lineas" value="{{ l.pk }}" {% if l.pk in lineas_sel %}checked{% endif %}> {{ l.nombre }}</label>{% empty %}<span class="small muted">No hay líneas.</span>{% endfor %}</div></div>
+  </div>
+  <button class="btn btn-primary mt-3">Guardar</button> <a href="{% url 'users:lista' %}" class="btn btn-outline-secondary mt-3">Volver</a>
+</div></form></div>
+<div class="col-lg-5">
+  {% if obj %}
+  <div class="card mb-3"><div class="card-header">Acceso</div><div class="card-body">
+    <form method="post" action="{% url 'users:acceso' obj.pk %}" class="d-flex flex-column gap-2">{% csrf_token %}
+      <button name="accion" value="enviar_link" class="btn btn-outline-primary btn-sm"><i class="bi bi-envelope"></i> Enviar link para crear contraseña</button>
+      <button name="accion" value="temporal" class="btn btn-outline-warning btn-sm" onclick="return confirm('Se genera una contraseña temporal y se muestra una sola vez. ¿Seguir?')"><i class="bi bi-key"></i> Generar contraseña temporal</button>
+    </form>
+    <div class="form-text mt-2">Los usuarios también pueden recuperarla solos desde "¿Olvidaste tu contraseña?" en el ingreso.</div>
+    <div class="small muted mt-2">Último ingreso: {{ obj.last_login|date:"d/m/Y H:i"|default:"nunca" }}</div>
+  </div></div>
+  {% endif %}
+  <div class="card"><div class="card-body small muted">
+    <b>Roles base:</b> <b>Agente</b> ve y trabaja solo sus prospectos. <b>Supervisor</b> ve todo, reasigna, importa, exporta y maneja el discador. <b>Administrador</b> tiene acceso total. Un <b>rol personalizado</b> reemplaza los permisos del rol base por la lista exacta que definas en <a href="{% url 'users:roles' %}">Roles y permisos</a>.
+  </div></div>
+</div>
+</div>
+<script>
+(function () {
+  const radios = document.querySelectorAll('[name=modo_password]'), box = document.getElementById('pwdTemp');
+  if (!box) return;
+  const upd = () => box.style.display = [...radios].find(r => r.checked)?.value === 'manual' ? '' : 'none';
+  radios.forEach(r => r.addEventListener('change', upd)); upd();
+})();
+</script>
+{% endblock %}

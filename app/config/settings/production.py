@@ -1,0 +1,11 @@
+from .base import *  # noqa
+
+DEBUG = False
+
+# SSL lo termina nginx / el proxy
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SESSION_COOKIE_SECURE = env_bool('SECURE_COOKIES', True)
+CSRF_COOKIE_SECURE = env_bool('SECURE_COOKIES', True)
+SECURE_HSTS_SECONDS = int(env('SECURE_HSTS_SECONDS', '0'))
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'SAMEORIGIN'

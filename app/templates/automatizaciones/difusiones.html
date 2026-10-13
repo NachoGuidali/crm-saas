@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Difusiones{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-broadcast"></i> Difusiones</h1></div>
+<div class="alert alert-info small py-2">Para crear una difusión: en <a href="{% url 'crm:oportunidades' %}">Oportunidades</a> filtrá los leads (etapa, fechas, pauta, etiqueta…), seleccionalos (o "todos los que cumplen los filtros") y elegí la acción <b>"Enviar difusión"</b>.</div>
+<div class="card"><div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-variant-numeric:tabular-nums">
+  <thead><tr><th>Difusión</th><th>Canal</th><th>Estado</th><th class="text-end">Personas</th><th class="text-end">Enviados</th><th class="text-end">Resultado</th><th>Creada</th></tr></thead>
+  <tbody>{% for d in difusiones %}<tr>
+    <td><a href="{% url 'automatizaciones:difusion' d.pk %}" class="fw-semibold">{{ d.nombre }}</a><div class="small muted">{{ d.plantilla_email|default:d.plantilla_wa|default:"" }}</div></td>
+    <td>{{ d.get_canal_display }}</td><td><span class="chip {% if d.estado == 'enviando' %}info{% elif d.estado == 'finalizada' %}ok{% elif d.estado == 'cancelada' %}danger{% endif %}">{{ d.get_estado_display }}</span></td>
+    <td class="text-end">{{ d.r.total }}</td><td class="text-end">{{ d.r.enviados }}</td>
+    <td class="text-end small">{% if d.canal == 'email' %}{{ d.r.pct.abiertos }}% abrió · {{ d.r.pct.clics }}% clic{% else %}{{ d.r.pct.leidos }}% leyó · {{ d.r.pct.respondidos }}% respondió{% endif %}</td>
+    <td class="small muted">{{ d.created_at|date:"d/m H:i" }} · {{ d.creada_por.display_name|default:"" }}</td></tr>
+  {% empty %}<tr><td colspan="7" class="muted text-center py-4">Todavía no hay difusiones.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+{% endblock %}

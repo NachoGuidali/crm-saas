@@ -1,0 +1,13 @@
+<div class="table-responsive"><table class="table table-sm mb-0" style="font-variant-numeric:tabular-nums">
+  <thead><tr><th>{% if detalle %}Automatización{% else %}Plantilla{% endif %}</th><th class="text-end">Enviados</th><th class="text-end">Entregados</th><th class="text-end">Leídos</th><th class="text-end">Respondieron</th><th style="width:18%"></th><th class="text-end">Cambió de etapa</th><th class="text-end">Fallidos</th></tr></thead>
+  <tbody>{% for r in filas %}<tr>
+    <td>{{ r.nombre }}{% if detalle and r.accion__embudo__nombre %}<div class="small muted">{{ r.accion__embudo__nombre }} · {{ r.accion__etapa__nombre }}</div>{% endif %}</td>
+    <td class="text-end">{{ r.n }}</td>
+    <td class="text-end">{{ r.pct_entregados }}%</td>
+    <td class="text-end">{{ r.pct_leidos }}%</td>
+    <td class="text-end fw-semibold">{{ r.respondidos }} <span class="muted fw-normal">({{ r.pct_respondidos }}%)</span></td>
+    <td><div class="track" style="height:6px;background:var(--bg3);border-radius:3px"><div style="height:6px;border-radius:3px;background:#3987e5;width:{{ r.pct_respondidos }}%"></div></div></td>
+    <td class="text-end">{{ r.avanzaron }} <span class="muted">({{ r.pct_avanzaron }}%)</span></td>
+    <td class="text-end">{{ r.fallidos|default:"·" }}</td></tr>
+  {% empty %}<tr><td colspan="8" class="muted text-center py-3">Sin envíos en el período.</td></tr>{% endfor %}</tbody>
+</table></div>

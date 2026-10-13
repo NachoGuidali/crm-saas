@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Plantillas{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-chat-square-text"></i> Plantillas de WhatsApp</h1><a href="{% url 'whatsapp:plantilla_nueva' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Nueva plantilla</a></div>
+<div class="card mb-4"><div class="table-responsive"><table class="table table-sm table-hover mb-0">
+  <thead><tr><th>Nombre</th><th>Texto</th><th>Línea</th><th>Meta</th><th>Twilio</th><th></th></tr></thead>
+  <tbody>{% for p in plantillas %}<tr class="{% if not p.activa %}opacity-50{% endif %}">
+    <td class="fw-semibold">{{ p.nombre }}</td><td class="small muted">{{ p.cuerpo|truncatechars:110 }}</td>
+    <td class="small">{{ p.linea|default:"Todas" }}</td>
+    <td><span class="chip {% if p.meta_estado == 'APPROVED' %}ok{% elif p.meta_estado == 'REJECTED' %}danger{% elif p.meta_estado == 'PENDING' %}warn{% endif %}" title="{{ p.meta_rechazo }}">{{ p.get_meta_estado_display }}</span></td>
+    <td class="small">{% if p.twilio_content_sid %}<i class="bi bi-check2 text-success"></i>{% else %}—{% endif %}</td>
+    <td><a href="{% url 'whatsapp:plantilla_editar' p.pk %}" class="btn btn-xs btn-outline-secondary">Editar</a></td>
+  </tr>{% empty %}<tr><td colspan="6" class="muted text-center py-3">Sin plantillas.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+<div class="page-head"><h1 style="font-size:17px"><i class="bi bi-lightning"></i> Respuestas rápidas <span class="sub">se usan escribiendo /atajo en el chat</span></h1></div>
+<div class="card"><div class="card-body">
+  {% for r in respuestas %}
+  <form method="post" action="{% url 'whatsapp:respuestas' %}" class="row g-2 align-items-center mb-2">{% csrf_token %}<input type="hidden" name="pk" value="{{ r.pk }}">
+    <div class="col-md-2"><div class="input-group input-group-sm"><span class="input-group-text">/</span><input name="atajo" value="{{ r.atajo }}" class="form-control"></div></div>
+    <div class="col-md-3"><input name="titulo" value="{{ r.titulo }}" class="form-control form-control-sm"></div>
+    <div class="col-md-5"><input name="texto" value="{{ r.texto }}" class="form-control form-control-sm"></div>
+    <div class="col-md-2 d-flex gap-1"><button class="btn btn-xs btn-outline-primary">Guardar</button><button name="eliminar" value="{{ r.pk }}" class="btn btn-xs btn-outline-danger"><i class="bi bi-trash"></i></button></div>
+  </form>
+  {% endfor %}
+  <form method="post" action="{% url 'whatsapp:respuestas' %}" class="row g-2 mt-2">{% csrf_token %}
+    <div class="col-md-2"><div class="input-group input-group-sm"><span class="input-group-text">/</span><input name="atajo" class="form-control" placeholder="atajo" required></div></div>
+    <div class="col-md-3"><input name="titulo" class="form-control form-control-sm" placeholder="Título" required></div>
+    <div class="col-md-5"><input name="texto" class="form-control form-control-sm" placeholder="Hola {primer_nombre}, soy {agente}…" required></div>
+    <div class="col-md-2"><button class="btn btn-sm btn-primary">Agregar</button></div>
+  </form>
+</div></div>
+{% endblock %}

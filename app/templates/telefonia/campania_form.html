@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Campaña de discado{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-telephone-forward"></i> {{ c|default:"Nueva campaña" }}</h1></div>
+<div class="row"><div class="col-lg-8"><form method="post" class="card"><div class="card-body">{% csrf_token %}
+  <div class="row g-2">
+    <div class="col-md-7"><label class="form-label">Nombre</label>{{ form.nombre }}{{ form.nombre.errors }}</div>
+    <div class="col-md-5"><label class="form-label">Embudo</label>{{ form.embudo }}</div>
+    <div class="col-md-4"><label class="form-label">Máximo de intentos</label>{{ form.max_intentos }}</div>
+    <div class="col-md-4"><label class="form-label">Minutos entre reintentos</label>{{ form.minutos_entre_intentos }}</div>
+    <div class="col-md-4"><label class="form-label">Pausa entre llamadas (s)</label>{{ form.segundos_entre_llamadas }}</div>
+    <div class="col-md-3"><label class="form-label">Desde</label>{{ form.hora_desde }}</div>
+    <div class="col-md-3"><label class="form-label">Hasta</label>{{ form.hora_hasta }}</div>
+    <div class="col-md-6"><label class="form-label">Días</label><div class="d-flex gap-3 flex-wrap small">{% for d in form.dias %}<label class="d-flex gap-1">{{ d.tag }} {{ d.choice_label }}</label>{% endfor %}</div></div>
+    <div class="col-12"><label class="form-label">Agentes</label><div class="checks-grid">{% for a in form.agentes %}<label>{{ a.tag }} {{ a.choice_label }}</label>{% empty %}<span class="muted small">No hay usuarios con interno de Anura.</span>{% endfor %}</div><div class="form-text">{{ form.agentes.help_text }}</div></div>
+  </div>
+  <button class="btn btn-primary mt-3">Guardar</button>
+</div></form></div>
+<div class="col-lg-4"><div class="card"><div class="card-body small muted">La franja horaria es importante: la normativa de protección al consumidor limita los horarios de llamadas comerciales. Confirmá con RAS/Comercial la franja permitida y la cantidad de reintentos.</div></div></div></div>
+{% endblock %}

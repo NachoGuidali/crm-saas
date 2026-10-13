@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Telefonía Anura{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-headset"></i> Telefonía Anura</h1>
+  <span class="chip {% if config.operativa %}ok{% else %}warn{% endif %}">{% if not config.activo %}Desactivada{% elif config.modo_demo %}Modo demostración{% else %}Conectada a Anura{% endif %}</span></div>
+<div class="row g-3">
+<div class="col-lg-6">
+  <form method="post" class="card"><div class="card-header">Conexión</div><div class="card-body">{% csrf_token %}<input type="hidden" name="accion" value="guardar">
+    <div class="d-flex gap-4 mb-2"><label class="d-flex gap-2">{{ form.activo }} Integración activa</label><label class="d-flex gap-2">{{ form.modo_demo }} Modo demostración</label></div>
+    <div class="form-text mb-2">En modo demostración las llamadas se simulan (sin costo) para capacitar y presentar el circuito.</div>
+    <div class="row g-2">
+      <div class="col-12"><div class="p-2 rounded" style="background:var(--bg3)">
+        <label class="d-flex gap-2 fw-semibold">{{ form.softphone_activo }} {{ form.softphone_activo.label }}</label>
+        <div class="form-text mb-2">{{ form.softphone_activo.help_text }} Las pantallas cargan dentro de un marco fijo: navegar no corta la llamada.</div>
+        <div class="row g-2">
+          <div class="col-md-5"><label class="form-label small">{{ form.softphone_ws.label }}</label>{{ form.softphone_ws }}</div>
+          <div class="col-md-5"><label class="form-label small">{{ form.sip_dominio.label }}</label>{{ form.sip_dominio }}</div>
+          <div class="col-md-2"><label class="form-label small">Puerto</label>{{ form.sip_puerto }}</div>
+        </div>
+        <div class="form-text">Usuario y contraseña SIP de cada terminal: abajo, en Internos.</div>
+      </div></div>
+      <div class="col-12"><label class="form-label">{{ form.webphone_url.label }}</label>{{ form.webphone_url }}<div class="form-text">{{ form.webphone_url.help_text }}</div></div>
+      <div class="col-12"><label class="form-label">{{ form.click2dial_token.label }}</label>{{ form.click2dial_token }}<div class="form-text">{{ form.click2dial_token.help_text }} Lo genera un administrador de la cuenta de Anura.</div></div>
+      <div class="col-12"><label class="form-label">{{ form.click2dial_url.label }}</label>{{ form.click2dial_url }}<div class="form-text">{{ form.click2dial_url.help_text }}</div></div>
+      <div class="col-12"><details class="small"><summary class="muted">API de tenant (opcional, solo si Anura la habilita)</summary><div class="row g-2 mt-1">
+        <div class="col-12"><label class="form-label">{{ form.api_url.label }}</label>{{ form.api_url }}<div class="form-text">{{ form.api_url.help_text }}</div></div>
+        <div class="col-md-5"><label class="form-label">Autenticación</label>{{ form.auth_tipo }}</div>
+        <div class="col-md-7"><label class="form-label">Token / API key</label>{{ form.api_token }}</div>
+        <div class="col-md-6"><label class="form-label">Usuario (Basic)</label>{{ form.api_usuario }}</div>
+        <div class="col-md-6"><label class="form-label">Contraseña (Basic)</label>{{ form.api_password }}</div>
+        <div class="col-md-4"><label class="form-label">Header</label>{{ form.auth_header_nombre }}</div>
+        <div class="col-md-4"><label class="form-label">Tenant ID</label>{{ form.tenant_id }}</div>
+        <div class="col-md-4"><label class="form-label">Account ID</label>{{ form.account_id }}</div>
+      </div></details></div>
+      <div class="col-12"><label class="form-label">{{ form.embudo_entrantes.label }}</label>{{ form.embudo_entrantes }}<div class="form-text">{{ form.embudo_entrantes.help_text }}</div></div>
+      <div class="col-12 small">
+        <label class="d-flex gap-2">{{ form.crear_tarjeta_salientes }} {{ form.crear_tarjeta_salientes.label }}</label>
+        <label class="d-flex gap-2">{{ form.solo_eventos_propios }} {{ form.solo_eventos_propios.label }}</label>
+        <div class="form-text mb-2 ms-4">{{ form.solo_eventos_propios.help_text }}</div>
+        <label class="d-flex gap-2">{{ form.tarea_llamada_perdida }} {{ form.tarea_llamada_perdida.label }}</label>
+        <label class="d-flex gap-2">{{ form.descargar_grabaciones }} Descargar y adjuntar grabaciones</label>
+        <label class="d-flex gap-2">{{ form.polling_activo }} {{ form.polling_activo.label }}</label>
+      </div>
+    </div>
+    <div class="mt-3 d-flex gap-2 flex-wrap"><button class="btn btn-primary">Guardar</button>
+      <button class="btn btn-outline-secondary" name="accion" value="probar">Verificar token</button></div>
+    <div class="form-text mt-2">Verificar no hace ninguna llamada: solo comprueba que Anura acepte el token.</div>
+  </div></form>
+
+  <div class="card mt-3"><div class="card-header">Eventos de llamadas (WebHook de Anura)</div><div class="card-body small">
+    <p class="mb-2">Dos pasos en el panel de Anura. <b>1)</b> <b>Configuración → Eventos → Agregar</b>: una plantilla con esta petición y el cuerpo de abajo. <b>2)</b> <b>Configuración → Cuenta</b> → cada cuenta de agente (y la que recibe entrantes / cola) → <b>Modificar → pestaña Eventos → Agregar</b> tres veces: START, TALK y END, dirección <b>BOTH</b>, con esa plantilla. Petición:</p>
+    <table class="table table-sm mb-2"><tbody>
+      <tr><td class="muted">Protocolo / Puerto</td><td>{% if webhook_https %}HTTPS / 443{% else %}HTTP / 80{% endif %}</td></tr>
+      <tr><td class="muted">Host</td><td><code class="copiable">{{ webhook_host }}</code></td></tr>
+      <tr><td class="muted">Ruta</td><td><code class="copiable">api/integrations/anura/webhook</code></td></tr>
+      <tr><td class="muted">Método / Content-Type</td><td>POST / application/json</td></tr>
+      <tr><td class="muted">Autorización</td><td>Bearer <code class="copiable" data-valor="{{ config.webhook_token }}">{{ config.webhook_token|slice:":8" }}…</code> <span class="muted">(clic para copiar)</span></td></tr>
+    </tbody></table>
+    <p class="mb-1">Cuerpo de la plantilla:</p>
+    <pre class="copiable p-2 rounded mb-2" style="background:var(--bg3);font-size:11.5px;white-space:pre-wrap" title="Clic para copiar">{{ plantilla_webhook }}</pre>
+    <p class="muted mb-1">Si prefieren no usar el header de autorización, sirve la URL con el token incluido:</p>
+    <code class="copiable d-block mb-2">{{ webhook_spec_url }}</code>
+    <form method="post">{% csrf_token %}<button name="accion" value="regenerar_token" class="btn btn-xs btn-outline-danger" onclick="return confirm('El token actual deja de funcionar: hay que actualizarlo en los eventos de Anura. ¿Seguir?')">Regenerar token</button></form>
+    <p class="muted mt-2 mb-0">Si Anura reenvía un evento no se duplica nada. Las llamadas que se originan desde el CRM viajan con su identificador en <code>custom1</code>, así que se unifican siempre. La grabación se descarga del link que llega en el evento END.</p>
+  </div></div>
+</div>
+
+<div class="col-lg-6">
+  <div class="card mb-3"><div class="card-header">Internos de los agentes (click2call y discador)</div><div class="card-body">
+    <table class="table table-sm"><tbody>{% for i in internos %}<tr><td>{{ i.usuario.display_name }}</td><td><code>{{ i.interno }}</code>{% if i.alias %}<div class="small muted">alias: {{ i.alias }}</div>{% endif %}{% if i.tiene_softphone %}<div class="small"><span class="chip ok"><i class="bi bi-headset"></i> teléfono CRM: {{ i.sip_usuario }}</span></div>{% endif %}</td>
+      <td class="text-end"><form method="post">{% csrf_token %}<input type="hidden" name="id" value="{{ i.pk }}"><button name="accion" value="borrar_interno" class="btn btn-xs btn-outline-danger"><i class="bi bi-x"></i></button></form></td></tr>
+    {% empty %}<tr><td class="muted">Sin internos.</td></tr>{% endfor %}</tbody></table>
+    <form method="post" class="row g-2">{% csrf_token %}<input type="hidden" name="accion" value="interno">
+      <div class="col-md-4"><select name="usuario" class="form-select form-select-sm">{% for u in usuarios %}<option value="{{ u.pk }}">{{ u.display_name }}</option>{% endfor %}</select></div>
+      <div class="col-md-4"><input name="interno" class="form-control form-control-sm" placeholder="Interno / terminal" required></div>
+      <div class="col-md-4"><input name="alias" class="form-control form-control-sm" placeholder="Alias (opcional)"></div>
+      <div class="col-md-4"><input name="sip_usuario" class="form-control form-control-sm" placeholder="Usuario SIP (terminal CRM)" autocomplete="off"></div>
+      <div class="col-md-4"><input name="sip_password" type="password" class="form-control form-control-sm" placeholder="Contraseña SIP" autocomplete="new-password"></div>
+      <div class="col-md-4"><button class="btn btn-sm btn-primary w-100">Asignar</button></div></form>
+    <div class="form-text">El <b>interno</b> se usa para originar y cortar llamadas. El <b>alias</b> sirve si Anura nombra al mismo teléfono de otra forma en los avisos (usuario SIP, ID de terminal); se pueden poner varios separados por coma. <b>Usuario y contraseña SIP</b>: los de la terminal "CRM" creada en Anura para ese interno (para el teléfono dentro del CRM); la contraseña se guarda cifrada. Para cambiarlos, volvé a asignar el interno.</div>
+  </div></div>
+
+  <div class="card mb-3"><div class="card-header">Ruteo de entrantes (DID / cola → embudo)</div><div class="card-body">
+    <table class="table table-sm"><tbody>{% for r in rutas %}<tr><td>{{ r.get_tipo_display }} <code>{{ r.valor }}</code></td><td>{{ r.embudo }}</td><td>{{ r.agente.display_name|default:"rotativo" }}</td>
+      <td class="text-end"><form method="post">{% csrf_token %}<input type="hidden" name="id" value="{{ r.pk }}"><button name="accion" value="borrar_ruta" class="btn btn-xs btn-outline-danger"><i class="bi bi-x"></i></button></form></td></tr>
+    {% empty %}<tr><td class="muted small">Sin rutas: todas las llamadas nuevas van al embudo por defecto.</td></tr>{% endfor %}</tbody></table>
+    <form method="post" class="row g-2">{% csrf_token %}<input type="hidden" name="accion" value="ruta">
+      <div class="col-4"><select name="tipo" class="form-select form-select-sm"><option value="did">DID</option><option value="cola">Cola</option></select></div>
+      <div class="col-8"><input name="valor" class="form-control form-control-sm" placeholder="Número o queueId" required></div>
+      <div class="col-6"><select name="embudo" class="form-select form-select-sm">{% for e in embudos %}<option value="{{ e.pk }}">{{ e }}</option>{% endfor %}</select></div>
+      <div class="col-6"><select name="agente" class="form-select form-select-sm"><option value="">Asignación del embudo</option>{% for u in usuarios %}<option value="{{ u.pk }}">{{ u.display_name }}</option>{% endfor %}</select></div>
+      <div class="col-12"><input name="descripcion" class="form-control form-control-sm" placeholder="Descripción (opcional)"></div>
+      <div class="col-12"><button class="btn btn-sm btn-primary">Agregar ruta</button></div></form>
+  </div></div>
+
+  <div class="card"><div class="card-header">Simular llamada entrante</div><div class="card-body">
+    <p class="small muted">Genera un evento igual al que mandaría Anura, por el mismo circuito (útil para probar sin telefonía real).</p>
+    <form method="post" class="row g-2">{% csrf_token %}<input type="hidden" name="accion" value="simular_entrante">
+      <div class="col-md-6"><input name="numero" class="form-control form-control-sm" placeholder="Número que llama (ej: 11 5555 1234)"></div>
+      <div class="col-md-6"><select name="estado" class="form-select form-select-sm"><option value="NOANSWER">No atendida (llamada perdida)</option><option value="ANSWER">Atendida</option><option value="BUSY">Ocupado</option></select></div>
+      <div class="col-md-6"><input name="did" class="form-control form-control-sm" placeholder="DID marcado (opcional)"></div>
+      <div class="col-md-6"><input name="interno" class="form-control form-control-sm" placeholder="Interno que atendió (opcional)"></div>
+      <div class="col-12"><button class="btn btn-sm btn-outline-primary"><i class="bi bi-telephone-inbound"></i> Simular</button></div></form>
+  </div></div>
+
+  <div class="card mt-3"><div class="card-header d-flex align-items-center">
+    <span class="me-auto">Últimos avisos de Anura</span>
+    <a href="" class="btn btn-sm btn-outline-secondary" title="Actualizar"><i class="bi bi-arrow-clockwise"></i></a>
+  </div><div class="card-body">
+    <p class="small muted mb-2">Diagnóstico: cada aviso que recibió el CRM y qué hizo con él. Sirve para ver si un aviso llegó, con qué agente vino y por qué se ignoró. Se guardan los últimos {{ avisos.0.MAX_EVENTOS|default:500 }}.</p>
+    <div class="table-responsive"><table class="table table-sm small mb-0">
+      <thead><tr><th>Fecha</th><th>Evento</th><th>Dir.</th><th>De → A</th><th>Origen</th><th>Resultado</th><th></th></tr></thead>
+      <tbody>
+      {% for a in avisos %}
+        <tr>
+          <td class="text-nowrap">{{ a.created_at|date:"d/m H:i:s" }}</td>
+          <td>{{ a.evento }}</td>
+          <td>{{ a.direccion }}</td>
+          <td class="text-nowrap">{{ a.de|default:"—" }} → {{ a.a|default:"—" }}</td>
+          <td>{{ a.origen }}</td>
+          <td class="{% if 'Ignorada' in a.resultado %}text-warning{% elif 'Registrada' in a.resultado %}text-success{% endif %}">{{ a.resultado }}</td>
+          <td><details><summary class="small" style="cursor:pointer">JSON</summary><pre class="small mt-1 p-2 rounded" style="background:var(--bg3);white-space:pre-wrap;max-width:420px">{{ a.payload }}</pre></details></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="7" class="text-center muted py-3">Todavía no llegó ningún aviso de Anura.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+  </div></div>
+</div>
+</div>
+{% endblock %}

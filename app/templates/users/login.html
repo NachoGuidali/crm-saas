@@ -1,0 +1,11 @@
+{% extends "users/_auth_base.html" %}
+{% block title %}Ingresar{% endblock %}
+{% block auth %}
+<form method="post" novalidate>{% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert alert-danger py-2 small">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+  <div class="mb-3"><label class="form-label">{{ form.username.label }}</label>{{ form.username }}</div>
+  <div class="mb-3"><label class="form-label">{{ form.password.label }}</label>{{ form.password }}</div>
+  <button class="btn btn-primary w-100" {% if bloqueado %}disabled{% endif %}>Ingresar</button>
+</form>
+<div class="text-center mt-3"><a href="{% url 'users:recupero' %}" class="small">¿Olvidaste tu contraseña?</a></div>
+{% endblock %}

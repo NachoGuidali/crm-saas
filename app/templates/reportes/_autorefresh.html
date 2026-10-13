@@ -1,0 +1,10 @@
+<div class="small muted text-end mb-2" id="autoRefresh"><i class="bi bi-arrow-repeat"></i> Se actualiza solo cada minuto · <span id="arHora"></span></div>
+<script>
+(function () {
+  const h = document.getElementById('arHora'); h.textContent = 'actualizado ' + new Date().toLocaleTimeString('es-AR', {hour: '2-digit', minute: '2-digit'});
+  setInterval(() => {
+    const ocupado = document.activeElement && ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName);
+    if (!document.hidden && !ocupado && !document.querySelector('.modal.show')) location.reload();
+  }, 60000);
+})();
+</script>

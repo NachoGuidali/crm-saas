@@ -1,0 +1,58 @@
+{% load crm_extras %}
+<div class="chat" style="height:560px" id="chatPanel" data-conv="{{ conv.pk|default:'' }}" data-contacto="{{ contacto.pk }}">
+  <div class="d-flex align-items-center gap-2 px-2 py-2 border-bottom flex-wrap" style="border-color:var(--border)!important">
+    {% if opciones_linea|length > 1 %}
+    <label class="small muted mb-0" for="selLineaChat">Escribir desde</label>
+    <select class="form-select form-select-sm" style="width:auto;max-width:100%" id="selLineaChat">
+      {% for o in opciones_linea %}<option value="{{ o.linea.pk }}" {% if o.linea == linea_actual %}selected{% endif %}>{{ o.linea.nombre }}{% if o.linea.telefono %} ({{ o.linea.telefono }}){% endif %} — {% if o.conv %}último mensaje {{ o.conv.ultimo_mensaje_at|date:"d/m" }}{% if o.conv.no_leidos %}, {{ o.conv.no_leidos }} sin leer{% endif %}{% else %}sin chat todavía{% endif %}{% if not o.usable %} · no la tenés habilitada{% endif %}</option>{% endfor %}
+    </select>
+    {% elif linea_actual %}<span class="chip"><i class="bi bi-phone"></i> {{ linea_actual.nombre }}{% if linea_actual.telefono %} ({{ linea_actual.telefono }}){% endif %}</span>{% endif %}
+    {% if linea_actual.es_oficial %}<span class="chip" title="Línea oficial: fuera de las 24 h solo plantillas aprobadas">oficial</span>{% endif %}
+    {% if conv %}<a class="small ms-auto" href="{% url 'whatsapp:inbox' %}?conv={{ conv.pk }}">Abrir en el inbox <i class="bi bi-box-arrow-up-right"></i></a>{% endif %}
+  </div>
+  <div class="chat-msgs" id="chatMsgs">
+    {% if conv %}{% include "whatsapp/_mensajes.html" %}{% else %}
+    <div class="m-auto text-center muted small"><i class="bi bi-whatsapp" style="font-size:2rem;opacity:.4"></i><br>Todavía no hay conversación desde {{ linea_actual.nombre|default:"esta línea" }}.<br>Escribile para iniciarla.</div>
+    {% endif %}
+  </div>
+  <div class="chat-input position-relative">
+    {% if contacto.no_contactar %}<div class="ventana-aviso"><i class="bi bi-slash-circle"></i> El contacto pidió no ser contactado.</div>{% endif %}
+    {% if not lineas %}
+      <div class="muted small">No tenés líneas de WhatsApp habilitadas.</div>
+    {% elif not contacto.telefono %}
+      <div class="muted small">El contacto no tiene teléfono.</div>
+    {% elif not puede_escribir %}
+      <div class="muted small"><i class="bi bi-lock"></i> Este chat es de la línea {{ linea_actual.nombre }}, que no tenés habilitada. Elegí otra línea arriba para escribirle.</div>
+    {% else %}
+      <div class="ventana-aviso" id="avisoVentana" style="{% if not ventana_cerrada %}display:none{% endif %}">
+        <i class="bi bi-clock-history"></i> {% if conv %}Pasaron más de 24 h del último mensaje del cliente{% else %}Todavía no hay conversación reciente desde esta línea{% endif %}: en una línea oficial solo podés enviar una <b>plantilla</b> aprobada.
+      </div>
+      <div class="rr-menu" id="rrMenu"></div>
+      <form id="chatForm" class="d-flex gap-2 align-items-end" enctype="multipart/form-data">
+        {% if not conv %}<input type="hidden" name="linea" value="{{ linea_actual.pk }}">{% endif %}
+        <div class="dropdown">
+          <button type="button" class="btn btn-outline-secondary btn-icon" data-bs-toggle="dropdown" title="Plantillas"><i class="bi bi-chat-square-text"></i></button>
+          <div class="dropdown-menu" style="max-height:300px;overflow-y:auto;width:320px">
+            {% for p in plantillas %}<a class="dropdown-item small" href="#" data-plantilla="{{ p.pk }}" style="white-space:normal"><b>{{ p.nombre }}</b><br><span class="muted">{{ p.cuerpo|truncatechars:90 }}</span></a>{% empty %}<span class="dropdown-item small muted">{% if linea_actual.es_oficial %}No hay plantillas aprobadas para esta línea{% else %}Sin plantillas{% endif %}</span>{% endfor %}
+          </div>
+        </div>
+        <button type="button" class="btn btn-outline-secondary btn-icon btn-voz" title="Grabar nota de voz" style="display:none"><i class="bi bi-mic"></i></button><label class="btn btn-outline-secondary btn-icon mb-0" title="Adjuntar archivo"><i class="bi bi-paperclip"></i><input type="file" name="archivo" hidden></label>
+        <textarea name="texto" rows="1" class="form-control" placeholder="Escribí un mensaje… (/ para respuestas rápidas)"></textarea>
+        <button class="btn btn-success btn-icon" title="Enviar"><i class="bi bi-send"></i></button>
+      </form><div class="grabando" style="display:none"><span class="rec-dot"></span> Grabando <b class="rec-t">0:00</b><button type="button" class="btn btn-sm btn-link text-danger rec-cancel" title="Cancelar"><i class="bi bi-trash"></i></button><button type="button" class="btn btn-success btn-icon rec-send" title="Enviar nota de voz"><i class="bi bi-send"></i></button></div>
+      <div class="small muted mt-1" id="adjuntoNombre"></div>
+    {% endif %}
+  </div>
+</div>
+<script>
+(function () {
+  const sel = document.getElementById('selLineaChat');
+  if (!sel) return;
+  sel.addEventListener('change', () => {
+    const params = new URLSearchParams(location.search);
+    params.set('linea', sel.value);
+    location.href = location.pathname + '?' + params.toString() + '#whatsapp';
+  });
+})();
+</script>
+{% include "whatsapp/_chat_js.html" %}

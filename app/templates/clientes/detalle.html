@@ -1,0 +1,153 @@
+{% extends "clientes/_base.html" %}
+{% load humanize %}
+{% block title %}{{ cliente.nombre }}{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2">
+  <h1 class="h4 mb-0 me-auto">{{ cliente.nombre }}
+    <span class="badge fs-6 align-middle {% if cliente.estado == 'activo' %}text-bg-success{% elif cliente.estado == 'prueba' %}text-bg-info{% else %}text-bg-danger{% endif %}">{{ cliente.get_estado_display }}</span></h1>
+  {% if url %}<a href="{{ url }}" target="_blank" class="btn btn-outline-primary btn-sm"><i class="bi bi-box-arrow-up-right"></i> Abrir CRM</a>{% endif %}
+  <form method="post">{% csrf_token %}
+    {% if cliente.tiene_acceso %}
+      <button name="accion" value="suspender" class="btn btn-outline-danger btn-sm" onclick="return confirm('¿Suspender el acceso de {{ cliente.nombre|escapejs }}?')">Suspender</button>
+    {% else %}
+      <button name="accion" value="reactivar" class="btn btn-success btn-sm">Reactivar</button>
+    {% endif %}
+  </form>
+</div>
+
+{% if cliente.motivo_suspension == 'falta_pago' and cliente.estado == 'suspendido' %}
+<div class="alert alert-danger py-2 small">Suspendido automáticamente por falta de pago. Al registrar el pago se reactiva.</div>
+{% endif %}
+
+{% if credenciales %}
+<div class="alert alert-warning">
+  <strong>Datos de acceso del administrador</strong> (anotalos: no se vuelven a mostrar)<br>
+  URL: <code>{{ url }}</code><br>
+  Usuario: <code>{{ credenciales.usuario }}</code> · Contraseña: <code>{{ credenciales.password }}</code>
+  {% if credenciales.temporal %}<br><span class="small">Es temporal: se le pide cambiarla al primer ingreso.</span>{% endif %}
+</div>
+{% endif %}
+
+<div class="row g-4">
+  <div class="col-md-8"><div class="card card-body">
+    <form method="post" novalidate>{% csrf_token %}
+      <div class="row">
+        <div class="col-md-6">{% include "clientes/_campo.html" with f=form.nombre %}</div>
+        <div class="col-md-3">{% include "clientes/_campo.html" with f=form.estado %}</div>
+        <div class="col-md-3">{% include "clientes/_campo.html" with f=form.prueba_hasta %}</div>
+        <div class="col-md-6">{% include "clientes/_campo.html" with f=form.plan %}</div>
+        <div class="col-md-3">{% include "clientes/_campo.html" with f=form.max_usuarios %}</div>
+        <div class="col-md-3">{% include "clientes/_campo.html" with f=form.max_lineas_whatsapp %}</div>
+        <div class="col-md-3">{% include "clientes/_campo.html" with f=form.max_wa_dia %}</div>
+        <div class="col-md-4">{% include "clientes/_campo.html" with f=form.cobro %}</div>
+        <div class="col-md-3">{% include "clientes/_campo.html" with f=form.precio_acordado %}</div>
+        <div class="col-md-5">{% include "clientes/_campo.html" with f=form.pagado_hasta %}</div>
+        <div class="col-12 mb-3"><div class="form-check">{{ form.suspension_automatica }}
+          <label class="form-check-label small" for="{{ form.suspension_automatica.id_for_label }}">Suspender automáticamente si vence y no paga ({{ dias_gracia }} días de gracia)</label></div></div>
+        <div class="col-md-4">{% include "clientes/_campo.html" with f=form.contacto_nombre %}</div>
+        <div class="col-md-4">{% include "clientes/_campo.html" with f=form.contacto_email %}</div>
+        <div class="col-md-4">{% include "clientes/_campo.html" with f=form.contacto_telefono %}</div>
+        <div class="col-12">{% include "clientes/_campo.html" with f=form.notas %}</div>
+      </div>
+      <button class="btn btn-primary">Guardar</button>
+    </form>
+  </div></div>
+  <div class="col-md-4"><div class="card card-body small mb-3">
+    <div class="d-flex align-items-center mb-2"><span class="fw-semibold me-auto">Cobro</span>{% with c=cliente %}{% include "clientes/_vence.html" %}{% endwith %}</div>
+    <div class="mb-1"><span class="text-secondary">Precio mensual:</span> {% if cliente.precio %}{{ moneda }} {{ cliente.precio|floatformat:2|intcomma }}{% if cliente.precio_acordado is not None %} <span class="text-secondary">(acordado)</span>{% endif %}{% else %}—{% endif %}</div>
+    <div class="mb-1"><span class="text-secondary">Pagado hasta:</span> {{ cliente.pagado_hasta|date:"d/m/Y"|default:"—" }}</div>
+    {% if cliente.estado == 'prueba' %}<div class="mb-1"><span class="text-secondary">Prueba hasta:</span> {{ cliente.prueba_hasta|date:"d/m/Y"|default:"—" }}</div>{% endif %}
+    <div><span class="text-secondary">Medio:</span> {{ cliente.get_cobro_display }}</div>
+  </div><div class="card card-body small">
+    <div class="mb-2"><span class="text-secondary">Subdominio:</span> {{ dominio }}</div>
+    <div class="mb-2"><span class="text-secondary">Schema:</span> <code>{{ cliente.schema_name }}</code></div>
+    {% if uso %}
+    <div class="mb-2"><span class="text-secondary">Usuarios activos:</span> {{ uso.usuarios }}{% if cliente.limite_usuarios %} de {{ cliente.limite_usuarios }}{% else %} (sin límite){% endif %}</div>
+    <div class="mb-2"><span class="text-secondary">Líneas de WhatsApp:</span> {{ uso.lineas }}{% if cliente.limite_lineas_whatsapp %} de {{ cliente.limite_lineas_whatsapp }}{% else %} (sin límite){% endif %}</div>
+    {% endif %}
+    <div><span class="text-secondary">Alta:</span> {{ cliente.created_at|date:"d/m/Y H:i" }}</div>
+  </div></div>
+</div>
+
+<h2 class="h5 mt-4 mb-3">Pagos</h2>
+<div class="row g-4">
+  <div class="col-md-5"><div class="card card-body">
+    <div class="fw-semibold mb-2">Registrar pago</div>
+    <form method="post" novalidate>{% csrf_token %}<input type="hidden" name="accion" value="pago">
+      <div class="row">
+        <div class="col-6">{% include "clientes/_campo.html" with f=form_pago.monto %}</div>
+        <div class="col-6">{% include "clientes/_campo.html" with f=form_pago.meses %}</div>
+        <div class="col-6">{% include "clientes/_campo.html" with f=form_pago.periodo_desde %}</div>
+        <div class="col-6">{% include "clientes/_campo.html" with f=form_pago.fecha %}</div>
+        <div class="col-6">{% include "clientes/_campo.html" with f=form_pago.medio %}</div>
+        <div class="col-6">{% include "clientes/_campo.html" with f=form_pago.referencia %}</div>
+        <div class="col-12">{% include "clientes/_campo.html" with f=form_pago.notas %}</div>
+        {% if not cliente.tiene_acceso %}<div class="col-12 mb-3"><div class="form-check">{{ form_pago.reactivar }}
+          <label class="form-check-label small" for="{{ form_pago.reactivar.id_for_label }}">{{ form_pago.reactivar.label }}</label></div></div>{% endif %}
+      </div>
+      <button class="btn btn-success btn-sm"><i class="bi bi-cash-coin"></i> Registrar pago</button>
+    </form>
+  </div></div>
+  <div class="col-md-7"><div class="card"><div class="table-responsive"><table class="table table-sm align-middle mb-0 small">
+    <thead><tr><th>Fecha</th><th class="text-end">Monto</th><th>Medio</th><th>Período</th><th>Referencia</th><th></th></tr></thead>
+    <tbody>
+    {% for p in pagos %}
+      <tr class="{% if p.anulado %}text-decoration-line-through text-secondary{% endif %}">
+        <td>{{ p.fecha|date:"d/m/Y" }}</td>
+        <td class="text-end">{{ p.monto|floatformat:2|intcomma }}</td>
+        <td>{{ p.get_medio_display }}</td>
+        <td>{{ p.periodo_desde|date:"d/m" }} → {{ p.periodo_hasta|date:"d/m/Y" }}</td>
+        <td title="{{ p.notas }}">{{ p.referencia|truncatechars:28 }}{% if p.registrado_por %}<div class="text-secondary">{{ p.registrado_por }}</div>{% endif %}</td>
+        <td class="text-end">{% if not p.anulado %}<form method="post" class="d-inline">{% csrf_token %}<input type="hidden" name="accion" value="anular_pago"><input type="hidden" name="pago" value="{{ p.pk }}">
+          <button class="btn btn-link btn-sm text-danger p-0" title="Anular" onclick="return confirm('¿Anular este pago? Se recalcula hasta cuándo tiene pago.')"><i class="bi bi-x-circle"></i></button></form>{% else %}anulado{% endif %}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="6" class="text-center text-secondary py-3">Sin pagos registrados.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div></div></div>
+</div>
+
+<h2 class="h5 mt-4 mb-3"><i class="bi bi-credit-card"></i> Mercado Pago</h2>
+{% if not mp_configurado %}
+<div class="card card-body small text-secondary">Mercado Pago no está configurado. Cargá <code>MP_ACCESS_TOKEN</code> y <code>MP_WEBHOOK_SECRET</code> en el <code>.env</code> (ver <code>docs/SAAS.md</code>).</div>
+{% else %}
+{% if link_mp %}
+<div class="alert alert-info small">Link de pago por {{ link_mp.meses }} {% if link_mp.meses == 1 %}mes{% else %}meses{% endif %} (mandáselo al cliente; cuando paga se registra solo):
+  <div class="input-group input-group-sm mt-1"><input class="form-control" value="{{ link_mp.url }}" readonly id="link-mp">
+  <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText(document.getElementById('link-mp').value);this.textContent='Copiado'">Copiar</button></div></div>
+{% endif %}
+<div class="row g-4">
+  <div class="col-md-7"><div class="card card-body small">
+    <div class="fw-semibold mb-2">Débito automático mensual</div>
+    {% if cliente.mp_suscripcion_id and cliente.mp_suscripcion_estado != 'cancelled' %}
+      <div class="mb-2"><span class="text-secondary">Estado:</span> <strong>{{ estado_mp }}</strong> · <span class="text-secondary">pagador:</span> {{ cliente.mp_email_pagador }}</div>
+      {% if cliente.mp_suscripcion_estado == 'pending' and cliente.mp_suscripcion_link %}
+      <div class="input-group input-group-sm mb-2"><input class="form-control" value="{{ cliente.mp_suscripcion_link }}" readonly id="link-sus">
+        <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText(document.getElementById('link-sus').value);this.textContent='Copiado'">Copiar link</button></div>
+      <div class="text-secondary mb-2">Mandale este link al cliente: entra con su cuenta de Mercado Pago y autoriza la tarjeta.</div>
+      {% endif %}
+      <form method="post" class="d-flex gap-2">{% csrf_token %}
+        <button name="accion" value="mp_actualizar" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-repeat"></i> Actualizar estado</button>
+        <button name="accion" value="mp_cancelar" class="btn btn-outline-danger btn-sm" onclick="return confirm('¿Cancelar la suscripción? Mercado Pago deja de cobrarle.')">Cancelar suscripción</button>
+      </form>
+    {% else %}
+      <p class="text-secondary">Se genera un link; el cliente lo abre, autoriza la tarjeta y Mercado Pago le cobra {% if cliente.precio %}{{ moneda }} {{ cliente.precio|floatformat:2|intcomma }}{% else %}el precio del plan{% endif %} todos los meses. Cada cobro corre el vencimiento solo.</p>
+      <form method="post" novalidate>{% csrf_token %}<input type="hidden" name="accion" value="mp_suscripcion">
+        {% include "clientes/_campo.html" with f=form_mp.email_pagador %}
+        <button class="btn btn-primary btn-sm">Generar link de suscripción</button>
+      </form>
+    {% endif %}
+    {% if cliente.mp_suscripcion_estado == 'cancelled' %}<div class="text-secondary mt-2">La última suscripción está cancelada.</div>{% endif %}
+  </div></div>
+  <div class="col-md-5"><div class="card card-body small">
+    <div class="fw-semibold mb-2">Link de pago único</div>
+    <p class="text-secondary">Para pagar uno o varios meses con Mercado Pago, sin débito automático.</p>
+    <form method="post" class="row g-2 align-items-end" novalidate>{% csrf_token %}<input type="hidden" name="accion" value="mp_link">
+      <div class="col-5">{% include "clientes/_campo.html" with f=form_link.meses %}</div>
+      <div class="col-7 mb-3"><button class="btn btn-outline-primary btn-sm w-100">Generar link</button></div>
+    </form>
+  </div></div>
+</div>
+{% endif %}
+{% endblock %}

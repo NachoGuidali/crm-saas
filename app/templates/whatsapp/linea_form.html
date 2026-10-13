@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}{{ linea|default:"Nueva línea" }}{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-phone"></i> {{ linea|default:"Conectar número" }}</h1>
+  {% if linea %}<span class="chip {% if linea.estado == 'conectada' %}ok{% elif linea.estado == 'error' %}danger{% else %}warn{% endif %}" id="chipEstado">{{ linea.get_estado_display }}</span>{% endif %}</div>
+<div class="row g-3">
+<div class="col-lg-7">
+<form method="post" class="card"><div class="card-body">{% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert alert-danger py-2">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+  <div class="row g-2">
+    <div class="col-md-6"><label class="form-label">Nombre</label>{{ form.nombre }}{{ form.nombre.errors }}</div>
+    <div class="col-md-6"><label class="form-label">Número (informativo)</label>{{ form.telefono }}</div>
+    <div class="col-12"><label class="form-label">Proveedor</label>{{ form.proveedor }}</div>
+    <div class="col-md-8"><label class="form-label">{{ form.embudo.label }}</label>{{ form.embudo }}<div class="form-text">{{ form.embudo.help_text }}</div></div>
+    <div class="col-md-4"><label class="form-label">Seg. entre envíos auto.</label>{{ form.min_segundos_entre_envios }}</div>
+    <div class="col-6"><label class="d-flex gap-2">{{ form.activa }} Activa</label></div>
+    <div class="col-6"><label class="form-label">Orden</label>{{ form.orden }}</div>
+  </div>
+  <div class="prov prov-evolution mt-3"><div class="section-title">Evolution API</div><div class="row g-2">
+    <div class="col-md-4"><label class="form-label">Instancia</label>{{ form.evolution_instancia }}<div class="form-text">Vacío = se genera sola</div>{{ form.evolution_instancia.errors }}</div>
+    <div class="col-md-8"><label class="form-label">URL (vacío = global)</label>{{ form.evolution_api_url }}</div>
+    <div class="col-12"><label class="form-label">API key (vacío = global)</label>{{ form.evolution_api_key }}</div></div></div>
+  <div class="prov prov-meta mt-3"><div class="section-title">Meta Cloud API</div><div class="row g-2">
+    <div class="col-md-6"><label class="form-label">Phone Number ID</label>{{ form.meta_phone_number_id }}{{ form.meta_phone_number_id.errors }}</div>
+    <div class="col-md-6"><label class="form-label">WABA ID</label>{{ form.meta_waba_id }}</div>
+    <div class="col-12"><label class="form-label">Access token permanente (System User)</label>{{ form.meta_access_token }}{{ form.meta_access_token.errors }}</div>
+    <div class="col-md-6"><label class="form-label">App secret (firma del webhook)</label>{{ form.meta_app_secret }}</div>
+    <div class="col-md-4"><label class="form-label">Verify token</label>{{ form.meta_verify_token }}{{ form.meta_verify_token.errors }}<div class="form-text">Vacío = se genera solo al guardar.</div></div>
+    <div class="col-md-2"><label class="form-label">Versión</label>{{ form.meta_api_version }}</div></div></div>
+  <div class="prov prov-twilio mt-3"><div class="section-title">Twilio</div><div class="row g-2">
+    <div class="col-md-6"><label class="form-label">Account SID</label>{{ form.twilio_account_sid }}{{ form.twilio_account_sid.errors }}</div>
+    <div class="col-md-6"><label class="form-label">Auth token</label>{{ form.twilio_auth_token }}{{ form.twilio_auth_token.errors }}</div>
+    <div class="col-md-6"><label class="form-label">Número remitente</label>{{ form.twilio_from }}{{ form.twilio_from.errors }}</div></div></div>
+  <div class="section-title mt-3">Quiénes usan esta línea</div>
+  <div class="checks-grid">{% for c in form.agentes %}<label>{{ c.tag }} {{ c.choice_label }}</label>{% endfor %}</div>
+  <div class="form-text">Sin marcar = todos los usuarios.</div>
+  <button class="btn btn-primary mt-3">Guardar</button>
+</div></form>
+</div>
+<div class="col-lg-5">
+  {% if linea %}
+  <div class="card mb-3"><div class="card-header">Webhook</div><div class="card-body small">
+    <p class="muted mb-1">URL que recibe los mensajes de esta línea{% if linea.proveedor == 'meta' %} (pegala en Meta → WhatsApp → Configuración, con el verify token){% elif linea.proveedor == 'twilio' %} (Twilio → número → "A message comes in"){% endif %}:</p>
+    <code class="copiable d-block">{{ linea.webhook_url }}</code>
+    {% if linea.proveedor == 'meta' %}<p class="muted mb-1 mt-2">Verify token:</p><code class="copiable d-block">{{ linea.meta_verify_token }}</code>{% endif %}
+    {% if linea.proveedor == 'evolution' %}<form method="post" action="{% url 'whatsapp:linea_conexion' linea.pk %}" class="mt-2">{% csrf_token %}<button name="accion" value="webhook" class="btn btn-sm btn-outline-secondary">Configurarlo en Evolution</button></form>{% endif %}
+    {% if linea.proveedor == 'meta' %}<form method="post" action="{% url 'whatsapp:linea_conexion' linea.pk %}" class="mt-2">{% csrf_token %}<button name="accion" value="sync_plantillas" class="btn btn-sm btn-outline-secondary">Sincronizar plantillas desde Meta</button></form>{% endif %}
+  </div></div>
+  {% if linea.proveedor == 'evolution' %}
+  <div class="card"><div class="card-header">Vincular el teléfono</div><div class="card-body text-center">
+    <div class="qr-box mb-2" id="qrBox"><span class="text-dark small">—</span></div>
+    <div class="small muted mb-2" id="qrEstado">Estado: {{ linea.get_estado_display }}</div>
+    <button class="btn btn-success btn-sm" id="btnQr"><i class="bi bi-qr-code"></i> Mostrar QR</button>
+    <form method="post" action="{% url 'whatsapp:linea_conexion' linea.pk %}" class="d-inline" onsubmit="return confirm('¿Desvincular este número?')">{% csrf_token %}<button name="accion" value="desconectar" class="btn btn-outline-danger btn-sm">Desvincular</button></form>
+    <p class="small muted mt-2 mb-0">En el teléfono: WhatsApp → Dispositivos vinculados → Vincular dispositivo.</p>
+  </div></div>
+  {% endif %}
+  {% endif %}
+</div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function () {
+  const sel = document.getElementById('id_proveedor');
+  const upd = () => document.querySelectorAll('.prov').forEach(p => p.style.display = p.classList.contains('prov-' + sel.value) ? '' : 'none');
+  sel.addEventListener('change', upd); upd();
+  {% if linea and linea.proveedor == 'evolution' %}
+  let timer = null;
+  async function consultar(qr) {
+    const d = await CRM.api('{% url "whatsapp:linea_conexion" linea.pk %}' + (qr ? '?qr=1' : ''), {silencioso: true});
+    document.getElementById('qrEstado').textContent = 'Estado: ' + d.estado_display + (d.detalle ? ' · ' + d.detalle : '');
+    if (d.qr) document.getElementById('qrBox').innerHTML = `<img src="${d.qr.startsWith('data:') ? d.qr : 'data:image/png;base64,' + d.qr}" alt="QR">`;
+    if (d.estado === 'conectada') { clearInterval(timer); document.getElementById('qrBox').innerHTML = '<i class="bi bi-check-circle-fill text-success" style="font-size:4rem"></i>'; }
+  }
+  document.getElementById('btnQr').addEventListener('click', () => { consultar(true); clearInterval(timer); timer = setInterval(() => consultar(true), 20000); setInterval(() => consultar(false), 4000); });
+  {% endif %}
+})();
+</script>
+{% endblock %}

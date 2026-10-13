@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% load crm_extras %}
+{% block title %}{{ contacto.nombre }}{% endblock %}
+{% block content %}
+<div class="ficha-head">
+  <div class="d-flex justify-content-between flex-wrap gap-2">
+    <div>
+      <h1 class="nombre">{{ contacto.nombre }} {% if contacto.no_contactar %}<span class="chip danger">No contactar</span>{% endif %}</h1>
+      <div class="datos">{% if contacto.telefono %}<span class="copiable" data-valor="{{ contacto.telefono }}"><i class="bi bi-telephone"></i> {{ contacto.telefono|telefono }}</span>{% endif %}
+        {% if contacto.email %}<span><i class="bi bi-envelope"></i> {{ contacto.email }}</span>{% endif %}
+        <span class="muted">Contacto desde {{ contacto.created_at|date:"d/m/Y" }}</span></div>
+    </div>
+    <div class="ficha-acciones align-items-start">
+      {% if contacto.telefono %}<button class="btn btn-primary btn-sm" data-llamar data-contacto="{{ contacto.pk }}"><i class="bi bi-telephone"></i> Llamar</button>{% endif %}
+      <form method="post" action="{% url 'crm:contacto_oportunidad' contacto.pk %}" class="d-flex gap-1">{% csrf_token %}
+        <select name="embudo" class="form-select form-select-sm">{% for e in embudos %}<option value="{{ e.pk }}">{{ e }}</option>{% endfor %}</select>
+        <button class="btn btn-outline-primary btn-sm text-nowrap"><i class="bi bi-plus"></i> Nueva oportunidad</button>
+      </form>
+      {% if 'eliminar' in perms_crm %}<form method="post" action="{% url 'crm:contacto_eliminar' contacto.pk %}" onsubmit="return confirm('¿Eliminar el contacto con todo su historial? No se puede deshacer.')">{% csrf_token %}<button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button></form>{% endif %}
+    </div>
+  </div>
+</div>
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="card mb-3"><div class="card-header">Oportunidades</div><div class="card-body p-0">
+      {% for o in oportunidades %}<a href="{% url 'crm:oportunidad_detalle' o.pk %}" class="d-block px-3 py-2 border-bottom text-decoration-none" style="color:var(--text)">
+        <div class="d-flex justify-content-between"><b class="small">{{ o.embudo }}</b><span class="badge bg-{{ o.get_estado_badge }}">{{ o.get_estado_display }}</span></div>
+        <div class="small muted">{{ o.etapa }} · {{ o.agente.display_name|default:"sin agente" }} · {{ o.created_at|date:"d/m/Y" }}{% if o.tipificacion %} · {{ o.tipificacion }}{% endif %}</div></a>
+      {% empty %}<div class="p-3 small muted">Sin oportunidades.</div>{% endfor %}
+    </div></div>
+    <div class="card"><div class="card-header">Datos</div><div class="card-body">
+      <form method="post" action="{% url 'crm:contacto_editar' contacto.pk %}">{% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        {% for f in contacto_form.campos_base %}<div class="mb-2"><label class="form-label">{{ f.label }}</label>{{ f }}</div>{% endfor %}
+        {% if contacto_form.campos_personalizados_bound %}<div class="section-title mt-3">Campos personalizados</div>{% endif %}
+        {% for f in contacto_form.campos_personalizados_bound %}<div class="mb-2"><label class="form-label">{{ f.label }}</label>{{ f }}</div>{% endfor %}
+        {% for etiqueta, valor, campo in datos_extra %}{% if not campo %}<div class="small"><span class="muted">{{ etiqueta }}:</span> {{ valor }}</div>{% endif %}{% endfor %}
+        <button class="btn btn-sm btn-primary mt-2">Guardar</button>
+      </form>
+    </div></div>
+  </div>
+  <div class="col-lg-8"><div class="card">
+    <div class="card-header p-0 border-0"><ul class="nav nav-tabs px-2 pt-2">
+      <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tA">Actividad</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabWa">WhatsApp</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tL">Llamadas</button></li>
+    </ul></div>
+    <div class="tab-content">
+      <div class="tab-pane fade show active card-pad" id="tA"><div class="timeline">{% for a in actividades %}{% include "crm/_actividad.html" with mostrar_embudo=True %}{% empty %}<div class="muted small">Sin actividad.</div>{% endfor %}</div></div>
+      <div class="tab-pane fade" id="tabWa">{% include "crm/_chat.html" %}</div>
+      <div class="tab-pane fade card-pad" id="tL">{% include "telefonia/_tabla_llamadas.html" %}</div>
+    </div>
+  </div></div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>if (location.hash === '#whatsapp') document.querySelector('[data-bs-target="#tabWa"]').click();</script>
+{% endblock %}

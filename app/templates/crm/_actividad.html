@@ -1,0 +1,10 @@
+{% load crm_extras %}<div class="tl-item {{ a.tipo }}" data-tipo="{{ a.tipo }}">
+  <span class="ic"><i class="bi bi-{{ a.icono }}"></i></span>
+  <div class="cab">{{ a.get_tipo_display }} · {% if a.usuario %}<b>{{ a.usuario.display_name }}</b>{% else %}<span title="Hecho por el sistema (automático)">automático</span>{% endif %} · {{ a.created_at|date:"d/m/Y H:i" }}{% if a.oportunidad and mostrar_embudo %} · {{ a.oportunidad.embudo }}{% endif %}</div>
+  {% if a.datos.cambios %}
+  <div class="cuerpo cambios">{% if a.datos.contexto %}<div class="muted small mb-1">{{ a.datos.contexto }}</div>{% endif %}
+    {% for c in a.datos.cambios %}<div><span class="muted">{{ c.label }}:</span> <s class="muted">{{ c.antes }}</s> <i class="bi bi-arrow-right small muted"></i> <b>{{ c.despues }}</b></div>{% endfor %}
+  </div>
+  {% else %}<div class="cuerpo">{{ a.texto|urlize }}</div>{% endif %}
+  {% if a.llamada and a.llamada.grabacion %}<audio controls preload="none" src="{{ a.llamada.grabacion.url }}"></audio>{% elif a.llamada.grabacion_estado == 'pendiente' %}<div class="muted small"><i class="bi bi-hourglass"></i> Descargando grabación…</div>{% endif %}
+</div>

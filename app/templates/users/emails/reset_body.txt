@@ -1,0 +1,10 @@
+Hola {{ user.first_name|default:user.username }},
+
+{% if bienvenida %}Te crearon un usuario en {{ crm_nombre }}. Tu usuario es: {{ user.username }}
+Para empezar, definí tu contraseña en este link:{% else %}Recibimos un pedido para cambiar tu contraseña de {{ crm_nombre }}.
+Para elegir una nueva, entrá a este link:{% endif %}
+
+{{ protocol }}://{{ domain }}{% url 'users:recupero_confirmar' uidb64=uid token=token %}
+
+El link vence en 2 horas y se puede usar una sola vez.
+{% if not bienvenida %}Si no fuiste vos, ignorá este email: tu contraseña no cambia.{% endif %}

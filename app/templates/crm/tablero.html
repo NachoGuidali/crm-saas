@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% load crm_extras %}
+{% block title %}Tablero · {{ embudo }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1><span class="dot" style="background:{{ embudo.color }};width:10px;height:10px"></span> {{ embudo.nombre }}</h1>
+  <div class="toolbar">
+    {% include "crm/_filtros_embudo.html" %}
+    <a href="{% url 'crm:oportunidades' %}?{{ request.GET.urlencode }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-list-ul"></i> Vista lista</a>
+    <a href="{% url 'crm:oportunidad_nueva' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Nuevo prospecto</a>
+  </div>
+</div>
+
+<form class="toolbar mb-3" method="get">
+  <input type="hidden" name="embudo" value="{{ embudo.pk }}">
+  <input type="search" name="q" value="{{ filtros.q }}" class="form-control form-control-sm" placeholder="Nombre, teléfono, email…" style="min-width:220px">
+  {% if user.ve_todo %}
+  <select name="agente" class="form-select form-select-sm">
+    <option value="">Todos los agentes</option>
+    <option value="ninguno" {% if filtros.agente == 'ninguno' %}selected{% endif %}>Sin asignar</option>
+    {% for a in agentes %}<option value="{{ a.pk }}" {% if filtros.agente == a.pk|stringformat:'s' %}selected{% endif %}>{{ a.display_name }}</option>{% endfor %}
+  </select>
+  {% endif %}
+  <select name="origen" class="form-select form-select-sm">
+    <option value="">Cualquier canal</option>
+    {% for k, v in origenes %}<option value="{{ k }}" {% if filtros.origen == k %}selected{% endif %}>{{ v }}</option>{% endfor %}
+  </select>
+  <select name="pauta" class="form-select form-select-sm" title="Pauta / campaña">
+    <option value="">Todas las pautas</option>
+    <option value="ninguna" {% if filtros.pauta == 'ninguna' %}selected{% endif %}>Sin pauta</option>
+    {% for p in pautas %}<option value="{{ p.pk }}" {% if filtros.pauta == p.pk|stringformat:'s' %}selected{% endif %}>{{ p.nombre }}</option>{% endfor %}
+  </select>
+  {% if lotes %}<select name="lote" class="form-select form-select-sm" title="Base importada" style="max-width:220px">
+    <option value="">Todas las bases</option>
+    {% for l in lotes %}<option value="{{ l.pk }}" {% if filtros.lote == l.pk|stringformat:'s' %}selected{% endif %}>{{ l }}</option>{% endfor %}
+  </select>{% endif %}
+  <select name="sin_actividad" class="form-select form-select-sm">
+    <option value="">Cualquier actividad</option>
+    <option value="3" {% if filtros.sin_actividad == '3' %}selected{% endif %}>Sin actividad +3 días</option>
+    <option value="7" {% if filtros.sin_actividad == '7' %}selected{% endif %}>Sin actividad +7 días</option>
+  </select>
+  <select name="pausadas" class="form-select form-select-sm">
+    <option value="">Incluir pausadas</option>
+    <option value="0" {% if filtros.pausadas == '0' %}selected{% endif %}>Ocultar pausadas</option>
+  </select>
+  <label class="btn btn-sm btn-outline-danger {% if filtros.prioritaria %}active{% endif %}" title="Solo prioridad (ej. reingresos)"><input type="checkbox" name="prioritaria" value="1" class="d-none" onchange="this.form.submit()" {% if filtros.prioritaria %}checked{% endif %}>🔥 Prioridad</label>
+  <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-funnel"></i> Filtrar</button>
+  {% if filtros.q or filtros.agente or filtros.origen or filtros.sin_actividad or filtros.pausadas or filtros.pauta or filtros.lote or filtros.prioritaria %}<a href="?embudo={{ embudo.pk }}" class="btn btn-link btn-sm">Limpiar</a>{% endif %}
+</form>
+
+<div class="board-wrap">
+  <div class="board" id="board">
+    {% for col in columnas %}
+    <div class="col {% if col.cierre %}cierre {{ col.etapa.tipo }}{% endif %}" style="--c:{{ col.etapa.color }}">
+      <div class="col-head">
+        <span class="t" title="{{ col.etapa.descripcion }}">{{ col.etapa.nombre }}</span>
+        <span class="n" data-count="{{ col.etapa.pk }}">{{ col.total|miles }}</span>
+      </div>
+      <div class="col-body" data-etapa="{{ col.etapa.pk }}" data-tipo="{{ col.etapa.tipo }}">
+        {% if col.cierre %}
+          <div class="drop-cierre"><i class="bi bi-{% if col.etapa.es_ganado %}trophy{% else %}x-octagon{% endif %}"></i>
+            Soltá acá para cerrar como <b>{% if col.etapa.es_ganado %}Venta{% else %}No venta{% endif %}</b>
+            <div class="sub">Se muestran los cerrados en los últimos 30 días</div></div>
+        {% endif %}
+        {% include "crm/_tarjetas.html" with cards=col.cards %}
+        {% if col.hay_mas %}<button class="btn btn-sm btn-outline-secondary ver-mas" data-etapa="{{ col.etapa.pk }}" data-offset="{{ col.cards|length }}">Ver más</button>{% endif %}
+        {% if not col.cards and not col.cierre %}<div class="text-center muted small py-3 vacio">Sin prospectos</div>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% include "crm/_tipificaciones_json.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  const board = document.getElementById('board');
+  let arrastrada = null, origen = null;
+
+  function ajustarConteo(etapa, delta) {
+    const n = board.querySelector(`[data-count="${etapa}"]`);
+    if (n) n.textContent = Math.max(0, parseInt((n.textContent || '0').replace(/\D/g, '') || '0') + delta).toLocaleString('es-AR');
+  }
+
+  board.addEventListener('dragstart', e => {
+    const card = e.target.closest('.tcard');
+    if (!card) return;
+    arrastrada = card; origen = card.parentElement;
+    card.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+  });
+  board.addEventListener('dragend', () => { if (arrastrada) arrastrada.classList.remove('dragging'); board.querySelectorAll('.over').forEach(c => c.classList.remove('over')); });
+  board.querySelectorAll('.col-body').forEach(col => {
+    col.addEventListener('dragover', e => { if (arrastrada) { e.preventDefault(); col.classList.add('over'); } });
+    col.addEventListener('dragleave', () => col.classList.remove('over'));
+    col.addEventListener('drop', async e => {
+      e.preventDefault(); col.classList.remove('over');
+      if (!arrastrada || col === origen) return;
+      const card = arrastrada, etapa = col.dataset.etapa, desde = card.dataset.etapa;
+      if (col.dataset.tipo !== 'normal') {
+        // Cierre: pide tipificación obligatoria
+        CRM.abrirCierre({op: card.dataset.id, etapa, tipo: col.dataset.tipo, nombre: card.dataset.nombre,
+          onOk: (r, postergado) => {
+            if (postergado) { location.reload(); return; }
+            const zona = col.querySelector('.drop-cierre');
+            if (zona) zona.after(card); else col.prepend(card);
+            card.dataset.etapa = etapa;
+            ajustarConteo(desde, -1); ajustarConteo(etapa, 1);
+          }});
+        return;
+      }
+      const verMas = col.querySelector('.ver-mas');
+      col.insertBefore(card, verMas || col.firstChild);   // optimista
+      const vacio = col.querySelector('.vacio'); if (vacio) vacio.remove();
+      ajustarConteo(desde, -1); ajustarConteo(etapa, 1);
+      try {
+        await CRM.mover(card.dataset.id, {etapa});
+        card.dataset.etapa = etapa;
+      } catch (err) {
+        origen.insertBefore(card, origen.firstChild); ajustarConteo(etapa, -1); ajustarConteo(desde, 1);
+      }
+    });
+  });
+
+  board.addEventListener('click', async e => {
+    const b = e.target.closest('.ver-mas');
+    if (!b) return;
+    b.disabled = true;
+    const params = new URLSearchParams(location.search);
+    params.set('etapa', b.dataset.etapa); params.set('offset', b.dataset.offset);
+    params.set('embudo', '{{ embudo.pk }}');
+    const d = await CRM.api('{% url "crm:tablero_columna" %}?' + params.toString());
+    b.insertAdjacentHTML('beforebegin', d.html);
+    const n = (d.html.match(/class="tcard/g) || []).length;
+    b.dataset.offset = parseInt(b.dataset.offset) + n;
+    b.disabled = false;
+    if (!d.hay_mas) b.remove();
+  });
+})();
+</script>
+{% endblock %}

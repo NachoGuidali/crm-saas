@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Mi perfil{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-person"></i> Mi perfil</h1><a href="{% url 'users:password_change' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-key"></i> Cambiar contraseña</a></div>
+<div class="row g-3"><div class="col-lg-6"><form method="post" enctype="multipart/form-data" class="card"><div class="card-body">{% csrf_token %}
+  {% for f in form %}<div class="mb-2"><label class="form-label">{{ f.label }}</label>{{ f }}{{ f.errors }}</div>{% endfor %}
+  <button class="btn btn-primary mt-2">Guardar</button>
+</div></form></div>
+<div class="col-lg-6"><div class="card"><div class="card-body">
+  <dl class="kv"><dt>Usuario</dt><dd>{{ user.username }}</dd><dt>Rol</dt><dd>{{ user.get_rol_display_full }}</dd>
+  <dt>Embudos</dt><dd>{% for e in user.embudos.all %}{{ e }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</dd>
+  <dt>Interno Anura</dt><dd>{{ user.interno_anura.interno|default:"—" }}</dd>
+  <dt>Permisos</dt><dd class="small">{% for p in user.permisos_efectivos %}<span class="chip me-1 mb-1">{{ p }}</span>{% empty %}Operación básica{% endfor %}</dd></dl>
+</div></div></div></div>
+{% endblock %}

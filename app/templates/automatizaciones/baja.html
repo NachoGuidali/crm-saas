@@ -1,0 +1,12 @@
+{% extends "users/_auth_base.html" %}
+{% block title %}Emails{% endblock %}
+{% block auth %}
+{% if hecho %}
+  <h5 class="mb-2">Listo</h5>
+  <p class="small muted mb-0">Ya no vas a recibir más emails nuestros en <b>{{ email }}</b>.</p>
+{% else %}
+  <h5 class="mb-2">¿Dejar de recibir emails?</h5>
+  <p class="small muted">No vamos a enviar más emails a <b>{{ email }}</b>.</p>
+  <form method="post"><button class="btn btn-primary w-100">Sí, no quiero recibir más emails</button></form>
+{% endif %}
+{% endblock %}

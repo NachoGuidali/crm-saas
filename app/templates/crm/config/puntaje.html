@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Puntaje de leads{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-star-half"></i> Puntaje de leads</h1></div>
+<p class="small muted" style="max-width:820px">Cada lead suma (o resta) puntos por las reglas que cumple. El puntaje se ve en la tarjeta, se puede ordenar y filtrar en la lista, y en <b>Mi día</b> los leads de mayor puntaje aparecen primero. Se recalcula solo cuando el lead entra, responde o cambia de etapa, y una vez por hora para las reglas que dependen del tiempo.</p>
+<div class="row g-3">
+  <div class="col-lg-7"><div class="card"><div class="card-header">Reglas</div>
+    <div class="table-responsive"><table class="table table-sm mb-0">
+      <thead><tr><th>Si…</th><th>Embudo</th><th class="text-end">Puntos</th><th></th></tr></thead>
+      <tbody>{% for r in reglas %}<tr class="{% if not r.activa %}opacity-50{% endif %}"><td>{{ r.descripcion }}</td><td class="small muted">{{ r.embudo|default:"Todos" }}</td>
+        <td class="text-end fw-semibold {% if r.puntos < 0 %}text-danger{% endif %}">{{ r.puntos|stringformat:"+d" }}</td>
+        <td class="text-end text-nowrap"><form method="post" class="d-inline">{% csrf_token %}<input type="hidden" name="id" value="{{ r.pk }}">
+          <button name="accion" value="toggle" class="btn btn-xs btn-outline-secondary">{% if r.activa %}Pausar{% else %}Activar{% endif %}</button>
+          <button name="accion" value="borrar" class="btn btn-xs btn-outline-danger"><i class="bi bi-x"></i></button></form></td></tr>
+      {% empty %}<tr><td colspan="4" class="muted small py-3 text-center">Sin reglas: todos los leads tienen puntaje 0.</td></tr>{% endfor %}</tbody>
+    </table></div></div>
+    <div class="card mt-3"><div class="card-header">Nueva regla</div><div class="card-body">
+      <form method="post" class="row g-2">{% csrf_token %}<input type="hidden" name="accion" value="nueva">
+        <div class="col-12"><label class="form-label">Si el lead…</label><select name="condicion" id="cond" class="form-select form-select-sm">{% for k, t in condiciones %}<option value="{{ k }}">{{ t }}</option>{% endfor %}</select></div>
+        <div class="col-md-6 c c-pauta"><label class="form-label">Pauta</label><select name="pauta" class="form-select form-select-sm">{% for p in pautas %}<option value="{{ p.pk }}">{{ p }}</option>{% endfor %}</select></div>
+        <div class="col-md-6 c c-canal"><label class="form-label">Canal</label><select name="canal" class="form-select form-select-sm">{% for k, t in canales %}<option value="{{ k }}">{{ t }}</option>{% endfor %}</select></div>
+        <div class="col-md-6 c c-etapa"><label class="form-label">Etapa</label><select name="etapa" class="form-select form-select-sm">{% for e in etapas %}<option value="{{ e.pk }}">{{ e.embudo }} · {{ e }}</option>{% endfor %}</select></div>
+        <div class="col-md-6 c c-campo"><label class="form-label">Campo</label><select name="campo" class="form-select form-select-sm">{% for k, t in campos %}<option value="{{ k }}">{{ t }}</option>{% endfor %}</select></div>
+        <div class="col-md-6 c c-campo c-origen_contiene"><label class="form-label">Valor / texto</label><input name="valor" class="form-control form-control-sm"></div>
+        <div class="col-md-4 c c-intentos_min c-sin_actividad_dias c-ingresos_min"><label class="form-label">N</label><input name="numero" type="number" min="0" class="form-control form-control-sm"></div>
+        <div class="col-md-4"><label class="form-label">Puntos</label><input name="puntos" type="number" class="form-control form-control-sm" placeholder="+20 o -15" required></div>
+        <div class="col-md-4"><label class="form-label">Embudo</label><select name="embudo" class="form-select form-select-sm"><option value="">Todos</option>{% for e in embudos %}<option value="{{ e.pk }}">{{ e }}</option>{% endfor %}</select></div>
+        <div class="col-12"><button class="btn btn-sm btn-primary">Agregar y recalcular</button></div>
+      </form>
+    </div></div>
+  </div>
+  <div class="col-lg-5"><div class="card"><div class="card-header">Leads en curso por puntaje</div><div class="card-body">
+    {% for d in distribucion %}<div class="d-flex justify-content-between small py-1 border-bottom" style="border-color:var(--border)!important"><a href="{% url 'crm:oportunidades' %}?embudo=todos&puntaje_min={{ d.puntaje }}&orden=-puntaje">★ {{ d.puntaje }}</a><span>{{ d.n }} leads</span></div>{% empty %}<div class="muted small">—</div>{% endfor %}
+    <div class="form-text mt-2">Ejemplos: "Respondió alguna vez +30", "Pauta Instagram +10", "Tiene email +5", "3+ intentos sin contacto −20", "7+ días sin actividad −15".</div>
+  </div></div></div>
+</div>
+<script>
+(function () {
+  const sel = document.getElementById('cond');
+  const upd = () => document.querySelectorAll('.c').forEach(el => el.style.display = el.classList.contains('c-' + sel.value) ? '' : 'none');
+  sel.addEventListener('change', upd); upd();
+})();
+</script>
+{% endblock %}

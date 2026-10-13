@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% load crm_extras %}
+{% block title %}{{ dif }}{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-broadcast"></i> {{ dif }} <span class="chip {% if dif.estado == 'enviando' %}info{% elif dif.estado == 'finalizada' %}ok{% elif dif.estado == 'cancelada' %}danger{% endif %}">{{ dif.get_estado_display }}</span></h1>
+  <a href="{% url 'automatizaciones:difusiones' %}" class="btn btn-outline-secondary btn-sm">Volver</a></div>
+{% if dif.estado == 'enviando' or dif.estado == 'programada' %}{% include "reportes/_autorefresh.html" %}{% endif %}
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-2"><div class="kpi"><div class="v">{{ r.total }}</div><div class="l">Personas</div></div></div>
+  <div class="col-6 col-md-2"><div class="kpi"><div class="v">{{ r.enviados }}</div><div class="l">Enviados</div><div class="d">{{ r.pendientes }} pendientes</div></div></div>
+  {% if dif.canal == 'email' %}
+  <div class="col-6 col-md-2"><div class="kpi"><div class="v">{{ r.pct.abiertos }}%</div><div class="l">Abrieron</div><div class="d">{{ r.abiertos }}</div></div></div>
+  <div class="col-6 col-md-2"><div class="kpi"><div class="v">{{ r.pct.clics }}%</div><div class="l">Hicieron clic</div><div class="d">{{ r.clics }}</div></div></div>
+  <div class="col-6 col-md-2"><div class="kpi"><div class="v">{{ r.bajas }}</div><div class="l">Se dieron de baja</div></div></div>
+  {% else %}
+  <div class="col-6 col-md-2"><div class="kpi"><div class="v">{{ r.pct.entregados }}%</div><div class="l">Entregados</div></div></div>
+  <div class="col-6 col-md-2"><div class="kpi"><div class="v">{{ r.pct.leidos }}%</div><div class="l">Leídos</div></div></div>
+  <div class="col-6 col-md-2"><div class="kpi"><div class="v">{{ r.pct.respondidos }}%</div><div class="l">Respondieron (48 h)</div><div class="d">{{ r.respondidos }}</div></div></div>
+  {% endif %}
+  <div class="col-6 col-md-2"><div class="kpi"><div class="v">{{ r.omitidos }}</div><div class="l">Omitidos</div><div class="d">{{ r.errores }} con error</div></div></div>
+</div>
+
+{% if dif.estado == 'borrador' %}
+<form method="post" class="card mb-3"><div class="card-header">Mensaje</div><div class="card-body">{% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert alert-danger py-2">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+  <div class="row g-2">
+    <div class="col-md-6"><label class="form-label">Nombre</label>{{ form.nombre }}</div>
+    <div class="col-md-6"><label class="form-label">Canal</label>{{ form.canal }}</div>
+    <div class="col-md-6 cnl cnl-email"><label class="form-label">Plantilla de email</label>{{ form.plantilla_email }}<div class="form-text"><a href="{% url 'automatizaciones:plantillas_email' %}" target="_blank">Crear o editar plantillas de email</a></div></div>
+    <div class="col-md-6 cnl cnl-whatsapp"><label class="form-label">Plantilla de WhatsApp</label>{{ form.plantilla_wa }}<div class="form-text">En líneas oficiales es obligatoria (y aprobada).</div></div>
+    <div class="col-md-6 cnl cnl-whatsapp"><label class="form-label">Línea</label>{{ form.linea }}<div class="form-text">{{ form.linea.help_text }}</div></div>
+    <div class="col-12 cnl cnl-whatsapp"><label class="form-label">{{ form.texto_wa.label }}</label>{{ form.texto_wa }}</div>
+  </div>
+  {% if omitidos_previstos %}<div class="alert alert-warning small py-2 mt-3 mb-0">{{ omitidos_previstos }} de {{ r.total }} se van a omitir (sin {% if dif.canal == 'email' %}email, dados de baja{% else %}teléfono{% endif %} o "no contactar").</div>{% endif %}
+  <div class="mt-3 d-flex gap-2 flex-wrap align-items-end">
+    <button name="accion" value="guardar" class="btn btn-outline-secondary">Guardar borrador</button>
+    <button name="accion" value="enviar" class="btn btn-primary" onclick="return confirm('¿Enviar a {{ r.total }} personas ahora?')"><i class="bi bi-send"></i> Enviar ahora</button>
+    <span class="muted small ms-2">o programar para</span>
+    <input type="datetime-local" name="cuando" class="form-control form-control-sm" style="max-width:210px">
+    <button name="accion" value="programar" class="btn btn-outline-primary btn-sm">Programar</button>
+    <button name="accion" value="cancelar" class="btn btn-outline-danger btn-sm ms-auto" formnovalidate onclick="return confirm('¿Descartar la difusión?')">Descartar</button>
+  </div>
+  {% if dif.descripcion_filtro %}<div class="form-text mt-2">Selección: {{ dif.descripcion_filtro|truncatechars:200 }}</div>{% endif %}
+</div></form>
+{% else %}
+<div class="card mb-3"><div class="card-body small d-flex gap-3 flex-wrap align-items-center">
+  <span><b>Canal:</b> {{ dif.get_canal_display }}</span>
+  <span><b>Mensaje:</b> {{ dif.plantilla_email|default:dif.plantilla_wa|default:"texto libre" }}</span>
+  {% if dif.programada_para %}<span><b>{% if dif.estado == 'programada' %}Sale el{% else %}Empezó{% endif %}:</b> {{ dif.programada_para|date:"d/m H:i" }}</span>{% endif %}
+  {% if dif.finalizada_at %}<span><b>Terminó:</b> {{ dif.finalizada_at|date:"d/m H:i" }}</span>{% endif %}
+  {% if dif.estado == 'programada' or dif.estado == 'enviando' %}<form method="post" class="ms-auto">{% csrf_token %}<button name="accion" value="cancelar" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Frenar la difusión? Lo ya enviado no se puede deshacer.')">Frenar envío</button></form>{% endif %}
+</div></div>
+{% endif %}
+
+<div class="card"><div class="card-header d-flex gap-2 align-items-center">Destinatarios
+  <div class="ms-auto d-flex gap-1">{% for k, t in estados %}<a href="?estado={{ k }}" class="btn btn-xs {% if request.GET.estado == k %}btn-primary{% else %}btn-outline-secondary{% endif %}">{{ t }}</a>{% endfor %}<a href="?" class="btn btn-xs btn-outline-secondary">Todos</a></div></div>
+  <div class="table-responsive"><table class="table table-sm mb-0">
+    <thead><tr><th>Persona</th><th>{% if dif.canal == 'email' %}Email{% else %}Teléfono{% endif %}</th><th>Estado</th><th>Resultado</th></tr></thead>
+    <tbody>{% for d in page %}<tr>
+      <td>{% if d.oportunidad %}<a href="{% url 'crm:oportunidad_detalle' d.oportunidad_id %}">{{ d.contacto.nombre }}</a>{% else %}{{ d.contacto.nombre }}{% endif %}</td>
+      <td class="small">{% if dif.canal == 'email' %}{{ d.contacto.email|default:"—" }}{% else %}{{ d.contacto.telefono|telefono }}{% endif %}</td>
+      <td><span class="chip {% if d.estado == 'enviado' %}ok{% elif d.estado == 'error' %}danger{% elif d.estado == 'omitido' %}warn{% endif %}">{{ d.get_estado_display }}</span></td>
+      <td class="small muted">{% if d.detalle %}{{ d.detalle }}{% elif d.email %}{% if d.email.clic_at %}Hizo clic{% elif d.email.abierto_at %}Abrió{% else %}Sin abrir{% endif %}{% if d.email.baja_at %} · se dio de baja{% endif %}{% elif d.mensaje %}{{ d.mensaje.get_status_display }}{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="4" class="muted text-center py-3">—</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% include "_paginacion.html" %}
+</div>
+{% if dif.estado == 'borrador' %}
+<script>
+(function () {
+  const c = document.getElementById('id_canal');
+  const upd = () => document.querySelectorAll('.cnl').forEach(el => el.style.display = el.classList.contains('cnl-' + c.value) ? '' : 'none');
+  c.addEventListener('change', upd); upd();
+})();
+</script>
+{% endif %}
+{% endblock %}

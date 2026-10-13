@@ -1,0 +1,12 @@
+{% autoescape off %}Hola{% if cliente.contacto_nombre %} {{ cliente.contacto_nombre }}{% endif %},
+
+Suspendimos el acceso de {{ cliente.nombre }} a {{ CRM_NOMBRE }} porque la suscripción venció el {{ vencimiento|date:"d/m/Y" }} y no registramos el pago.
+
+Tus datos están guardados: apenas registremos el pago se reactiva todo tal cual estaba.
+{% if datos_pago %}
+Datos para el pago:
+{{ datos_pago }}
+{% endif %}
+Gracias,
+{{ CRM_NOMBRE }}
+{% endautoescape %}

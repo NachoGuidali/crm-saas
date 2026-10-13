@@ -1,0 +1,8 @@
+<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;color:#222">
+  <h2 style="color:#3B7EF6">{{ crm_nombre }}</h2>
+  <p>Hola {{ user.first_name|default:user.username }},</p>
+  {% if bienvenida %}<p>Te crearon un usuario en <b>{{ crm_nombre }}</b>. Tu usuario es <b>{{ user.username }}</b>. Para empezar, definí tu contraseña:</p>
+  {% else %}<p>Recibimos un pedido para cambiar tu contraseña. Para elegir una nueva hacé clic acá:</p>{% endif %}
+  <p><a href="{{ protocol }}://{{ domain }}{% url 'users:recupero_confirmar' uidb64=uid token=token %}" style="background:#3B7EF6;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;display:inline-block">{% if bienvenida %}Crear mi contraseña{% else %}Cambiar contraseña{% endif %}</a></p>
+  <p style="color:#777;font-size:13px">El link vence en 2 horas y se puede usar una sola vez.{% if not bienvenida %} Si no fuiste vos, ignorá este email.{% endif %}</p>
+</div>

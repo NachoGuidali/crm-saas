@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Discador{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-telephone-forward"></i> Discador progresivo</h1>
+  {% if 'discador' in perms_crm %}<a href="{% url 'telefonia:campania_nueva' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Nueva campaña</a>{% endif %}</div>
+{% if sesion %}<div class="alert alert-success py-2"><i class="bi bi-headset"></i> Estás conectado al discador de <a href="{% url 'telefonia:campania' sesion.campania_id %}"><b>{{ sesion.campania }}</b></a>{% if sesion.en_pausa %} (en pausa){% endif %}.</div>{% endif %}
+<div class="row g-3">{% for c in campanias %}
+  <div class="col-md-6 col-xl-4"><div class="card h-100"><div class="card-body">
+    {% with r=c.resumen %}
+    <div class="d-flex justify-content-between"><h5 class="mb-1">{{ c.nombre }}</h5><span class="chip {% if c.estado == 'activa' %}ok{% elif c.estado == 'pausada' %}warn{% endif %}">{{ c.get_estado_display }}</span></div>
+    <div class="small muted mb-2">{{ c.embudo|default:"Sin embudo" }} · {{ c.agentes.count }} agentes · {{ c.hora_desde|time:"H:i" }}–{{ c.hora_hasta|time:"H:i" }}</div>
+    <div class="small">{{ r.total }} contactos · <b>{{ r.contactado|default:0 }}</b> contactados · {{ r.pendiente|default:0 }} pendientes · {{ r.reintentar|default:0 }} a reintentar</div>
+    <a href="{% url 'telefonia:campania' c.pk %}" class="btn btn-sm btn-outline-secondary mt-3">Abrir</a>
+    {% endwith %}
+  </div></div></div>
+{% empty %}<div class="col-12"><div class="empty-state card"><div class="empty-icon"><i class="bi bi-telephone-forward"></i></div>No hay campañas de discado.</div></div>{% endfor %}</div>
+<div class="card mt-3"><div class="card-body small muted"><b>Cómo funciona:</b> Anura no ofrece discado predictivo por API, así que el CRM implementa un <b>discador progresivo</b>: cuando un agente conectado queda libre, le origina la próxima llamada de la lista (una por agente). Respeta la franja horaria, los reintentos y la espera entre intentos, y saltea números bloqueados en Anura y contactos "no contactar".</div></div>
+{% endblock %}

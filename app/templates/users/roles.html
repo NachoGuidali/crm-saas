@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Roles y permisos{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-shield-lock"></i> Roles y permisos</h1><a href="{% url 'users:rol_nuevo' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Nuevo rol</a></div>
+<div class="row g-3">
+  <div class="col-lg-6"><div class="card"><div class="card-header">Roles personalizados</div><div class="card-body p-0">
+    {% for r in roles %}<a href="{% url 'users:rol_editar' r.pk %}" class="d-block px-3 py-2 border-bottom text-decoration-none" style="color:var(--text)">
+      <div class="d-flex justify-content-between"><b>{{ r.nombre }}</b><span class="small muted">{{ r.n }} usuario{{ r.n|pluralize }}</span></div>
+      <div class="small muted">{{ r.descripcion }}</div>
+      <div class="mt-1">{% for p in r.permisos %}<span class="chip me-1">{{ p }}</span>{% empty %}<span class="small muted">Sin permisos extra</span>{% endfor %}</div></a>
+    {% empty %}<div class="p-3 small muted">Sin roles personalizados.</div>{% endfor %}
+  </div></div></div>
+  <div class="col-lg-6"><div class="card"><div class="card-header">Permisos de los roles base</div><div class="card-body">
+    {% for label, perms in permisos_por_rol %}<div class="mb-2"><b class="small">{{ label }}</b><div>{% for p in perms %}<span class="chip me-1 mb-1">{{ p }}</span>{% empty %}<span class="small muted">Operación básica: sus prospectos, chats y llamadas.</span>{% endfor %}</div></div>{% endfor %}
+    <div class="sep"></div>
+    {% for grupo, items in permisos_grupos %}<div class="section-title mt-2">{{ grupo }}</div>{% for slug, label in items %}<div class="small"><code>{{ slug }}</code> — {{ label }}</div>{% endfor %}{% endfor %}
+  </div></div></div>
+</div>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "clientes/_base.html" %}
+{% block title %}Planes{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center mb-3">
+  <h1 class="h4 mb-0 me-auto">Planes</h1>
+  <a href="{% url 'panel:plan_nuevo' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Nuevo plan</a>
+</div>
+<div class="card"><table class="table table-hover align-middle mb-0">
+  <thead><tr><th>Plan</th><th class="text-end">Precio mensual</th><th class="text-end">Usuarios</th><th class="text-end">Líneas WA</th><th class="text-end">Clientes</th><th></th></tr></thead>
+  <tbody>
+  {% for p in planes %}
+    <tr>
+      <td><a href="{% url 'panel:plan_editar' p.pk %}">{{ p.nombre }}</a></td>
+      <td class="text-end">$ {{ p.precio_mensual }}</td>
+      <td class="text-end">{{ p.max_usuarios|default:"Sin límite" }}</td>
+      <td class="text-end">{{ p.max_lineas_whatsapp|default:"Sin límite" }}</td>
+      <td class="text-end">{{ p.clientes.count }}</td>
+      <td>{% if not p.activo %}<span class="badge text-bg-secondary">No disponible</span>{% endif %}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="6" class="text-center text-secondary py-4">Todavía no hay planes.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endblock %}

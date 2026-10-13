@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% load crm_extras %}
+{% block title %}Mi día{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1><i class="bi bi-sunrise"></i> Hola, {{ user.first_name|default:user.username }} <span class="sub">{% now "l d/m" %}</span></h1>
+  <a href="{% url 'crm:siguiente' %}" class="btn btn-primary"><i class="bi bi-play-fill"></i> Empezar con el próximo prospecto</a>
+</div>
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi"><div class="v">{{ stats.abiertas }}</div><div class="l">Prospectos en curso</div></div></div>
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi"><div class="v">{{ cola.nuevos|length }}{% if cola.nuevos|length == 30 %}+{% endif %}</div><div class="l">Nuevos sin gestionar</div></div></div>
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi {% if cola.tareas %}alerta{% endif %}"><div class="v">{{ cola.tareas|length }}</div><div class="l">Tareas para hoy</div></div></div>
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi"><div class="v">{{ stats.intentos_hoy }}</div><div class="l">Gestiones hoy</div></div></div>
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi"><div class="v">{{ stats.ventas_hoy }}</div><div class="l">Ventas hoy</div></div></div>
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi"><div class="v">{{ stats.ventas_mes }}</div><div class="l">Ventas del mes</div></div></div>
+</div>
+{% if not user.disponible %}<div class="alert alert-warning py-2"><i class="bi bi-moon"></i> Estás como <b>No disponible</b>: no te llegan prospectos nuevos. Cambialo arriba a la derecha.</div>{% endif %}
+{% if cola.prioritarias %}<div class="card mb-3" style="border-color:rgba(239,68,68,.4)"><div class="card-header">🔥 Prioridad: atender primero</div>
+  <div class="d-flex flex-wrap">{% for o in cola.prioritarias %}<div class="cola-item" style="min-width:280px;flex:1">
+    <div class="ic"><i class="bi bi-fire text-danger"></i></div>
+    <div class="flex-grow-1" style="min-width:0"><a class="nom" href="{% url 'crm:oportunidad_detalle' o.pk %}?desde=cola">{{ o.contacto.nombre }}</a>
+      <div class="small muted">{{ o.prioridad_motivo|default:"Prioridad" }} · {{ o.etapa }}</div></div>
+    {% if o.contacto.telefono %}<button class="btn btn-xs btn-outline-primary" data-llamar data-op="{{ o.pk }}"><i class="bi bi-telephone"></i></button>{% endif %}
+  </div>{% endfor %}</div></div>{% endif %}
+<div class="row g-3">
+  <div class="col-lg-4"><div class="card h-100"><div class="card-header">1 · Tareas de hoy y vencidas</div>
+    {% for t in cola.tareas %}<div class="cola-item {% if t.vencida %}vencida{% endif %}">
+      <div class="ic"><i class="bi bi-{{ t.icono }}"></i></div>
+      <div class="flex-grow-1" style="min-width:0">
+        {% if t.oportunidad %}<a class="nom" href="{% url 'crm:oportunidad_detalle' t.oportunidad_id %}">{{ t.titulo }}</a>{% else %}<span class="fw-semibold">{{ t.titulo }}</span>{% endif %}
+        <div class="small {% if t.vencida %}text-danger{% else %}muted{% endif %}">{{ t.vence_at|date:"H:i" }}{% if t.vencida %} · vencida {{ t.vence_at|timesince }}{% endif %}</div>
+      </div>
+      <button class="btn btn-xs btn-outline-success" data-accion="{% url 'crm:tarea_accion' t.pk 'completar' %}" data-recargar="1" title="Hecha"><i class="bi bi-check2"></i></button>
+    </div>{% empty %}<div class="p-3 small muted">Nada pendiente para hoy 👌</div>{% endfor %}
+  </div></div>
+  <div class="col-lg-4"><div class="card h-100"><div class="card-header">2 · Nuevos: primer contacto</div>
+    {% for o in cola.nuevos %}<div class="cola-item">
+      <div class="ic"><i class="bi bi-person-plus"></i></div>
+      <div class="flex-grow-1" style="min-width:0"><a class="nom" href="{% url 'crm:oportunidad_detalle' o.pk %}?desde=cola">{{ o.contacto.nombre }}</a>
+        <div class="small muted">{{ o.contacto.telefono|telefono }} · hace {{ o.asignada_at|default:o.created_at|timesince }}</div></div>
+      {% if o.contacto.telefono %}<button class="btn btn-xs btn-outline-primary" data-llamar data-op="{{ o.pk }}"><i class="bi bi-telephone"></i></button>{% endif %}
+    </div>{% empty %}<div class="p-3 small muted">No tenés prospectos nuevos.</div>{% endfor %}
+  </div></div>
+  <div class="col-lg-4"><div class="card h-100"><div class="card-header">3 · Sin actividad desde ayer</div>
+    {% for o in cola.frios %}<div class="cola-item">
+      <div class="ic"><i class="bi bi-hourglass-split"></i></div>
+      <div class="flex-grow-1" style="min-width:0"><a class="nom" href="{% url 'crm:oportunidad_detalle' o.pk %}?desde=cola">{{ o.contacto.nombre }}</a>
+        <div class="small muted">{{ o.etapa }} · {{ o.intentos_contacto }} intento{{ o.intentos_contacto|pluralize }} · {{ o.ultima_actividad_at|timesince }}</div></div>
+      {% if o.contacto.telefono %}<button class="btn btn-xs btn-outline-primary" data-llamar data-op="{{ o.pk }}"><i class="bi bi-telephone"></i></button>{% endif %}
+    </div>{% empty %}<div class="p-3 small muted">Todo al día.</div>{% endfor %}
+  </div></div>
+</div>
+{% endblock %}

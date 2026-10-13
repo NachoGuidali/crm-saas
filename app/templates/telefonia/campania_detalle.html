@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% load crm_extras %}
+{% block title %}{{ c }}{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-telephone-forward"></i> {{ c.nombre }} <span class="chip {% if c.estado == 'activa' %}ok{% elif c.estado == 'pausada' %}warn{% endif %}">{{ c.get_estado_display }}</span></h1>
+  <div class="toolbar">
+    {% if 'discador' in perms_crm %}
+    <form method="post" class="d-flex gap-1">{% csrf_token %}
+      {% if c.estado != 'activa' and c.estado != 'finalizada' %}<button name="accion" value="activar" class="btn btn-success btn-sm"><i class="bi bi-play-fill"></i> Activar</button>{% endif %}
+      {% if c.estado == 'activa' %}<button name="accion" value="pausar" class="btn btn-warning btn-sm"><i class="bi bi-pause-fill"></i> Pausar</button>{% endif %}
+      {% if c.estado != 'finalizada' %}<button name="accion" value="finalizar" class="btn btn-outline-danger btn-sm" onclick="return confirm('¿Finalizar la campaña?')">Finalizar</button>{% endif %}
+    </form>
+    <a href="{% url 'telefonia:campania_editar' c.pk %}" class="btn btn-outline-secondary btn-sm">Editar</a>
+    {% endif %}
+  </div>
+</div>
+{% if not config.operativa %}<div class="alert alert-warning py-2">La telefonía Anura no está activa: el discador no va a llamar.</div>{% endif %}
+{% if c.estado == 'activa' and not en_horario %}<div class="alert alert-info py-2">Fuera de la franja horaria ({{ c.hora_desde|time:"H:i" }}–{{ c.hora_hasta|time:"H:i" }}): el discador espera.</div>{% endif %}
+
+<div class="row g-3 mb-3">
+  {% for k, lbl in estados %}<div class="col-4 col-md-2"><div class="kpi"><div class="v" data-res="{{ k }}">{{ resumen|get_item:k|default:0 }}</div><div class="l">{{ lbl }}</div></div></div>{% endfor %}
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="card mb-3"><div class="card-header">Mi puesto</div><div class="card-body">
+      {% if mi_sesion %}
+        <div class="mb-2">{% if mi_sesion.en_pausa %}<span class="chip warn">En pausa</span>{% else %}<span class="chip ok">Conectado: recibís llamadas</span>{% endif %}</div>
+        <form method="post" class="d-flex gap-2">{% csrf_token %}
+          <button name="accion" value="pausa" class="btn btn-sm btn-outline-warning">{% if mi_sesion.en_pausa %}Volver a recibir{% else %}Pausa{% endif %}</button>
+          <button name="accion" value="desconectar" class="btn btn-sm btn-outline-danger">Desconectarme</button></form>
+        <div class="form-text mt-2">Cuando terminás una llamada tenés {{ c.segundos_entre_llamadas }} s para tipificar antes de la siguiente.</div>
+      {% elif user in c.agentes.all %}
+        <form method="post">{% csrf_token %}<button name="accion" value="conectar" class="btn btn-success"><i class="bi bi-headset"></i> Conectarme al discador</button></form>
+      {% else %}<div class="small muted">No estás asignado a esta campaña.</div>{% endif %}
+    </div></div>
+    <div class="card mb-3"><div class="card-header">Agentes conectados</div><div class="card-body" id="conectados">
+      {% for s in sesiones %}<div class="small">{{ s.agente.display_name }} {% if s.en_pausa %}<span class="chip warn">pausa</span>{% endif %}</div>{% empty %}<div class="small muted">Nadie conectado.</div>{% endfor %}
+    </div></div>
+    {% if 'discador' in perms_crm and c.estado != 'finalizada' %}
+    <div class="card"><div class="card-header">Cargar contactos</div><div class="card-body">
+      <form method="post">{% csrf_token %}<input type="hidden" name="accion" value="cargar">
+        <label class="form-label">Oportunidades en curso de {{ c.embudo|default:"todos los embudos" }} en la etapa</label>
+        <select name="etapa" class="form-select form-select-sm mb-2"><option value="">Cualquier etapa</option>{% for e in etapas %}<option value="{{ e.pk }}">{{ e.nombre }}</option>{% endfor %}</select>
+        <label class="small d-flex gap-1 mb-2"><input type="checkbox" name="sin_contacto" value="1" class="form-check-input" checked> Solo las que todavía no tuvieron contacto efectivo</label>
+        <button class="btn btn-sm btn-primary">Cargar</button>
+      </form>
+      <div class="form-text">También podés cargar desde <a href="{% url 'crm:oportunidades' %}">Oportunidades</a> seleccionando y "Cargar al discador".</div>
+      <form method="post" class="mt-2">{% csrf_token %}<button name="accion" value="reintentar_todos" class="btn btn-xs btn-outline-secondary">Volver a encolar los "no contesta"</button></form>
+    </div></div>
+    {% endif %}
+  </div>
+  <div class="col-lg-8"><div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">Contactos
+      <form method="get"><select name="estado" class="form-select form-select-sm" onchange="this.form.submit()"><option value="">Todos</option>{% for k, v in estados %}<option value="{{ k }}" {% if filtros.estado == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></form></div>
+    <div class="table-responsive"><table class="table table-sm mb-0">
+      <thead><tr><th>Contacto</th><th>Teléfono</th><th>Estado</th><th>Intentos</th><th>Próximo</th><th>Agente</th><th>Detalle</th></tr></thead>
+      <tbody>{% for cc in page %}<tr>
+        <td>{% if cc.oportunidad %}<a href="{% url 'crm:oportunidad_detalle' cc.oportunidad_id %}">{{ cc.contacto.nombre }}</a>{% else %}{{ cc.contacto.nombre }}{% endif %}</td>
+        <td class="text-nowrap">{{ cc.telefono|telefono }}</td><td><span class="chip">{{ cc.get_estado_display }}</span></td>
+        <td>{{ cc.intentos }}</td><td class="small">{{ cc.proximo_intento_at|date:"d/m H:i" }}</td><td class="small">{{ cc.agente.display_name|default:"" }}</td><td class="small muted">{{ cc.detalle }}</td>
+      </tr>{% empty %}<tr><td colspan="7" class="muted text-center py-3">Sin contactos cargados.</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </div>{% include "_paginacion.html" %}</div>
+</div>
+{% if c.estado == 'activa' %}
+<script>
+setInterval(async () => {
+  if (document.hidden) return;
+  const d = await CRM.api('?json=1', {silencioso: true});
+  Object.entries(d.resumen).forEach(([k, v]) => { const el = document.querySelector(`[data-res="${k}"]`); if (el) el.textContent = v; });
+  document.getElementById('conectados').innerHTML = d.conectados.length ? d.conectados.map(s => `<div class="small">${CRM.esc(s.agente)} ${s.en_llamada ? '<span class="chip ok">en llamada</span>' : ''}${s.pausa ? '<span class="chip warn">pausa</span>' : ''}</div>`).join('') : '<div class="small muted">Nadie conectado.</div>';
+}, 5000);
+</script>
+{% endif %}
+{% endblock %}

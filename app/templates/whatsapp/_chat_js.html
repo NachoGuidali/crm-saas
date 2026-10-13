@@ -1,0 +1,115 @@
+<script type="application/json" id="rr-data">[{% for r in respuestas %}{"atajo": "{{ r.atajo|escapejs }}", "titulo": "{{ r.titulo|escapejs }}", "texto": "{{ r.texto|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]</script>
+<script>
+(function () {
+  const panel = document.getElementById('chatPanel'), msgs = document.getElementById('chatMsgs'), form = document.getElementById('chatForm');
+  const vars = {primer_nombre: '{{ contacto.nombre|escapejs }}'.split(' ')[0], nombre: '{{ contacto.nombre|escapejs }}',
+                agente: '{{ user.first_name|default:user.username|escapejs }}', embudo: '{{ op.embudo.nombre|default:""|escapejs }}'};
+  const ids = msgs.querySelectorAll('[data-id]');
+  let ultimo = ids.length ? parseInt(ids[ids.length - 1].dataset.id) : 0;
+  const bajar = () => { msgs.scrollTop = msgs.scrollHeight; };
+  bajar();
+  if (!form) return;
+  const ta = form.querySelector('textarea'), file = form.querySelector('[name=archivo]');
+  ta.addEventListener('input', () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 140) + 'px'; });
+  ta.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !rrAbierto()) { e.preventDefault(); form.requestSubmit(); } });
+  file.addEventListener('change', () => { document.getElementById('adjuntoNombre').textContent = file.files[0] ? '📎 ' + file.files[0].name : ''; });
+
+  async function enviar(fd) {
+    const conv = panel.dataset.conv;
+    if (!conv) fd.append('contacto', panel.dataset.contacto);
+    const url = conv ? `/whatsapp/conversacion/${conv}/enviar/` : '/whatsapp/enviar/';
+    const r = await CRM.api(url, {data: fd});
+    const vacio = msgs.querySelector('.m-auto'); if (vacio) vacio.remove();
+    msgs.insertAdjacentHTML('beforeend', r.html); bajar();
+    if (!conv) { panel.dataset.conv = r.conv; const sel = form.querySelector('[name=linea]'); if (sel) sel.remove(); }
+    ultimo = Math.max(ultimo, r.id);
+  }
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!ta.value.trim() && !file.files.length) return;
+    const fd = new FormData(form);
+    const btn = form.querySelector('.btn-success'); btn.disabled = true;
+    try { await enviar(fd); ta.value = ''; file.value = ''; document.getElementById('adjuntoNombre').textContent = ''; ta.style.height = ''; }
+    catch (err) { if (/24 h/.test(err.message)) document.getElementById('avisoVentana').style.display = ''; }
+    finally { btn.disabled = false; ta.focus(); }
+  });
+  form.querySelectorAll('[data-plantilla]').forEach(a => a.addEventListener('click', async e => {
+    e.preventDefault();
+    if (!confirm('¿Enviar la plantilla "' + a.querySelector('b').textContent + '"?')) return;
+    const fd = new FormData(); fd.append('plantilla', a.dataset.plantilla);
+    const sel = form.querySelector('[name=linea]'); if (sel) fd.append('linea', sel.value);
+    try { await enviar(fd); } catch (err) {}
+  }));
+
+  // Nota de voz: grabar en el navegador y enviar (el servidor la pasa al formato de WhatsApp)
+  (function () {
+    const btn = form.querySelector('.btn-voz'), barra = form.parentElement.querySelector('.grabando');
+    if (!btn || !barra || !navigator.mediaDevices || !window.MediaRecorder) return;
+    btn.style.display = '';
+    let rec = null, partes = [], stream = null, inicio = 0, reloj = null, enviarAlTerminar = false;
+    const tipo = ['audio/ogg;codecs=opus', 'audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find(t => MediaRecorder.isTypeSupported(t)) || '';
+    const mostrar = grabando => { form.style.display = grabando ? 'none' : ''; barra.style.display = grabando ? 'flex' : 'none'; };
+    const terminar = () => { clearInterval(reloj); if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; mostrar(false); };
+    btn.addEventListener('click', async () => {
+      try { stream = await navigator.mediaDevices.getUserMedia({audio: true}); }
+      catch (e) { CRM.toast('No se pudo usar el micrófono: permitilo en el navegador para este sitio.', 'error'); return; }
+      partes = []; enviarAlTerminar = false;
+      rec = new MediaRecorder(stream, tipo ? {mimeType: tipo} : undefined);
+      rec.ondataavailable = e => { if (e.data.size) partes.push(e.data); };
+      rec.onstop = async () => {
+        terminar();
+        if (!enviarAlTerminar || !partes.length) return;
+        const mime = rec.mimeType || tipo || 'audio/webm';
+        const fd = new FormData();
+        fd.append('archivo', new File([new Blob(partes, {type: mime})], 'nota-de-voz.' + (mime.includes('ogg') ? 'ogg' : mime.includes('mp4') ? 'm4a' : 'webm'), {type: mime}));
+        fd.append('voz', '1');
+        const lin = form.querySelector('[name=linea]'); if (lin) fd.append('linea', lin.value);
+        try { await enviar(fd); } catch (err) { if (/24 h/.test(err.message)) document.getElementById('avisoVentana').style.display = ''; }
+      };
+      rec.start(); inicio = Date.now(); mostrar(true);
+      const t = barra.querySelector('.rec-t');
+      reloj = setInterval(() => {
+        const s = Math.floor((Date.now() - inicio) / 1000);
+        t.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+        if (s >= 300) { enviarAlTerminar = true; rec.stop(); }  // tope 5 minutos
+      }, 250);
+    });
+    barra.querySelector('.rec-cancel').addEventListener('click', () => { enviarAlTerminar = false; if (rec && rec.state !== 'inactive') rec.stop(); else terminar(); });
+    barra.querySelector('.rec-send').addEventListener('click', () => { enviarAlTerminar = true; if (rec && rec.state !== 'inactive') rec.stop(); });
+  })();
+
+  // Respuestas rápidas con "/"
+  const rr = JSON.parse(document.getElementById('rr-data').textContent), menu = document.getElementById('rrMenu');
+  let rrSel = 0, rrItems = [];
+  const rrAbierto = () => menu.style.display === 'block';
+  const completar = t => t.replace(/\{(\w+)\}/g, (m, k) => vars[k] !== undefined ? vars[k] : m);
+  ta.addEventListener('keyup', e => {
+    if (['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(e.key)) return;
+    const m = ta.value.match(/^\/(\w*)$/);
+    if (!m) { menu.style.display = 'none'; return; }
+    rrItems = rr.filter(r => r.atajo.startsWith(m[1]));
+    rrSel = 0;
+    menu.innerHTML = rrItems.map((r, i) => `<div class="item ${i === 0 ? 'sel' : ''}" data-i="${i}"><b>/${CRM.esc(r.atajo)}</b> <span class="muted">${CRM.esc(r.titulo)}</span></div>`).join('');
+    menu.style.display = rrItems.length ? 'block' : 'none';
+  });
+  ta.addEventListener('keydown', e => {
+    if (!rrAbierto()) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); rrSel = (rrSel + (e.key === 'ArrowDown' ? 1 : -1) + rrItems.length) % rrItems.length;
+      menu.querySelectorAll('.item').forEach((el, i) => el.classList.toggle('sel', i === rrSel)); }
+    if (e.key === 'Enter') { e.preventDefault(); ta.value = completar(rrItems[rrSel].texto); menu.style.display = 'none'; }
+    if (e.key === 'Escape') menu.style.display = 'none';
+  });
+  menu.addEventListener('click', e => { const it = e.target.closest('.item'); if (it) { ta.value = completar(rrItems[it.dataset.i].texto); menu.style.display = 'none'; ta.focus(); } });
+
+  // Nuevos mensajes (polling cada 5 s solo mientras la pestaña está visible)
+  setInterval(async () => {
+    if (document.hidden || !panel.dataset.conv) return;
+    try {
+      const d = await CRM.api(`/whatsapp/conversacion/${panel.dataset.conv}/mensajes/?despues=${ultimo}&leer=1`, {silencioso: true});
+      if (d.html.trim()) { msgs.insertAdjacentHTML('beforeend', d.html); ultimo = d.ultimo; bajar(); }
+      Object.entries(d.estados || {}).forEach(([id, st]) => { const el = msgs.querySelector(`[data-id="${id}"] .st`); if (el) el.dataset.st = st, el.className = 'st bi ' + ({read: 'bi-check2-all leido', delivered: 'bi-check2-all', sent: 'bi-check2', failed: 'bi-exclamation-circle text-danger'}[st] || 'bi-clock'); });
+      document.getElementById('avisoVentana').style.display = d.ventana ? 'none' : '';
+    } catch (e) {}
+  }, 5000);
+})();
+</script>

@@ -1,0 +1,8 @@
+{% extends "users/_auth_base.html" %}
+{% block title %}Revisá tu email{% endblock %}
+{% block auth %}
+<div class="text-center"><i class="bi bi-envelope-check text-success" style="font-size:2.5rem"></i>
+<p class="mt-2">Si el email corresponde a una cuenta activa, te llegó un link para crear tu contraseña.</p>
+<p class="small muted">Revisá también la carpeta de spam. El link vence en 2 horas.</p>
+<a href="{% url 'users:login' %}" class="btn btn-outline-secondary btn-sm">Volver</a></div>
+{% endblock %}

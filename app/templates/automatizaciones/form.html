@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}Automatización{% endblock %}
+{% block extra_css %}
+<style>
+  .paso { border-left: 3px solid var(--border2); padding: 4px 0 6px 16px; margin-bottom: 18px; }
+  .paso h6 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--text3); margin-bottom: 8px; }
+  .paso h6 b { color: var(--text); }
+  .resumen-auto { font-size: 15px; line-height: 1.5; }
+  .resumen-auto b { color: var(--text); }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-lightning-charge"></i> {{ accion|default:"Nueva automatización" }} <span class="sub">{{ embudo }}</span></h1></div>
+<div class="row g-3"><div class="col-lg-7"><form method="post" class="card"><div class="card-body">{% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert alert-danger py-2">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+  {% if form.errors %}<div class="alert alert-danger py-2 small">Revisá los campos marcados.</div>{% endif %}
+  <div class="mb-3"><label class="form-label">Nombre</label>{{ form.nombre }}</div>
+
+  <div class="paso"><h6><b>1.</b> Cuándo</h6>
+    {{ form.disparador }}
+    <div class="row g-2 mt-1">
+      <div class="col-md-6" id="boxEtapa"><label class="form-label small">Etapa</label>{{ form.etapa }}{{ form.etapa.errors }}</div>
+      <div class="col-md-6 d-flex align-items-end" id="boxTodas"><label class="small d-flex gap-2">{{ form.todas_las_etapas }} {{ form.todas_las_etapas.label }}</label></div>
+      <div class="col-12" id="boxOtras"><a class="small" data-bs-toggle="collapse" href="#otrasEtapas">+ También en otras etapas</a>
+        <div class="collapse {% if form.instance.pk and form.instance.otras_etapas.exists %}show{% endif %}" id="otrasEtapas"><div class="checks-grid small mt-1">{% for c in form.otras_etapas %}<label>{{ c.tag }} {{ c.choice_label }}</label>{% endfor %}</div></div></div>
+      <div class="col-md-12" id="boxPrevia"><label class="form-label small">{{ form.accion_previa.label }}</label>{{ form.accion_previa }}{{ form.accion_previa.errors }}
+        <div class="form-text">Para armar secuencias: "Bienvenida" → 3 días después "Recordatorio" → 4 días después "Último aviso". Cada paso se omite solo si la persona ya avanzó (si tildás "solo si sigue en la etapa").</div></div>
+    </div>
+    <div class="form-text" id="ayudaDisp"></div>
+  </div>
+
+  <div class="paso"><h6><b>2.</b> <span id="lblDemora">Cuánto esperar</span></h6>
+    <div class="row g-2"><div class="col-5 col-md-3">{{ form.demora_valor }}{{ form.demora_valor.errors }}</div><div class="col-7 col-md-4">{{ form.demora_unidad }}</div></div>
+    <div class="form-text" id="ayudaDemora"></div>
+  </div>
+
+  <div class="paso"><h6><b>3.</b> Qué hacer</h6>
+    {{ form.tipo }}
+    <div class="row g-2 mt-1">
+      <div class="col-12 t t-whatsapp"><label class="form-label small">Plantilla de WhatsApp</label>{{ form.plantilla }}{{ form.plantilla.errors }}<div class="form-text">{{ form.plantilla.help_text }}</div></div>
+      <div class="col-12 t t-whatsapp"><label class="form-label small">Línea</label>{{ form.linea }}<div class="form-text">{{ form.linea.help_text }}</div></div>
+      <div class="col-12 t t-email"><label class="form-label small">Plantilla de email</label>{{ form.plantilla_email }}{{ form.plantilla_email.errors }}<div class="form-text"><a href="{% url 'automatizaciones:plantillas_email' %}" target="_blank">Crear o editar plantillas de email</a> · o escribí asunto y texto abajo.</div></div>
+      <div class="col-12 t t-email"><label class="form-label small">Asunto <span class="muted">(si no usás plantilla)</span></label>{{ form.email_asunto }}</div>
+      <div class="col-12 t t-whatsapp t-email t-sms"><label class="form-label small">Texto <span class="muted">(si no usás plantilla)</span></label>{{ form.texto }}{{ form.texto.errors }}<div class="form-text">{{ form.texto.help_text }}</div></div>
+      <div class="col-md-8 t t-tarea t-notif_agente t-notif_supervisores t-prioridad"><label class="form-label small">Título de la tarea / aviso <span class="muted">(en prioridad: el motivo, ej. "Reingresó")</span></label>{{ form.tarea_titulo }}</div>
+      <div class="col-md-4 t t-tarea"><label class="form-label small">Vence en (horas)</label>{{ form.tarea_vence_horas }}</div>
+      <div class="col-md-6 t t-etapa"><label class="form-label small">{{ form.mover_a.label }}</label>{{ form.mover_a }}{{ form.mover_a.errors }}</div>
+      <div class="col-md-6 t t-etapa"><label class="form-label small">{{ form.tipificacion.label }}</label>{{ form.tipificacion }}{{ form.tipificacion.errors }}</div>
+      <div class="col-12 t t-embudo"><label class="form-label small">{{ form.modo_embudo.label }}</label>{{ form.modo_embudo }}{{ form.modo_embudo.errors }}</div>
+      <div class="col-md-6 t t-embudo m-destino"><label class="form-label small">{{ form.embudo_destino.label }}</label>{{ form.embudo_destino }}{{ form.embudo_destino.errors }}</div>
+      <div class="col-md-6 t t-embudo m-destino"><label class="form-label small">{{ form.etapa_destino.label }}</label>{{ form.etapa_destino }}{{ form.etapa_destino.errors }}<div class="form-text">{{ form.etapa_destino.help_text }}</div></div>
+      <div class="col-md-6 t t-embudo m-volver"><label class="form-label small">{{ form.volver_a.label }}</label>{{ form.volver_a }}</div>
+      <div class="col-md-6 t t-embudo"><label class="form-label small">{{ form.asignar_destino.label }}</label>{{ form.asignar_destino }}</div>
+      <div class="col-md-6 t t-embudo m-usuario"><label class="form-label small">{{ form.usuario_destino.label }}</label>{{ form.usuario_destino }}{{ form.usuario_destino.errors }}</div>
+      <div class="col-md-6 t t-reasignar"><label class="form-label small">{{ form.reparto.label }}</label>{{ form.reparto }}</div>
+      <div class="col-md-6 t t-reasignar"><label class="form-label small">{{ form.volver_a_etapa.label }}</label>{{ form.volver_a_etapa }}<div class="form-text">{{ form.volver_a_etapa.help_text }}</div></div>
+      <div class="col-12 t t-reasignar"><div class="form-text">Nunca se la vuelve a dar al mismo vendedor. Respeta "solo conectados" y "disponible" del embudo; el nuevo vendedor recibe la tarea "Contactar". Si no hay otro disponible, queda como está.</div></div>
+      <div class="col-md-6 t t-etiqueta"><label class="form-label small">Etiqueta</label>{{ form.etiqueta }}{{ form.etiqueta.errors }}<div class="form-text"><a href="{% url 'crm:etiquetas' %}" target="_blank">Crear etiquetas</a></div></div>
+      <div class="col-12 t t-embudo"><div class="form-text"><b>Crear</b>: para cuando deja de ser lead (ej. Venta → embudo Clientes). <b>Mover</b>: la misma tarjeta cambia de embudo y recuerda de dónde vino. <b>Volver</b>: la devuelve a su embudo de origen.</div></div>
+    </div>
+  </div>
+
+  <div class="paso"><h6><b>4.</b> Condiciones</h6>
+    <div class="small">
+      <label class="d-flex gap-2">{{ form.activa }} Activa</label>
+      <label class="d-flex gap-2">{{ form.solo_si_sigue_en_etapa }} {{ form.solo_si_sigue_en_etapa.label }}</label>
+      <label class="d-flex gap-2">{{ form.solo_en_horario }} {{ form.solo_en_horario.label }}</label>
+      <a class="small d-inline-block mt-2" data-bs-toggle="collapse" href="#condExtra">+ Solo para ciertas campañas o etiquetas</a>
+      <div class="collapse {% if form.instance.pk and form.instance.resumen_condiciones %}show{% endif %}" id="condExtra">
+        {% if form.solo_pautas.field.queryset.exists %}<div class="mt-2"><label class="form-label small">{{ form.solo_pautas.label }}</label><div class="checks-grid">{% for c in form.solo_pautas %}<label>{{ c.tag }} {{ c.choice_label }}</label>{% endfor %}</div></div>{% endif %}
+        <div class="mt-2"><label class="form-label small">{{ form.solo_etiquetas.label }}</label><div class="checks-grid">{% for c in form.solo_etiquetas %}<label>{{ c.tag }} {{ c.choice_label }}</label>{% empty %}<span class="muted">No hay etiquetas. <a href="{% url 'crm:etiquetas' %}" target="_blank">Crear</a></span>{% endfor %}</div></div>
+        <div class="mt-2"><label class="form-label small">{{ form.excluir_etiquetas.label }}</label><div class="checks-grid">{% for c in form.excluir_etiquetas %}<label>{{ c.tag }} {{ c.choice_label }}</label>{% endfor %}</div>
+          <div class="form-text">Ej.: "Nunca si tiene la etiqueta Socio" para que a un cliente no le lleguen tareas ni mensajes de venta.</div></div>
+      </div>
+      <div class="form-text">Nunca se envía nada a quien pidió "no contactar", a leads pausados o cerrados, ni emails a quien se dio de baja.</div>
+    </div>
+  </div>
+
+  <div class="d-flex gap-2"><button class="btn btn-primary">Guardar</button>{% if accion %}<button name="eliminar" value="1" class="btn btn-outline-danger" onclick="return confirm('¿Eliminar?')">Eliminar</button>{% endif %}
+    <a href="{% url 'automatizaciones:lista' %}" class="btn btn-outline-secondary">Volver</a></div>
+</div></form></div>
+<div class="col-lg-5">
+  <div class="card mb-3" style="position:sticky;top:12px"><div class="card-header">En resumen</div><div class="card-body resumen-auto" id="resumen">—</div></div>
+  <div class="card"><div class="card-header">Vista previa del mensaje</div><div class="card-body chat-msgs"><div class="burbuja out auto" id="prev" style="white-space:pre-wrap">—</div></div></div>
+</div></div>
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const tipo = $('id_tipo'), pl = $('id_plantilla'), tx = $('id_texto'), pe = $('id_plantilla_email'), asunto = $('id_email_asunto');
+  const disp = $('id_disparador'), etapa = $('id_etapa'), previa = $('id_accion_previa');
+  const dv = $('id_demora_valor'), du = $('id_demora_unidad');
+  const textos = {{ plantillas_texto|safe }}, textosEmail = {{ plantillas_email_texto|safe }};
+  const sel = el => el && el.selectedOptions[0] && el.value ? el.selectedOptions[0].text : '';
+  const esc = s => String(s || '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+
+  const upd = () => document.querySelectorAll('.t').forEach(el => el.style.display = el.classList.contains('t-' + tipo.value) ? '' : 'none');
+  const prev = () => {
+    let t = tx.value;
+    if (tipo.value === 'whatsapp' && pl.value && textos[pl.value]) t = textos[pl.value];
+    if (tipo.value === 'email') t = pe.value && textosEmail[pe.value] ? textosEmail[pe.value] : (asunto.value ? asunto.value + '\n\n' : '') + tx.value;
+    $('prev').textContent = t || '—';
+  };
+
+  const DISP = {
+    entrada: ['Cuánto esperar desde que entra a la etapa', 'Al entrar a la etapa elegida. Ej: bienvenida al instante, seguimiento al día 3.'],
+    sin_respuesta: ['Si no responde en', 'Cuenta desde que entró a la etapa. Si en ese tiempo el cliente escribió o atendió una llamada, no se hace.'],
+    respuesta: ['Cuánto esperar después de que responde', 'La primera vez que el cliente escribe por WhatsApp/SMS o atiende una llamada estando en la etapa.'],
+    sin_actividad: ['Sin ninguna actividad durante', 'Si la tarjeta no tiene movimientos (llamadas, mensajes, notas, cambios) durante ese tiempo.'],
+    reingreso: ['Cuánto esperar después de que reingresa', 'Cuando la persona vuelve a entrar (escribe de nuevo, llena otro formulario, se importa de nuevo) y no se duplicó porque ya tenía la tarjeta.'],
+    despues_de: ['Cuánto esperar después de esa automatización', 'Cuando la automatización elegida se ejecutó (por ejemplo, se envió el mensaje de bienvenida).'],
+  };
+  const updDisp = () => {
+    const d = DISP[disp.value] || DISP.entrada;
+    $('lblDemora').textContent = d[0]; $('ayudaDisp').textContent = d[1];
+    $('boxEtapa').style.display = disp.value === 'despues_de' ? 'none' : '';
+    $('boxPrevia').style.display = disp.value === 'despues_de' ? '' : 'none';
+    $('boxTodas').style.display = $('boxOtras').style.display = disp.value === 'despues_de' ? 'none' : '';
+    etapa.disabled = $('id_todas_las_etapas').checked;
+    $('ayudaDemora').textContent = ['entrada', 'respuesta', 'despues_de', 'reingreso'].includes(disp.value) ? '0 = enseguida.' : '';
+  };
+
+  const ACC = {whatsapp: 'enviar un WhatsApp', email: 'enviar un email', sms: 'enviar un SMS', tarea: 'crear una tarea para el vendedor',
+    notif_agente: 'avisar al vendedor', notif_supervisores: 'avisar a supervisión', etapa: 'mover la tarjeta', embudo: 'pasarla a otro embudo',
+    reasignar: 'reasignarla a <b>otro vendedor</b>', prioridad: 'marcarla como <b>🔥 prioridad</b>', etiqueta: 'ponerle una etiqueta'};
+  const resumen = () => {
+    const n = parseInt(dv.value || '0'), u = sel(du), espera = n ? `${n} ${u}` : '';
+    const otras = [...document.querySelectorAll('[name=otras_etapas]:checked')].map(c => esc(c.parentElement.textContent.trim()));
+    const et = $('id_todas_las_etapas').checked ? 'cualquier etapa abierta' : ([esc(sel(etapa)) || '…', ...otras].join(', '));
+    let cuando = {
+      entrada: `Cuando la tarjeta <b>entra a ${et}</b>`,
+      sin_respuesta: `Si, desde que entró a <b>${et}</b>, el cliente <b>no responde en ${espera || '…'}</b>`,
+      respuesta: `Cuando el cliente <b>responde</b> estando en <b>${et}</b>`,
+      sin_actividad: `Si la tarjeta lleva <b>${espera || '…'} sin actividad</b> en <b>${et}</b>`,
+      despues_de: `Después de la automatización <b>${esc(sel(previa)) || '…'}</b>`,
+      reingreso: `Cuando el lead <b>reingresa</b> estando en <b>${et}</b>`,
+    }[disp.value];
+    if (espera && ['entrada', 'respuesta', 'despues_de', 'reingreso'].includes(disp.value)) cuando += `, esperar <b>${espera}</b> y`;
+    let que = ACC[tipo.value] || '';
+    if (tipo.value === 'whatsapp' && sel(pl)) que += ` (plantilla «${esc(sel(pl))}»)`;
+    if (tipo.value === 'email' && sel(pe)) que += ` (plantilla «${esc(sel(pe))}»)`;
+    if (tipo.value === 'reasignar') que += ($('id_reparto').value === 'menor_carga' ? ', al que tenga menos' : ', según la regla del embudo') + (sel($('id_volver_a_etapa')) ? ` y volverla a <b>${esc(sel($('id_volver_a_etapa')))}</b>` : '');
+    if (tipo.value === 'etiqueta' && sel($('id_etiqueta'))) que = `ponerle la etiqueta <b>${esc(sel($('id_etiqueta')))}</b>`;
+    if (tipo.value === 'etapa' && sel($('id_mover_a'))) que = `mover la tarjeta a <b>${esc(sel($('id_mover_a')))}</b>` + (sel($('id_tipificacion')) ? ` (${esc(sel($('id_tipificacion')))})` : '');
+    const conds = [];
+    if ($('id_solo_si_sigue_en_etapa').checked) conds.push('solo si sigue en esa etapa');
+    if ($('id_solo_en_horario').checked) conds.push('dentro del horario de atención');
+    const marcadas = n => [...document.querySelectorAll(`[name=${n}]:checked`)].map(c => esc(c.parentElement.textContent.trim()));
+    if (marcadas('solo_pautas').length) conds.push('solo pautas: ' + marcadas('solo_pautas').join(', '));
+    if (marcadas('solo_etiquetas').length) conds.push('solo con etiqueta: ' + marcadas('solo_etiquetas').join(', '));
+    if (marcadas('excluir_etiquetas').length) conds.push('nunca con etiqueta: ' + marcadas('excluir_etiquetas').join(', '));
+    $('resumen').innerHTML = `${cuando} → <b>${que}</b>.` + (conds.length ? `<div class="small muted mt-2">${conds.join(' · ')}</div>` : '');
+  };
+
+  const modo = $('id_modo_embudo'), asig = $('id_asignar_destino'), emb = $('id_embudo_destino'), et = $('id_etapa_destino');
+  const opciones = [...et.options].map(o => ({v: o.value, t: o.text}));
+  const filtrarEtapas = () => {
+    const nombre = emb.selectedOptions[0] ? emb.selectedOptions[0].text : '', actual = et.value;
+    et.innerHTML = '';
+    opciones.filter(o => !o.v || o.t.startsWith(nombre + ' · ')).forEach(o => et.add(new Option(o.t.replace(nombre + ' · ', ''), o.v, false, o.v === actual)));
+  };
+  const updEmbudo = () => {
+    if (tipo.value !== 'embudo') return;
+    document.querySelectorAll('.m-destino').forEach(el => el.style.display = modo.value === 'volver' ? 'none' : '');
+    document.querySelectorAll('.m-volver').forEach(el => el.style.display = modo.value === 'volver' ? '' : 'none');
+    document.querySelectorAll('.m-usuario').forEach(el => el.style.display = asig.value === 'usuario' ? '' : 'none');
+  };
+  emb.addEventListener('change', filtrarEtapas); modo.addEventListener('change', updEmbudo); asig.addEventListener('change', updEmbudo);
+  tipo.addEventListener('change', () => { upd(); updEmbudo(); });
+  disp.addEventListener('change', updDisp);
+  $('id_todas_las_etapas').addEventListener('change', updDisp);
+  document.querySelector('form').addEventListener('input', () => { prev(); resumen(); });
+  document.querySelector('form').addEventListener('change', () => { prev(); resumen(); });
+  upd(); filtrarEtapas(); updEmbudo(); updDisp(); prev(); resumen();
+})();
+</script>
+{% endblock %}

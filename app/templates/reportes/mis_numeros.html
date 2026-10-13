@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% load humanize crm_extras %}
+{% block title %}Mis números{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1><i class="bi bi-person-lines-fill"></i> {% if agente == user %}Mis números{% else %}{{ agente.display_name }}{% endif %} <span class="sub">{{ embudo|default:"Todos los embudos" }} · {{ desde|date:"d/m" }} al {{ hasta|date:"d/m/Y" }}</span></h1>
+  <form class="toolbar" method="get">
+    {% include "crm/_filtros_embudo.html" %}
+    {% if agentes %}<select name="agente" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">{% for a in agentes %}<option value="{{ a.pk }}" {% if a == agente %}selected{% endif %}>{{ a.display_name }}</option>{% endfor %}</select>{% endif %}
+    <div class="btn-group btn-group-sm">
+      {% for k, t in "hoy:Hoy,7d:7 días,mes:Este mes,30d:30 días"|split_pares %}<button class="btn btn-outline-secondary {% if p == k %}active{% endif %}" name="p" value="{{ k }}">{{ t }}</button>{% endfor %}
+    </div>
+  </form>
+</div>
+{% include "reportes/_autorefresh.html" %}
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi"><div class="v">{{ unicos.unicos }}</div><div class="l">Leads recibidos</div><div class="d">{{ unicos.reingresos }} reingresaron</div></div></div>
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi {% if sin_contactar %}alerta{% endif %}"><div class="v"><a href="{% url 'crm:oportunidades' %}?agente={{ agente.pk }}&estado=abierta&intentos_max=0">{{ sin_contactar }}</a></div><div class="l">Sin contactar todavía</div></div></div>
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi"><div class="v">{{ m.contactabilidad }}%</div><div class="l">Contactabilidad</div></div></div>
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi"><div class="v">{{ m.ventas }}</div><div class="l">Ventas</div><div class="d">{{ m.conversion }}% de los cierres</div></div></div>
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi"><div class="v">{{ m.llamadas }}</div><div class="l">Llamadas</div><div class="d">{{ m.minutos }} min hablados</div></div></div>
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi {% if m.tareas_vencidas %}alerta{% endif %}"><div class="v">{{ m.tareas_vencidas }}</div><div class="l">Tareas vencidas</div></div></div>
+</div>
+{% if sla %}
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3"><div class="kpi {% if sla.vencidos_ahora %}alerta{% endif %}"><div class="v"><a href="{% url 'crm:oportunidades' %}?embudo={{ embudo.pk|default:'todos' }}&sla=vencido{% if agente %}&agente={{ agente.pk }}{% endif %}">{{ sla.vencidos_ahora }}</a></div><div class="l">Fuera de SLA ahora (sin contactar)</div></div></div>
+  <div class="col-6 col-md-3"><div class="kpi"><div class="v">{{ sla.pct }}%</div><div class="l">Contactados dentro del SLA{% if sla.minutos %} ({{ sla.minutos }} min){% endif %}</div><div class="d">{{ sla.dentro }} a tiempo · {{ sla.fuera }} fuera</div></div></div>
+  <div class="col-6 col-md-3"><div class="kpi"><div class="v">{% if sla.promedio_min is not None %}{{ sla.promedio_min }} min{% else %}—{% endif %}</div><div class="l">Promedio hasta la primera gestión</div></div></div>
+  <div class="col-6 col-md-3"><div class="kpi"><div class="v">{{ sla.pendientes }}</div><div class="l">Asignados, todavía en plazo</div></div></div>
+</div>
+{% endif %}
+<div class="row g-3 mb-3">
+  <div class="col-lg-5">{% include "reportes/_conversion.html" %}</div>
+  <div class="col-lg-7">{% include "reportes/_pipeline.html" %}</div>
+</div>
+{% if cc %}<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3"><div class="kpi"><div class="v">{{ cc.conectado_h }} h</div><div class="l">Tiempo conectada</div></div></div>
+  <div class="col-6 col-md-3"><div class="kpi"><div class="v">{{ cc.habla_min }} min</div><div class="l">Tiempo de habla</div><div class="d">{{ cc.promedio_habla|duracion }} promedio por llamada</div></div></div>
+  <div class="col-6 col-md-3"><div class="kpi"><div class="v">{% if cc.acw_prom is not None %}{{ cc.acw_prom|duracion }}{% else %}—{% endif %}</div><div class="l">After call work promedio</div></div></div>
+  <div class="col-6 col-md-3"><div class="kpi"><div class="v">{% if cc.ocupacion is not None %}{{ cc.ocupacion }}%{% else %}—{% endif %}</div><div class="l">Ocupación (habla / conectada)</div></div></div>
+</div>{% endif %}
+<div class="card"><div class="card-header">Actividad en el período <span class="muted small">· todos los embudos</span></div><div class="card-body">
+  {% if act %}<div class="row g-3">{% for k, t in columnas_actividad %}<div class="col-6 col-md-3 col-xl-2"><div class="small muted">{{ t }}</div><div class="fs-5 fw-semibold" style="font-variant-numeric:tabular-nums">{{ act|get_item:k }}</div></div>{% endfor %}</div>
+  {% else %}<div class="muted small">Sin actividad registrada en el período.</div>{% endif %}
+</div></div>
+<script>document.querySelectorAll('.fill[data-v]').forEach(e => e.style.width = '0');</script>
+{% endblock %}

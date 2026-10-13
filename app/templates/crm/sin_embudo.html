@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Tablero{% endblock %}
+{% block content %}
+<div class="empty-state card">
+  <div class="empty-icon"><i class="bi bi-funnel"></i></div>
+  <h5>No tenés embudos asignados</h5>
+  <p>Pedile a un supervisor que te habilite en un embudo de ventas.</p>
+  {% if 'embudos' in perms_crm %}<a href="{% url 'crm:embudos' %}" class="btn btn-primary btn-sm">Configurar embudos</a>{% endif %}
+</div>
+{% endblock %}

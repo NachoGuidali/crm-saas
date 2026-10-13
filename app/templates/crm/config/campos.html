@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Campos personalizados{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-ui-checks-grid"></i> Campos personalizados de los contactos</h1>
+  {% if campo %}<a href="{% url 'crm:campos' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-plus-lg"></i> Nuevo campo</a>{% endif %}</div>
+<div class="row g-3">
+  <div class="col-lg-7"><div class="card"><div class="table-responsive"><table class="table table-sm table-hover mb-0">
+    <thead><tr><th>Campo</th><th>Tipo</th><th>Clave</th><th>Aplica a</th><th>Se ve en</th><th></th></tr></thead>
+    <tbody>{% for c in campos %}<tr class="{% if not c.activo %}opacity-50{% endif %}">
+      <td><b>{{ c.nombre }}</b>{% if c.requerido %} <span class="chip warn">obligatorio</span>{% endif %}{% if c.ayuda %}<div class="small muted">{{ c.ayuda }}</div>{% endif %}
+        {% if c.opciones %}<div class="small muted">{{ c.opciones|join:" · " }}</div>{% endif %}</td>
+      <td class="small">{{ c.get_tipo_display }}</td>
+      <td><code class="copiable" title="Copiar">{{ c.slug }}</code></td>
+      <td class="small">{{ c.embudo|default:"Todos" }}</td>
+      <td class="small">Ficha{% if c.mostrar_en_tarjeta %} · tarjeta{% endif %}{% if c.mostrar_en_lista %} · lista{% endif %}{% if c.filtrable %} · filtro{% endif %}{% if c.etapas_obligatorio %}<div class="mt-1">{% for e in c.etapas_obligatorio %}<span class="chip warn me-1" title="{{ e.embudo }}">obligatorio desde {{ e.nombre }}</span>{% endfor %}</div>{% endif %}</td>
+      <td><a href="{% url 'crm:campo_editar' c.pk %}" class="btn btn-xs btn-outline-secondary">Editar</a></td>
+    </tr>{% empty %}<tr><td colspan="6" class="text-center muted py-4">Todavía no hay campos personalizados. Creá el primero a la derecha.</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+  <div class="card mt-3"><div class="card-body small muted">
+    <b>¿Dónde aparecen?</b> En el alta de prospectos, en la ficha (editables), en la importación de Excel (como columnas a mapear, marcadas con ★),
+    en la API (<code>POST /api/v1/leads/</code> con la clave como nombre del dato), en la exportación CSV, y como variable
+    <code>{clave}</code> en mensajes automáticos, respuestas rápidas y plantillas.
+  </div></div></div>
+
+  <div class="col-lg-5"><form method="post" class="card"><div class="card-header">{% if campo %}Editar «{{ campo }}»{% else %}Nuevo campo{% endif %}</div><div class="card-body">{% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger py-2">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+    <div class="row g-2">
+      <div class="col-md-7"><label class="form-label">Nombre</label>{{ form.nombre }}{{ form.nombre.errors }}</div>
+      <div class="col-md-5"><label class="form-label">Tipo</label>{{ form.tipo }}</div>
+      <div class="col-12" id="wrapOpciones"><label class="form-label">{{ form.opciones_texto.label }}</label>{{ form.opciones_texto }}{{ form.opciones_texto.errors }}<div class="form-text">{{ form.opciones_texto.help_text }}</div></div>
+      <div class="col-12"><label class="form-label">Texto de ayuda</label>{{ form.ayuda }}</div>
+      <div class="col-md-8"><label class="form-label">Aplica a</label>{{ form.embudo }}<div class="form-text">{{ form.embudo.help_text }}</div></div>
+      <div class="col-md-4"><label class="form-label">Orden</label>{{ form.orden }}</div>
+      <div class="col-12"><label class="form-label">Obligatorio a partir de la etapa</label>
+        <div class="small" style="max-height:180px;overflow-y:auto">{% regroup etapas by embudo as grupos %}{% for g in grupos %}<div class="muted mt-1">{{ g.grouper }}</div>
+          {% for e in g.list %}<label class="d-flex gap-2"><input type="checkbox" class="form-check-input" name="etapas_requeridas" value="{{ e.pk }}" {% if e.pk in etapas_sel %}checked{% endif %}> {{ e.nombre }}</label>{% endfor %}{% endfor %}</div>
+        <div class="form-text">Para pasar a esa etapa (o a una posterior, incluida Venta) el campo tiene que estar completo.</div></div>
+      <div class="col-12 small">
+        <label class="d-flex gap-2">{{ form.requerido }} Obligatorio siempre (al cargar a mano)</label>
+        <label class="d-flex gap-2">{{ form.mostrar_en_tarjeta }} {{ form.mostrar_en_tarjeta.label }}</label>
+        <label class="d-flex gap-2">{{ form.mostrar_en_lista }} {{ form.mostrar_en_lista.label }}</label>
+        <label class="d-flex gap-2">{{ form.filtrable }} {{ form.filtrable.label }}</label>
+        <label class="d-flex gap-2">{{ form.activo }} Activo</label>
+      </div>
+    </div>
+    <div class="mt-3 d-flex gap-2"><button class="btn btn-primary">Guardar</button>
+      {% if campo %}<button name="eliminar" value="1" class="btn btn-outline-danger" onclick="return confirm('¿Eliminar el campo? Los valores ya cargados quedan guardados en los contactos.')">Eliminar</button>{% endif %}</div>
+  </div></form></div>
+</div>
+<script>
+(function () { const t = document.getElementById('id_tipo'), w = document.getElementById('wrapOpciones');
+  const upd = () => w.style.display = t.value === 'lista' ? '' : 'none'; t.addEventListener('change', upd); upd(); })();
+</script>
+{% endblock %}

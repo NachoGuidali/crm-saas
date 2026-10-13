@@ -1,0 +1,7 @@
+<div class="dropdown multi">
+  <button type="button" class="form-select form-select-sm text-start text-nowrap {% if sel %}border-primary{% endif %}" data-bs-toggle="dropdown" data-bs-auto-close="outside" style="min-width:130px">{{ titulo }}{% if sel %} <span class="badge bg-primary">{{ sel|length }}</span>{% endif %}</button>
+  <div class="dropdown-menu p-2" style="max-height:320px;overflow-y:auto;min-width:230px">
+    {% if opciones|length > 8 %}<input type="search" class="form-control form-control-sm mb-2 multi-buscar" placeholder="Buscar…">{% endif %}
+    {% for v, l in opciones %}<label class="d-flex gap-2 small py-1 multi-op" style="cursor:pointer"><input type="checkbox" class="form-check-input" name="{{ nombre }}" value="{{ v }}" {% if v in sel %}checked{% endif %}> {{ l }}</label>{% empty %}<span class="small muted">Sin opciones</span>{% endfor %}
+  </div>
+</div>

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Usuarios{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-people"></i> Usuarios</h1><a href="{% url 'users:nuevo' %}" class="btn btn-primary btn-sm"><i class="bi bi-person-plus"></i> Nuevo usuario</a></div>
+<form class="toolbar mb-3"><input type="search" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Buscar…">
+  <select name="rol" class="form-select form-select-sm"><option value="">Todos los roles</option>{% for k, v in roles %}<option value="{{ k }}" {% if filtros.rol == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select>
+  <button class="btn btn-outline-secondary btn-sm">Filtrar</button></form>
+<div class="card"><div class="table-responsive"><table class="table table-sm table-hover mb-0">
+  <thead><tr><th>Usuario</th><th>Email</th><th>Rol</th><th>Estado</th><th class="text-end">En curso</th><th>Último ingreso</th></tr></thead>
+  <tbody>{% for u in page %}<tr class="{% if not u.is_active %}opacity-50{% endif %}">
+    <td><span class="avatar-xs">{{ u.iniciales }}</span> <a href="{% url 'users:editar' u.pk %}" class="fw-semibold">{{ u.display_name }}</a> <span class="muted small">@{{ u.username }}</span></td>
+    <td class="small">{{ u.email }}</td><td>{{ u.get_rol_display_full }}</td>
+    <td>{% if not u.is_active %}<span class="chip">Inactivo</span>{% elif u.debe_cambiar_password %}<span class="chip warn">Contraseña temporal</span>{% elif not u.disponible %}<span class="chip warn">No disponible</span>{% else %}<span class="chip ok">Activo</span>{% endif %}</td>
+    <td class="text-end">{{ u.abiertas }}</td><td class="small">{{ u.last_login|date:"d/m/Y H:i"|default:"nunca" }}</td>
+  </tr>{% endfor %}</tbody>
+</table></div></div>
+{% include "_paginacion.html" %}
+{% endblock %}

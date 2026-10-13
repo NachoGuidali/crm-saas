@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Plantillas de email{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-envelope-paper"></i> Plantillas de email</h1>
+  <a href="{% url 'automatizaciones:plantillas_email' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Nueva</a></div>
+<div class="row g-3">
+  <div class="col-lg-4"><div class="card"><div class="list-group list-group-flush">
+    {% for p in plantillas %}<a href="{% url 'automatizaciones:plantilla_email' p.pk %}" class="list-group-item list-group-item-action {% if p == plantilla %}active{% endif %}{% if not p.activa %} opacity-50{% endif %}"><b class="small">{{ p.nombre }}</b><div class="small muted text-truncate">{{ p.asunto }}</div></a>
+    {% empty %}<div class="p-3 small muted">Todavía no hay plantillas.</div>{% endfor %}
+  </div></div></div>
+  <div class="col-lg-8"><form method="post" class="card"><div class="card-header">{{ plantilla|default:"Nueva plantilla" }}</div><div class="card-body">{% csrf_token %}
+    <div class="row g-2">
+      <div class="col-md-6"><label class="form-label">Nombre (interno)</label>{{ form.nombre }}{{ form.nombre.errors }}</div>
+      <div class="col-md-6 d-flex align-items-end"><label class="d-flex gap-2">{{ form.activa }} Activa</label></div>
+      <div class="col-12"><label class="form-label">Asunto</label>{{ form.asunto }}{{ form.asunto.errors }}</div>
+      <div class="col-12"><label class="form-label">Mensaje</label>{{ form.cuerpo }}{{ form.cuerpo.errors }}<div class="form-text">{{ form.cuerpo.help_text }} En difusiones y automáticos se agrega solo al pie el link "Darme de baja".</div></div>
+    </div>
+    <div class="mt-3 d-flex gap-2"><button class="btn btn-primary">Guardar</button>{% if plantilla %}<button name="eliminar" value="1" class="btn btn-outline-danger ms-auto" onclick="return confirm('¿Eliminar la plantilla?')">Eliminar</button>{% endif %}</div>
+  </div></form></div>
+</div>
+{% endblock %}

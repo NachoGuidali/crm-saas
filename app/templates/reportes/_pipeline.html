@@ -1,0 +1,11 @@
+<div class="card"><div class="card-header">Pipeline en curso por vendedora y etapa <span class="muted small">· ahora</span></div>
+{% if pipeline and pipeline.filas %}
+<div class="table-responsive"><table class="table table-sm mb-0" style="font-variant-numeric:tabular-nums">
+  <thead><tr><th>Vendedora</th>{% for e in pipeline.etapas %}<th class="text-end"><span class="dot" style="background:{{ e.color }}"></span> {{ e.nombre }}</th>{% endfor %}<th class="text-end">Total</th></tr></thead>
+  <tbody>{% for f in pipeline.filas %}<tr><td>{{ f.agente.display_name|default:"Sin asignar" }}</td>
+    {% for c in f.celdas %}<td class="text-end" style="{% if c and pipeline.max %}background:rgba(57,135,229,{% widthratio c pipeline.max 45 %}e-2){% endif %}">{{ c|default:"·" }}</td>{% endfor %}
+    <td class="text-end fw-semibold">{{ f.total }}</td></tr>{% endfor %}</tbody>
+  <tfoot><tr><th>Total</th>{% for t in pipeline.totales %}<th class="text-end">{{ t }}</th>{% endfor %}<th class="text-end">{{ pipeline.total }}</th></tr></tfoot>
+</table></div>
+{% else %}<div class="card-body muted small">{% if pipeline is None %}Elegí un embudo para ver el pipeline.{% else %}Sin oportunidades en curso.{% endif %}</div>{% endif %}
+</div>

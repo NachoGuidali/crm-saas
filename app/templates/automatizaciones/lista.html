@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Automatizaciones{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-lightning-charge"></i> Automatizaciones <span class="sub">{{ embudo }}</span></h1>
+  <div class="toolbar">{% include "crm/_filtros_embudo.html" %}<a href="{% url 'automatizaciones:ejecuciones' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-clock-history"></i> Historial</a>
+  <a href="{% url 'automatizaciones:nueva' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Nueva</a></div></div>
+<div class="alert alert-info py-2 small"><i class="bi bi-info-circle"></i> Los mensajes automáticos del circuito vienen <b>desactivados</b>: activalos cuando Marketing apruebe los textos y se revise la normativa de protección de datos. Nunca se envían a contactos "no contactar" ni a prospectos pausados.</div>
+{% for g in etapas %}
+<div class="card mb-2"><div class="card-body py-2">
+  <div class="d-flex align-items-center gap-2"><span class="dot" style="background:{{ g.etapa.color }}"></span><b>En «{{ g.etapa.nombre }}»</b>
+    <a href="{% url 'automatizaciones:nueva' %}?etapa={{ g.etapa.pk }}" class="btn btn-xs btn-outline-secondary ms-auto"><i class="bi bi-plus"></i></a></div>
+  {% for a in g.acciones %}
+  <div class="d-flex align-items-center gap-2 mt-2 ps-3 {% if not a.activa %}opacity-50{% endif %}">
+    <i class="bi bi-{{ a.icono }}"></i>
+    <div class="flex-grow-1 small"><a href="{% url 'automatizaciones:editar' a.pk %}" class="fw-semibold">{{ a.nombre }}</a> <span class="muted">· {% if a.disparador != 'entrada' %}{{ a.get_disparador_display|truncatewords:4 }} · {% endif %}{{ a.get_tipo_display }} · {{ a.demora_display }}{% if a.plantilla %} · plantilla «{{ a.plantilla }}»{% endif %}{% if a.tipo == "embudo" or a.tipo == "etapa" or a.tipo == "reasignar" or a.tipo == "etiqueta" %} · {{ a.resumen_embudo }}{% endif %}</span>
+      {% if a.todas_las_etapas or a.otras_etapas.all %} <span class="chip info">{{ a.resumen_etapas }}</span>{% endif %}
+      {% with c=a.resumen_condiciones %}{% if c %} <span class="chip">{{ c }}</span>{% endif %}{% endwith %}</div>
+    <form method="post" action="{% url 'automatizaciones:editar' a.pk %}">{% csrf_token %}<button name="toggle" value="1" class="btn btn-xs {% if a.activa %}btn-success{% else %}btn-outline-secondary{% endif %}">{% if a.activa %}Activa{% else %}Inactiva{% endif %}</button></form>
+  </div>
+  {% empty %}<div class="small muted ps-3 mt-1">Sin acciones.</div>{% endfor %}
+</div></div>
+{% endfor %}
+<div class="card mt-3"><div class="card-body small muted"><b>Además, por embudo</b> (en Embudos → configurar): recordatorio al agente cuando un prospecto lleva N días sin actividad, aviso a supervisión cuando queda estancado en una etapa, aviso de cada venta y asignación automática con horario.</div></div>
+{% endblock %}

@@ -1,0 +1,36 @@
+# ── Entornos y secretos ──────────────────────────────────
+# Se ignoran TODOS los .env* (tienen secretos reales) menos el .env.example (solo placeholders).
+.env
+.env.*
+!.env.example
+
+# Credenciales sueltas que nunca deben versionarse
+*.pem
+*.key
+.cloudflare.ini
+id_rsa*
+
+# ── Python ───────────────────────────────────────────────
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# ── Django / app ─────────────────────────────────────────
+app/media/
+app/staticfiles/
+app/logs/*.log
+*.sqlite3
+celerybeat-schedule*
+
+# ── Backups y dumps ──────────────────────────────────────
+*.dump
+*.dump.enc
+*.tgz
+*.tgz.enc
+
+# ── Artefactos de Windows/WSL ────────────────────────────
+*:Zone.Identifier
+Thumbs.db
+.DS_Store

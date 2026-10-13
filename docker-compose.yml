@@ -1,0 +1,100 @@
+name: crm-ventas
+
+x-app: &app
+  build: ./app
+  restart: unless-stopped
+  env_file: .env
+  volumes:
+    - media:/app/media
+  depends_on:
+    db: {condition: service_healthy}
+    redis: {condition: service_healthy}
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-crm_ventas}
+      POSTGRES_USER: ${POSTGRES_USER:-crm_ventas}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    command: postgres -c max_connections=200 -c shared_buffers=256MB
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # Sin política de desalojo: Redis es broker de Celery además de caché (no puede perder tareas).
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy noeviction
+    volumes: [redisdata:/data]
+    healthcheck: {test: ["CMD", "redis-cli", "ping"], interval: 10s, retries: 5}
+
+  web:
+    <<: *app
+    command: >
+      sh -c "python manage.py migrate_schemas --noinput &&
+             python manage.py setup_plataforma &&
+             gunicorn config.wsgi:application -b 0.0.0.0:8000 -k gthread -w $${WEB_WORKERS:-4} --threads 8 --timeout 60 --keep-alive 5 --access-logfile -"
+    # En el servidor queda solo en 127.0.0.1 (entra por nginx); en local se puede abrir con WEB_BIND=0.0.0.0
+    ports: ["${WEB_BIND:-127.0.0.1}:${WEB_PORT:-8000}:8000"]
+
+  # Webhooks entrantes (WhatsApp / Anura) y tareas generales: nunca esperan detrás de un envío masivo.
+  worker:
+    <<: *app
+    command: celery -A config worker -Q entrantes,default -c ${WORKER_CONCURRENCY:-4} -l info
+
+  # Envíos salientes, automatizaciones e importaciones masivas.
+  worker-masivos:
+    <<: *app
+    command: celery -A config worker -Q salientes,masivos -c ${WORKER_MASIVOS_CONCURRENCY:-3} -l info
+
+  beat:
+    <<: *app
+    command: celery -A config beat -l info -s /tmp/celerybeat-schedule
+
+  # Opcional: Evolution API para líneas por QR. Levantar con: docker compose --profile evolution up -d
+  # Crea (una sola vez) la base "evolution" que usa Evolution dentro del mismo Postgres.
+  evolution-db-init:
+    profiles: ["evolution"]
+    image: postgres:15-alpine
+    restart: "no"
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_USER:-crm_ventas}
+      POSTGRES_DB: ${POSTGRES_DB:-crm_ventas}
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        psql -h db -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}" -tAc "SELECT 1 FROM pg_database WHERE datname='evolution'" | grep -q 1 ||
+        psql -h db -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}" -c "CREATE DATABASE evolution"
+    depends_on:
+      db: {condition: service_healthy}
+
+  evolution-api:
+    profiles: ["evolution"]
+    image: evoapicloud/evolution-api:latest
+    restart: unless-stopped
+    environment:
+      SERVER_URL: ${EVOLUTION_SERVER_URL:-http://localhost:8080}
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://${POSTGRES_USER:-crm_ventas}:${POSTGRES_PASSWORD}@db:5432/evolution
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://redis:6379/6
+    ports: ["${WEB_BIND:-127.0.0.1}:${EVOLUTION_PORT:-8080}:8080"]
+    volumes: [evolution:/evolution/instances]
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      evolution-db-init: {condition: service_completed_successfully}
+
+volumes:
+  pgdata:
+  redisdata:
+  media:
+  evolution:

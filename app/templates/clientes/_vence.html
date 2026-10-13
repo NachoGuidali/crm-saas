@@ -1,0 +1,6 @@
+{% if c.estado_cobro == 'vencido' %}<span class="badge text-bg-danger">Vencido hace {{ c.dias_vencido }} d</span>
+{% elif c.estado_cobro == 'en_gracia' %}<span class="badge text-bg-danger">Vencido hace {{ c.dias_vencido }} d</span> <span class="small text-secondary">(gracia)</span>
+{% elif c.estado_cobro == 'por_vencer' %}<span class="badge text-bg-warning">{% if c.dias_para_vencer == 0 %}Vence hoy{% else %}Vence en {{ c.dias_para_vencer }} d{% endif %}</span>
+{% elif c.estado_cobro == 'al_dia' %}<span class="badge text-bg-success">Al día</span>
+{% elif c.estado_cobro == 'sin_fecha' %}<span class="badge text-bg-secondary">Sin fecha</span>{% endif %}
+{% if c.vencimiento and c.estado_cobro %}<div class="small text-secondary">{{ c.vencimiento|date:"d/m/Y" }}</div>{% endif %}

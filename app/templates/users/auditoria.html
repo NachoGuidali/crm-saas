@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Auditoría{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-clipboard-check"></i> Auditoría</h1></div>
+<p class="text-secondary small">Registro de acciones sensibles (ingresos, usuarios, credenciales, exportaciones y borrados). No se puede editar ni borrar.</p>
+
+<form method="get" class="row g-2 mb-3">
+  <div class="col-auto">
+    <select name="accion" class="form-select form-select-sm" onchange="this.form.submit()">
+      <option value="">Todas las acciones</option>
+      {% for val, lbl in acciones %}<option value="{{ val }}" {% if val == accion %}selected{% endif %}>{{ lbl }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-auto"><input name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Usuario, objeto o IP"></div>
+  <div class="col-auto"><button class="btn btn-sm btn-outline-secondary">Filtrar</button></div>
+</form>
+
+<div class="card"><div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0 small">
+  <thead><tr><th>Fecha</th><th>Acción</th><th>Usuario</th><th>Objeto</th><th>Detalle</th><th>IP</th></tr></thead>
+  <tbody>
+  {% for r in pagina %}
+    <tr>
+      <td class="text-nowrap">{{ r.created_at|date:"d/m/Y H:i" }}</td>
+      <td><span class="badge {% if r.accion == 'login_fallido' %}text-bg-danger{% elif r.accion in 'borrado_masivo,usuario_baja,cliente_suspension' %}text-bg-warning{% else %}text-bg-secondary{% endif %}">{{ r.get_accion_display }}</span></td>
+      <td>{{ r.usuario_desc }}</td>
+      <td>{{ r.objeto }}</td>
+      <td class="text-secondary">{{ r.detalle|truncatechars:80 }}</td>
+      <td class="text-nowrap">{{ r.ip|default:"—" }}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="6" class="text-center text-secondary py-4">Sin registros.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div></div>
+
+{% if pagina.has_other_pages %}
+<nav class="mt-3"><ul class="pagination pagination-sm">
+  {% if pagina.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ pagina.previous_page_number }}&accion={{ accion }}&q={{ q }}">Anterior</a></li>{% endif %}
+  <li class="page-item disabled"><span class="page-link">Página {{ pagina.number }} de {{ pagina.paginator.num_pages }}</span></li>
+  {% if pagina.has_next %}<li class="page-item"><a class="page-link" href="?page={{ pagina.next_page_number }}&accion={{ accion }}&q={{ q }}">Siguiente</a></li>{% endif %}
+</ul></nav>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Supervisión{% endblock %}
+{% block content %}
+{% include "reportes/_autorefresh.html" %}
+<div class="page-head"><h1><i class="bi bi-binoculars"></i> Supervisión</h1><div class="toolbar">{% include "crm/_filtros_embudo.html" %}</div></div>
+<div class="row g-3 mb-3">
+  <div class="col-md"><div class="kpi {% if sin_asignar %}alerta{% endif %}"><div class="v">{{ sin_asignar }}</div><div class="l">Prospectos sin asignar</div>
+    {% if sin_asignar and 'reasignar' in perms_crm %}<form method="post" class="mt-2">{% csrf_token %}<input type="hidden" name="accion" value="asignar_cola"><button class="btn btn-sm btn-outline-warning">Asignar ahora (rotativo)</button></form>{% endif %}</div></div>
+  <div class="col-md"><div class="kpi {% if estancados %}alerta{% endif %}"><div class="v">{{ estancados }}</div><div class="l">Estancados (+{{ embudo.dias_estancado_alerta|default:7 }} días en la misma etapa)</div>
+    <a class="small" href="{% url 'crm:oportunidades' %}?embudo={{ embudo.pk }}&estancados=1">Ver lista</a></div></div>
+  {% if sla_vencidos is not None %}<div class="col-md"><div class="kpi {% if sla_vencidos %}alerta{% endif %}"><div class="v">{{ sla_vencidos }}</div><div class="l">Fuera de SLA ({{ embudo.sla_minutos }} min sin contactar)</div>
+    <a class="small" href="{% url 'crm:oportunidades' %}?embudo={{ embudo.pk }}&sla=vencido">Ver lista</a></div></div>{% endif %}
+  <div class="col-md"><div class="kpi {% if total_sin_calificar %}alerta{% endif %}"><div class="v">{{ total_sin_calificar }}</div><div class="l">Llamadas sin calificar (30 días)</div>
+    <a class="small" href="{% url 'telefonia:llamadas' %}?resultado=sin">Ver lista</a></div></div>
+  <div class="col-md"><div class="kpi"><div class="v">{{ wa_sin_asignar }}</div><div class="l">Chats de WhatsApp sin asignar</div><a class="small" href="{% url 'whatsapp:inbox' %}?bandeja=sin_asignar">Ir al inbox</a></div></div>
+</div>
+<div class="card"><div class="card-header">Carga por agente — {{ embudo }} <span class="chip ok ms-2">{{ n_online }} en línea</span>{% if n_ausentes %}<span class="chip warn ms-1" title="CRM abierto sin usar hace más de {{ ausente_min }} min (siguen recibiendo leads)">{{ n_ausentes }} ausente{{ n_ausentes|pluralize }}</span>{% endif %}</div><div class="table-responsive"><table class="table table-sm table-hover mb-0">
+  <thead><tr><th>Agente</th><th>Conexión</th><th>Estado</th><th class="text-end">En curso</th><th class="text-end">Sin gestionar</th><th class="text-end">Tareas vencidas</th><th class="text-end" title="Llamadas atendidas sin resultado cargado">Sin calificar</th><th class="text-end" title="Prioritarias en curso (ej. reingresos)">Prioridad</th><th class="text-end">Chats sin leer</th><th class="text-end">Llamadas hoy</th><th class="text-end">Ventas del mes</th><th></th></tr></thead>
+  <tbody>{% for f in filas %}<tr>
+    <td><span class="avatar-xs">{{ f.u.iniciales }}</span> {{ f.u.display_name }}</td>
+    <td class="small text-nowrap">{% if f.ausente_desde %}<span class="dot" style="background:#F59E0B"></span> <b>Ausente</b><div class="muted" style="font-size:11px" title="Tiene el CRM abierto pero no lo usa hace más de {{ ausente_min }} min. Sigue recibiendo leads.">sin usar el CRM desde las {{ f.ausente_desde|date:"H:i" }}</div>{% elif f.online %}<span class="dot" style="background:#22C97A"></span> <b>En línea</b>{% if f.desde %}<div class="muted" style="font-size:11px">desde las {{ f.desde|date:"H:i" }}</div>{% endif %}{% else %}<span class="dot" style="background:#6b7280"></span> <span class="muted">Desconectada</span>{% if f.ultima_vez %}<div class="muted" style="font-size:11px">última vez {{ f.ultima_vez|date:"d/m H:i" }}</div>{% endif %}{% endif %}</td>
+    <td>{% if f.en_llamada %}<span class="chip ok"><i class="bi bi-telephone-fill"></i> En llamada</span>{% elif f.u.disponible %}<span class="chip">Disponible</span>{% else %}<span class="chip warn">No disponible</span>{% endif %}</td>
+    <td class="text-end"><a href="{% url 'crm:oportunidades' %}?embudo={{ embudo.pk }}&agente={{ f.u.pk }}&estado=abierta">{{ f.u.abiertas }}</a></td>
+    <td class="text-end {% if f.u.sin_gestion > 10 %}text-warning{% endif %}">{{ f.u.sin_gestion }}</td>
+    <td class="text-end {% if f.u.tareas_vencidas %}text-danger{% endif %}">{{ f.u.tareas_vencidas }}</td>
+    <td class="text-end">{% if f.sin_calificar %}<a class="text-danger fw-semibold" href="{% url 'telefonia:llamadas' %}?resultado=sin&agente={{ f.u.pk }}">{{ f.sin_calificar }}</a>{% else %}0{% endif %}</td>
+    <td class="text-end">{% if f.prioritarias %}<a href="{% url 'crm:oportunidades' %}?embudo={{ embudo.pk }}&agente={{ f.u.pk }}&prioritaria=1">🔥 {{ f.prioritarias }}</a>{% else %}0{% endif %}</td>
+    <td class="text-end">{{ f.wa }}</td><td class="text-end">{{ f.llamadas_hoy }}</td><td class="text-end fw-semibold">{{ f.u.ventas_mes }}</td>
+    <td class="text-end">{% if 'reasignar' in perms_crm and f.u.abiertas %}<form method="post" onsubmit="return confirm('¿Repartir todas las oportunidades en curso de {{ f.u.display_name|escapejs }} entre el resto del equipo?')">{% csrf_token %}<input type="hidden" name="agente" value="{{ f.u.pk }}"><button class="btn btn-xs btn-outline-secondary" title="Redistribuir su cartera (vacaciones, baja)"><i class="bi bi-shuffle"></i> Redistribuir</button></form>{% endif %}</td>
+  </tr>{% empty %}<tr><td colspan="12" class="text-center muted py-3">No hay agentes en este embudo.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+{% endblock %}

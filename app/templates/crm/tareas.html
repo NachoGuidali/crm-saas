@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Tareas{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-calendar-check"></i> Tareas</h1></div>
+<div class="toolbar mb-3">
+  <div class="btn-group btn-group-sm">
+    <a class="btn btn-outline-secondary {% if f == 'hoy' %}active{% endif %}" href="?f=hoy&de={{ de }}">Hoy</a>
+    <a class="btn btn-outline-secondary {% if f == 'vencidas' %}active{% endif %}" href="?f=vencidas&de={{ de }}">Vencidas</a>
+    <a class="btn btn-outline-secondary {% if f == 'pendientes' %}active{% endif %}" href="?f=pendientes&de={{ de }}">Todas las pendientes</a>
+    <a class="btn btn-outline-secondary {% if f == 'completadas' %}active{% endif %}" href="?f=completadas&de={{ de }}">Completadas</a>
+  </div>
+  {% if user.ve_todo %}
+  <form class="d-flex gap-2" method="get"><input type="hidden" name="f" value="{{ f }}">
+    <select name="de" class="form-select form-select-sm" onchange="this.form.submit()"><option value="mias">Mis tareas</option><option value="todas" {% if de == 'todas' %}selected{% endif %}>De todo el equipo</option></select>
+    {% if de == 'todas' %}<select name="agente" class="form-select form-select-sm" onchange="this.form.submit()"><option value="">Todos</option>{% for a in agentes %}<option value="{{ a.pk }}" {% if filtros.agente == a.pk|stringformat:'s' %}selected{% endif %}>{{ a.display_name }}</option>{% endfor %}</select>{% endif %}
+  </form>
+  {% endif %}
+</div>
+<div class="card"><div class="table-responsive"><table class="table table-sm table-hover mb-0">
+  <thead><tr><th></th><th>Tarea</th><th>Prospecto</th><th>Vence</th>{% if de == 'todas' %}<th>Asignada a</th>{% endif %}<th>Prioridad</th><th></th></tr></thead>
+  <tbody>{% for t in page %}<tr>
+    <td><i class="bi bi-{{ t.icono }}"></i></td>
+    <td>{{ t.titulo }}{% if t.automatica %} <span class="chip" title="Creada automáticamente"><i class="bi bi-lightning-charge"></i></span>{% endif %}{% if t.descripcion %}<div class="small muted">{{ t.descripcion|truncatechars:80 }}</div>{% endif %}</td>
+    <td>{% if t.oportunidad %}<a href="{% url 'crm:oportunidad_detalle' t.oportunidad_id %}">{{ t.oportunidad.contacto.nombre }}</a>{% elif t.contacto %}<a href="{% url 'crm:contacto_detalle' t.contacto_id %}">{{ t.contacto.nombre }}</a>{% endif %}</td>
+    <td class="{% if t.vencida %}text-danger{% endif %} text-nowrap">{{ t.vence_at|date:"d/m H:i" }}</td>
+    {% if de == 'todas' %}<td>{{ t.asignado_a.display_name }}</td>{% endif %}
+    <td>{% if t.prioridad == 'alta' %}<span class="chip danger">Alta</span>{% else %}{{ t.get_prioridad_display }}{% endif %}</td>
+    <td class="text-nowrap">{% if t.estado == 'pendiente' %}
+      <button class="btn btn-xs btn-outline-success" data-accion="{% url 'crm:tarea_accion' t.pk 'completar' %}" data-recargar="1"><i class="bi bi-check2"></i> Hecha</button>
+      <button class="btn btn-xs btn-outline-secondary" data-accion="{% url 'crm:tarea_accion' t.pk 'posponer' %}" data-payload='{"horas":24}' data-recargar="1">+1 día</button>
+      <button class="btn btn-xs btn-outline-danger" data-accion="{% url 'crm:tarea_accion' t.pk 'cancelar' %}" data-confirm="¿Cancelar la tarea?" data-recargar="1"><i class="bi bi-x"></i></button>
+      {% else %}<span class="small muted">{{ t.completada_at|date:"d/m H:i" }}</span>{% endif %}</td>
+  </tr>{% empty %}<tr><td colspan="7" class="text-center muted py-4">Sin tareas.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+{% include "_paginacion.html" %}
+{% endblock %}

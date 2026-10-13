@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}{{ embudo|default:"Nuevo embudo" }}{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-funnel"></i> {{ embudo|default:"Nuevo embudo" }}</h1>
+  {% if embudo %}<a href="{% url 'automatizaciones:lista' %}?embudo={{ embudo.pk }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-lightning-charge"></i> Automatizaciones de este embudo</a>{% endif %}</div>
+<form method="post">{% csrf_token %}
+{% if form.errors %}<div class="alert alert-danger py-2">Revisá los campos marcados.</div>{% endif %}
+<div class="row g-3">
+  <div class="col-lg-6"><div class="card h-100"><div class="card-header">General</div><div class="card-body">
+    <div class="row g-2">
+      <div class="col-8"><label class="form-label">Nombre</label>{{ form.nombre }}{{ form.nombre.errors }}</div>
+      <div class="col-4"><label class="form-label">Color</label>{{ form.color }}</div>
+      <div class="col-12"><label class="form-label">Descripción</label>{{ form.descripcion }}</div>
+      <div class="col-6"><label class="form-label">Orden</label>{{ form.orden }}</div>
+      <div class="col-6 d-flex align-items-end"><label class="d-flex gap-2">{{ form.activo }} Activo</label></div>
+      <div class="col-12"><label class="form-label">Línea de WhatsApp para mensajes automáticos</label>{{ form.linea_whatsapp }}</div>
+    </div>
+  </div></div></div>
+  <div class="col-lg-6"><div class="card h-100"><div class="card-header">Asignación automática</div><div class="card-body">
+    <label class="form-label">Regla</label>{{ form.modo_asignacion }}
+    <div class="row g-2 mt-1">
+      <div class="col-sm-6"><label class="form-label">{{ form.asignar_entre.label }}</label>{{ form.asignar_entre }}</div>
+      <div class="col-sm-6" id="boxSinConectados"><label class="form-label">{{ form.sin_conectados.label }}</label>{{ form.sin_conectados }}</div>
+    </div>
+    <div class="form-text">"Conectado" = tiene el CRM abierto (en cualquier pestaña) y está disponible. Se desconecta a los 4 minutos de cerrarlo o al salir. Las excepciones por origen se configuran abajo, en <a href="#reglas">Reglas por origen</a>.</div>
+    <div class="row g-2 mt-1">
+      <div class="col-sm-4"><label class="form-label">SLA primer contacto (min)</label>{{ form.sla_minutos }}</div>
+      <div class="col-sm-5"><label class="form-label">{{ form.sla_accion.label }}</label>{{ form.sla_accion }}</div>
+      <div class="col-sm-3"><label class="form-label">Máx. reasignaciones</label>{{ form.sla_max_reasignaciones }}</div>
+    </div>
+    <div class="form-text">{{ form.sla_minutos.help_text }} Se cuenta desde la asignación; fuera del horario de atención no se reasigna.</div>
+    <label class="d-flex gap-2 mt-2 small">{{ form.crear_tarea_al_asignar }} {{ form.crear_tarea_al_asignar.label }}</label>
+    <label class="d-flex gap-2 mt-2 small">{{ form.respetar_horario }} {{ form.respetar_horario.label }}</label>
+    <div class="row g-2 mt-1">
+      <div class="col-6"><label class="form-label">Desde</label>{{ form.horario_desde }}</div>
+      <div class="col-6"><label class="form-label">Hasta</label>{{ form.horario_hasta }}</div>
+      <div class="col-12"><label class="form-label">Días de atención</label><div class="d-flex gap-3 flex-wrap small">{% for c in form.dias_habiles %}<label class="d-flex gap-1">{{ c.tag }} {{ c.choice_label }}</label>{% endfor %}</div></div>
+      <div class="col-12"><label class="form-label">Si ingresa fuera de horario</label>{{ form.fuera_de_horario }}</div>
+    </div>
+  </div></div></div>
+  <div class="col-lg-6"><div class="card h-100"><div class="card-header">Agentes habilitados (reciben prospectos)</div><div class="card-body">
+    <div class="checks-grid">{% for c in form.agentes %}<label>{{ c.tag }} {{ c.choice_label }}{% if c.data.value.value in conectados %} <span class="dot" style="background:#22C97A" title="Conectado ahora"></span>{% endif %}</label>{% endfor %}</div>
+    {% if embudo %}<div class="form-text"><span class="dot" style="background:#22C97A"></span> = conectado ahora.</div>{% endif %}
+    <div class="section-title mt-3">Supervisores (avisos de ventas y estancados)</div>
+    <div class="checks-grid">{% for c in form.supervisores %}<label>{{ c.tag }} {{ c.choice_label }}</label>{% endfor %}</div>
+    <div class="form-text">Sin supervisores marcados, avisa a todos los usuarios con permiso de supervisión.</div>
+  </div></div></div>
+  <div class="col-lg-6"><div class="card h-100"><div class="card-header">Reglas operativas</div><div class="card-body">
+    <div class="row g-2">
+      <div class="col-12"><label class="form-label">{{ form.max_intentos_sin_respuesta.label }}</label>{{ form.max_intentos_sin_respuesta }}</div>
+      <div class="col-6"><label class="form-label">{{ form.dias_inactividad_recordatorio.label }}</label>{{ form.dias_inactividad_recordatorio }}</div>
+      <div class="col-6"><label class="form-label">{{ form.dias_estancado_alerta.label }}</label>{{ form.dias_estancado_alerta }}</div>
+      <div class="col-12"><label class="form-label">{{ form.reingreso_perdidos.label }}</label>{{ form.reingreso_perdidos }}</div>
+      <div class="col-12"><label class="d-flex gap-2 small">{{ form.notificar_venta_supervisores }} {{ form.notificar_venta_supervisores.label }}</label></div>
+      <div class="col-12"><label class="d-flex gap-2 small">{{ form.exigir_resultado }} {{ form.exigir_resultado.label }}</label>
+        <div class="form-text">{{ form.exigir_resultado.help_text }} Las opciones se configuran abajo, en <a href="#resultados">Resultados de gestión</a>.</div></div>
+    </div>
+  </div></div></div>
+  <div class="col-lg-6"><div class="card h-100"><div class="card-header">Vencimiento de la ficha (cartera)</div><div class="card-body">
+    <div class="row g-2">
+      <div class="col-sm-4"><label class="form-label">{{ form.vence_dias.label }}</label>{{ form.vence_dias }}</div>
+      <div class="col-sm-8"><label class="form-label">{{ form.vence_accion.label }}</label>{{ form.vence_accion }}</div>
+      <div class="col-12"><label class="form-label">{{ form.vence_hasta_etapa.label }}</label>{{ form.vence_hasta_etapa }}</div>
+    </div>
+    <div class="form-text">{{ form.vence_dias.help_text }} {{ form.vence_hasta_etapa.help_text }} Fuera del horario de atención no se reasigna. Al reasignarse, el nuevo vendedor arranca con el plazo completo.</div>
+  </div></div></div>
+  <div class="col-lg-6"><div class="card h-100"><div class="card-header">Clientes (socios)</div><div class="card-body">
+    <div class="row g-2">
+      <div class="col-12"><label class="form-label">{{ form.socios_a.label }}</label>{{ form.socios_a }}</div>
+      <div class="col-sm-6"><label class="form-label">{{ form.socios_usuario.label }}</label>{{ form.socios_usuario }}</div>
+      <div class="col-sm-6"><label class="form-label">{{ form.etiqueta_venta.label }}</label>{{ form.etiqueta_venta }}</div>
+      <div class="col-12"><label class="d-flex gap-2 small">{{ form.clientes_de_otros }} {{ form.clientes_de_otros.label }}</label></div>
+    </div>
+    <div class="form-text">Un cliente que vuelve a escribir, llamar o llenar un formulario <b>no abre una tarjeta nueva ni se reparte entre vendedores</b>: queda registrado en su venta y su chat / llamada perdida va a quien elijas acá. {{ form.etiqueta_venta.help_text }}</div>
+  </div></div></div>
+</div>
+<div class="mt-3"><button class="btn btn-primary">Guardar embudo</button> <a href="{% url 'crm:embudos' %}" class="btn btn-outline-secondary">Volver</a></div>
+</form>
+
+{% if embudo %}
+<div class="card mt-3" id="reglas"><div class="card-header d-flex align-items-center">Reglas por origen (excepciones a la asignación)
+  <a href="{% url 'crm:regla_nueva' embudo.pk %}" class="btn btn-sm btn-primary ms-auto"><i class="bi bi-plus-lg"></i> Nueva regla</a></div>
+  <div class="card-body">
+    <p class="small muted mb-2">Se revisan en orden cuando entra un lead; gana la primera que coincide. Si ninguna coincide, se usa la asignación general de arriba.</p>
+    {% for r in reglas %}
+    <div class="d-flex align-items-center gap-2 py-2 border-bottom{% if not r.activa %} opacity-50{% endif %}" style="border-color:var(--border)!important">
+      <span class="chip">{{ forloop.counter }}</span>
+      <div class="flex-grow-1 small"><b>{{ r.nombre }}</b>{% if not r.activa %} <span class="chip">inactiva</span>{% endif %}
+        <div class="muted">Si {{ r.resumen_condiciones }} →
+          {% if r.accion == 'sin_asignar' %}<b>no se asigna</b> (queda para asignación manual)
+          {% else %}<b>{% for a in r.agentes.all %}{{ a.display_name }}{% if not forloop.last %}, {% endif %}{% endfor %}</b>
+            ({{ r.get_asignar_entre_display|lower }}{% if r.si_no_hay == 'embudo' %}; si no pueden, regla general{% elif r.si_no_hay == 'todos' %}; si no hay conectados, igual entre ellos{% else %}; si no pueden, espera{% endif %}){% endif %}
+        </div></div>
+      <a href="{% url 'crm:regla_editar' embudo.pk r.pk %}" class="btn btn-xs btn-outline-secondary"><i class="bi bi-pencil"></i></a>
+    </div>
+    {% empty %}<div class="small muted">Sin reglas: todos los leads se asignan con la regla general.</div>{% endfor %}
+  </div></div>
+
+<div class="row g-3 mt-2">
+  <div class="col-lg-6" id="etapas"><div class="card"><div class="card-header">Etapas (en orden)</div><div class="card-body">
+    {% for e in etapas %}
+    <div class="d-flex align-items-center gap-2 py-2 border-bottom" style="border-color:var(--border)!important">
+      <span class="dot" style="background:{{ e.color }}"></span>
+      <div class="flex-grow-1"><b class="small">{{ e.nombre }}</b> <span class="chip">{{ e.get_tipo_display }}</span>{% if e.marca_contacto_efectivo %} <span class="chip info">contacto efectivo</span>{% endif %}
+        <div class="small muted">{{ e.descripcion }} · {{ e.n }} oportunidades</div>
+        {% if e.campos_requeridos %}<div class="mt-1"><span class="small muted">Obligatorio desde acá:</span> {% for c in e.campos_requeridos %}<span class="chip warn me-1">{% for k, l in campos_requeribles %}{% if k == c %}{{ l }}{% endif %}{% endfor %}</span>{% endfor %}</div>{% endif %}</div>
+      <form method="post" action="{% url 'crm:etapa_accion' embudo.pk e.pk 'subir' %}">{% csrf_token %}<button class="btn btn-xs btn-outline-secondary" title="Subir"><i class="bi bi-arrow-up"></i></button></form>
+      <form method="post" action="{% url 'crm:etapa_accion' embudo.pk e.pk 'bajar' %}">{% csrf_token %}<button class="btn btn-xs btn-outline-secondary" title="Bajar"><i class="bi bi-arrow-down"></i></button></form>
+      <button class="btn btn-xs btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#et{{ e.pk }}"><i class="bi bi-pencil"></i></button>
+      <form method="post" action="{% url 'crm:etapa_accion' embudo.pk e.pk 'eliminar' %}" onsubmit="return confirm('¿Eliminar la etapa?')">{% csrf_token %}<button class="btn btn-xs btn-outline-danger"><i class="bi bi-trash"></i></button></form>
+    </div>
+    <form method="post" action="{% url 'crm:etapa_accion' embudo.pk e.pk 'guardar' %}" class="collapse row g-2 py-2" id="et{{ e.pk }}">{% csrf_token %}
+      <div class="col-6"><input name="nombre" value="{{ e.nombre }}" class="form-control form-control-sm"></div>
+      <div class="col-6"><select name="color" class="form-select form-select-sm">{% for v, l in etapa_form.fields.color.choices %}<option value="{{ v }}" {% if v == e.color %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+      <div class="col-12"><input name="descripcion" value="{{ e.descripcion }}" class="form-control form-control-sm" placeholder="Descripción"></div>
+      <div class="col-6"><select name="tipo" class="form-select form-select-sm">{% for v, l in etapa_form.fields.tipo.choices %}<option value="{{ v }}" {% if v == e.tipo %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+      <div class="col-6"><label class="small d-flex gap-1"><input type="checkbox" name="marca_contacto_efectivo" class="form-check-input" {% if e.marca_contacto_efectivo %}checked{% endif %}> Contacto efectivo</label></div>
+      {% if e.tipo != 'perdido' %}<div class="col-12"><input type="hidden" name="requeridos_enviados" value="1">
+        <label class="form-label">Datos obligatorios para pasar a esta etapa (y a las siguientes)</label>
+        <div class="checks-grid">{% for k, l in campos_requeribles %}<label><input type="checkbox" class="form-check-input" name="campos_requeridos" value="{{ k }}" {% if k in e.campos_requeridos %}checked{% endif %}> {{ l }}</label>{% endfor %}</div>
+        <div class="form-text">Si falta alguno, al mover la tarjeta se pide completarlo en el momento. No aplica al cerrar como No venta.</div></div>{% endif %}
+      <div class="col-12"><button class="btn btn-sm btn-primary">Guardar etapa</button></div>
+    </form>
+    {% endfor %}
+    <form method="post" action="{% url 'crm:etapa_nueva' embudo.pk 'guardar' %}" class="row g-2 mt-2">{% csrf_token %}
+      <div class="col-5">{{ etapa_form.nombre }}</div><div class="col-4">{{ etapa_form.tipo }}</div><div class="col-3">{{ etapa_form.color }}</div>
+      <div class="col-12"><button class="btn btn-sm btn-outline-primary"><i class="bi bi-plus"></i> Agregar etapa</button></div>
+    </form>
+  </div></div></div>
+
+  <div class="col-12" id="resultados"><div class="card"><div class="card-header">Resultados de gestión <span class="muted small">· se eligen al terminar cada llamada atendida</span></div><div class="card-body">
+    {% for r in resultados %}
+    <form method="post" action="{% url 'crm:resultado_editar' embudo.pk r.pk %}" class="d-flex align-items-center gap-2 py-1 {% if not r.activo %}opacity-50{% endif %}">{% csrf_token %}
+      <div class="flex-grow-1 small"><b>{{ r.nombre }}</b>
+        {% if r.contactado %}<span class="chip ok">habló con el cliente</span>{% else %}<span class="chip">no habló</span>{% endif %}
+        {% if r.pide_fecha %}<span class="chip info">pide fecha de rellamado</span>{% endif %}
+        {% if r.mover_a %}<span class="chip warn">mueve a {{ r.mover_a }}</span>{% endif %}
+        {% if not r.embudo_id %}<span class="chip">global</span>{% endif %}</div>
+      <input type="hidden" name="accion" value="toggle"><button class="btn btn-xs btn-outline-secondary">{% if r.activo %}Desactivar{% else %}Activar{% endif %}</button>
+    </form>
+    {% empty %}<div class="small muted">Sin resultados cargados.</div>{% endfor %}
+    <div class="sep"></div>
+    <form method="post" action="{% url 'crm:resultado_nuevo' embudo.pk %}" class="row g-2 align-items-end">{% csrf_token %}
+      <div class="col-md-4"><label class="form-label">Nombre</label>{{ res_form.nombre }}</div>
+      <div class="col-md-3"><label class="form-label">Mover la tarjeta a</label>{{ res_form.mover_a }}</div>
+      <div class="col-md-1"><label class="form-label">Orden</label>{{ res_form.orden }}</div>
+      <div class="col-md-4 small"><label class="d-flex gap-1">{{ res_form.contactado }} Habló con el cliente</label><label class="d-flex gap-1">{{ res_form.pide_fecha }} Pide fecha para volver a llamar</label>
+        <label class="d-flex gap-1"><input type="checkbox" name="solo_este" value="1" class="form-check-input" checked> Solo para este embudo</label><input type="hidden" name="activo" value="on"></div>
+      <div class="col-12"><button class="btn btn-sm btn-outline-primary"><i class="bi bi-plus"></i> Agregar resultado</button></div>
+    </form>
+  </div></div></div>
+  <div class="col-lg-6" id="tipificaciones"><div class="card"><div class="card-header">Tipificaciones de cierre</div><div class="card-body">
+    {% regroup tipificaciones by get_resultado_display as grupos %}
+    {% for g in grupos %}<div class="section-title mt-2">{{ g.grouper }}</div>
+      {% for t in g.list %}
+      <div class="d-flex align-items-start gap-2 py-1 {% if not t.activa %}opacity-50{% endif %}">
+        <div class="flex-grow-1 small"><b>{{ t.nombre }}</b> <span class="muted">· {{ t.categoria }}</span>{% if t.accion %} <span class="chip warn">{{ t.get_accion_display|truncatechars:40 }}</span>{% endif %}{% if t.requiere_nota %} <span class="chip">nota obligatoria</span>{% endif %}{% if not t.embudo_id %} <span class="chip">global</span>{% endif %}
+          <div class="muted">{{ t.descripcion }}</div></div>
+        <form method="post" action="{% url 'crm:tipificacion_editar' embudo.pk t.pk %}">{% csrf_token %}<input type="hidden" name="accion" value="toggle"><button class="btn btn-xs btn-outline-secondary">{% if t.activa %}Desactivar{% else %}Activar{% endif %}</button></form>
+      </div>
+      {% endfor %}
+    {% endfor %}
+    <div class="sep"></div>
+    <form method="post" action="{% url 'crm:tipificacion_nueva' embudo.pk %}" class="row g-2">{% csrf_token %}
+      <div class="col-6"><label class="form-label">Resultado</label>{{ tip_form.resultado }}</div>
+      <div class="col-6"><label class="form-label">Categoría</label>{{ tip_form.categoria }}</div>
+      <div class="col-12"><label class="form-label">Nombre</label>{{ tip_form.nombre }}</div>
+      <div class="col-12"><label class="form-label">Cuándo se aplica</label>{{ tip_form.descripcion }}</div>
+      <div class="col-8"><label class="form-label">Acción especial</label>{{ tip_form.accion }}</div>
+      <div class="col-4 d-flex align-items-end"><label class="small d-flex gap-1">{{ tip_form.requiere_nota }} Nota obligatoria</label><input type="hidden" name="activa" value="on"></div>
+      <div class="col-12"><button class="btn btn-sm btn-outline-primary"><i class="bi bi-plus"></i> Agregar tipificación</button></div>
+    </form>
+  </div></div></div>
+</div>
+{% endif %}
+{% endblock %}
+{% block extra_js %}
+<script>
+(function () {
+  const sel = document.getElementById('id_asignar_entre'), box = document.getElementById('boxSinConectados');
+  if (!sel || !box) return;
+  const ver = () => { box.style.visibility = sel.value === 'conectados' ? '' : 'hidden'; };
+  sel.addEventListener('change', ver); ver();
+})();
+</script>
+{% endblock %}

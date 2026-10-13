@@ -1,0 +1,6 @@
+{% extends "users/_auth_base.html" %}
+{% block title %}Contraseña actualizada{% endblock %}
+{% block auth %}
+<div class="text-center"><i class="bi bi-check-circle text-success" style="font-size:2.5rem"></i><p class="mt-2">¡Listo! Tu contraseña se actualizó.</p>
+<a href="{% url 'users:login' %}" class="btn btn-primary">Ingresar</a></div>
+{% endblock %}

@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% load crm_extras %}
+{% block title %}Oportunidades{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1><i class="bi bi-list-check"></i> Oportunidades <span class="sub">{{ page.paginator.count|miles }} resultados</span></h1>
+  <div class="toolbar">
+    {% include "crm/_filtros_embudo.html" %}
+    <a href="{% url 'crm:tablero' %}?{{ query }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-kanban"></i> Tablero</a>
+    {% if 'exportar' in perms_crm %}<a href="{% url 'crm:exportar' %}?{{ query }}" class="btn btn-outline-secondary btn-sm" title="Exporta lo filtrado"><i class="bi bi-download"></i> Exportar CSV</a>{% endif %}
+    <a href="{% url 'crm:oportunidad_nueva' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Nuevo</a>
+  </div>
+</div>
+
+<form class="card mb-2" method="get" id="formFiltros"><div class="card-body py-2">
+  <input type="hidden" name="embudo" value="{{ embudo.pk }}">
+  {% if filtros.orden %}<input type="hidden" name="orden" value="{{ filtros.orden }}">{% endif %}
+  {% if filtros.origen_pauta %}<input type="hidden" name="origen_pauta" value="{{ filtros.origen_pauta }}">{% endif %}
+  <div class="toolbar">
+    <input type="search" name="q" value="{{ filtros.q }}" class="form-control form-control-sm" placeholder="Nombre, teléfono, email, DNI…" style="min-width:220px">
+    {% include "crm/_multi.html" with nombre="etapa" titulo="Etapa" opciones=opciones.etapa sel=sel.etapa %}
+    {% if user.ve_todo %}{% include "crm/_multi.html" with nombre="agente" titulo="Agente" opciones=opciones.agente sel=sel.agente %}{% endif %}
+    {% include "crm/_multi.html" with nombre="estado" titulo="Estado" opciones=opciones.estado sel=sel.estado %}
+    <select name="fecha" class="form-select form-select-sm" title="Qué fecha filtrar" style="max-width:220px">
+      {% for k, l in campos_fecha %}<option value="{{ k }}" {% if filtros.fecha == k %}selected{% endif %}>Fecha: {{ l }}</option>{% endfor %}
+    </select>
+    <input type="date" name="desde" value="{{ filtros.desde }}" class="form-control form-control-sm" title="Desde">
+    <input type="date" name="hasta" value="{{ filtros.hasta }}" class="form-control form-control-sm" title="Hasta">
+    <div class="btn-group btn-group-sm" role="group" aria-label="Rangos rápidos">
+      <button type="button" class="btn btn-outline-secondary rango" data-r="hoy">Hoy</button>
+      <button type="button" class="btn btn-outline-secondary rango" data-r="ayer">Ayer</button>
+      <button type="button" class="btn btn-outline-secondary rango" data-r="semana">Semana</button>
+      <button type="button" class="btn btn-outline-secondary rango" data-r="mes">Mes</button>
+      <button type="button" class="btn btn-outline-secondary rango" data-r="30">30 días</button>
+    </div>
+    <label class="btn btn-sm btn-outline-danger {% if filtros.prioritaria %}active{% endif %}" title="Solo las marcadas como prioridad (ej. reingresos)"><input type="checkbox" name="prioritaria" value="1" class="d-none" onchange="this.form.submit()" {% if filtros.prioritaria %}checked{% endif %}>🔥 Prioridad</label>
+    <button class="btn btn-primary btn-sm"><i class="bi bi-funnel"></i> Filtrar</button>
+    <button type="button" class="btn btn-link btn-sm" data-bs-toggle="collapse" data-bs-target="#masFiltros">Más filtros</button>
+  </div>
+  <div class="collapse {% if sel.pauta or sel.origen or sel.tipificacion or sel.lote or sel.etiqueta or filtros.intentos_min or filtros.intentos_max or filtros.ingresos_min or filtros.puntaje_min or filtros.sin_actividad or filtros.sin_calificar or filtros.vencida %}show{% endif %}" id="masFiltros">
+    <div class="toolbar mt-2">
+      {% include "crm/_multi.html" with nombre="pauta" titulo="Pauta" opciones=opciones.pauta sel=sel.pauta %}
+      {% include "crm/_multi.html" with nombre="origen" titulo="Canal" opciones=opciones.origen sel=sel.origen %}
+      {% include "crm/_multi.html" with nombre="tipificacion" titulo="Tipificación" opciones=opciones.tipificacion sel=sel.tipificacion %}
+      {% if opciones.lote %}{% include "crm/_multi.html" with nombre="lote" titulo="Base importada" opciones=opciones.lote sel=sel.lote %}{% endif %}
+      {% include "crm/_multi.html" with nombre="etiqueta" titulo="Etiqueta" opciones=opciones.etiqueta sel=sel.etiqueta %}
+      <input type="number" min="0" name="intentos_min" value="{{ filtros.intentos_min }}" class="form-control form-control-sm" placeholder="Intentos desde" style="max-width:130px">
+      <input type="number" min="0" name="intentos_max" value="{{ filtros.intentos_max }}" class="form-control form-control-sm" placeholder="Intentos hasta" style="max-width:130px">
+      <input type="number" name="puntaje_min" value="{{ filtros.puntaje_min }}" class="form-control form-control-sm" placeholder="Puntaje desde" style="max-width:140px">
+      <input type="number" min="1" name="ingresos_min" value="{{ filtros.ingresos_min }}" class="form-control form-control-sm" placeholder="Ingresó al menos N veces" style="max-width:190px" title="Cantidad de veces que entró (primer ingreso + reingresos)">
+      <select name="sin_actividad" class="form-select form-select-sm" style="max-width:200px"><option value="">Cualquier actividad</option>
+        <option value="1" {% if filtros.sin_actividad == '1' %}selected{% endif %}>Sin actividad +1 día</option>
+        <option value="3" {% if filtros.sin_actividad == '3' %}selected{% endif %}>Sin actividad +3 días</option>
+        <option value="7" {% if filtros.sin_actividad == '7' %}selected{% endif %}>Sin actividad +7 días</option>
+        <option value="30" {% if filtros.sin_actividad == '30' %}selected{% endif %}>Sin actividad +30 días</option>
+      </select>
+      <label class="small d-flex gap-1 align-items-center"><input type="checkbox" name="sin_calificar" value="1" class="form-check-input mt-0" {% if filtros.sin_calificar %}checked{% endif %}> Con llamadas sin calificar</label>
+      <label class="small d-flex gap-1 align-items-center"><input type="checkbox" name="vencida" value="1" class="form-check-input mt-0" {% if filtros.vencida %}checked{% endif %}> Ficha vencida</label>
+      {% for c in campos_filtro %}{% with clave='cp_'|add:c.slug %}
+      {% if c.tipo == 'lista' %}<select name="{{ clave }}" class="form-select form-select-sm"><option value="">{{ c.nombre }}</option>{% for o in c.opciones %}<option value="{{ o }}" {% if filtros|get_item:clave == o %}selected{% endif %}>{{ o }}</option>{% endfor %}</select>
+      {% elif c.tipo == 'sino' %}<select name="{{ clave }}" class="form-select form-select-sm"><option value="">{{ c.nombre }}</option><option value="true" {% if filtros|get_item:clave == 'true' %}selected{% endif %}>{{ c.nombre }}: Sí</option><option value="false" {% if filtros|get_item:clave == 'false' %}selected{% endif %}>{{ c.nombre }}: No</option></select>
+      {% else %}<input name="{{ clave }}" value="{{ filtros|get_item:clave|default:'' }}" class="form-control form-control-sm" placeholder="{{ c.nombre }}">{% endif %}
+      {% endwith %}{% endfor %}
+    </div>
+  </div>
+  {% if chips %}<div class="d-flex flex-wrap gap-1 align-items-center mt-2">
+    {% for texto, url in chips %}<a href="?{{ url }}" class="chip info text-decoration-none" title="Quitar filtro">{{ texto }} <i class="bi bi-x"></i></a>{% endfor %}
+    <a href="?embudo={{ embudo.pk }}" class="small ms-1">Limpiar todo</a>
+  </div>{% endif %}
+</div></form>
+
+<form method="post" action="{% url 'crm:acciones_masivas' %}" id="formMasivo">{% csrf_token %}
+  <input type="hidden" name="filtros_qs" value="{{ query }}">
+  <input type="hidden" name="volver" value="{{ request.get_full_path }}">
+  <input type="hidden" name="todos_filtrados" value="0" id="todosFiltrados">
+  <div class="card mb-2" id="barraMasiva" style="display:none;position:sticky;top:-20px;z-index:20"><div class="card-body py-2">
+    <div class="toolbar">
+      <b class="small"><span id="nSel">0</span> seleccionadas</b>
+      {% if total_filtrado > page.object_list|length %}<a href="#" class="small" id="selTodos">Seleccionar las {{ total_filtrado|miles }} que cumplen los filtros</a>{% endif %}
+      <a href="#" class="small muted" id="selNinguna">Quitar selección</a>
+    </div>
+    <div class="toolbar mt-2">
+      <select name="accion" class="form-select form-select-sm" id="accionMasiva" required style="max-width:230px">
+        <option value="">Elegí una acción…</option>
+        {% if 'reasignar' in perms_crm %}<option value="reasignar">Reasignar a un agente</option><option value="repartir">Repartir entre varios agentes</option>{% endif %}
+        <option value="mover">Mover a etapa</option>
+        <option value="cerrar">Cerrar / postergar (tipificar)</option>
+        <option value="pausar">Pausar</option>
+        <option value="reanudar">Reactivar</option>
+        <option value="tarea">Crear tarea (queda en Mi día)</option>
+        <option value="prioridad">Marcar como prioridad 🔥</option>
+        <option value="etiqueta">Agregar etiqueta</option>
+        {% if 'discador' in perms_crm %}<option value="campania">Cargar al discador</option>{% endif %}
+        {% if 'difusiones' in perms_crm %}<option value="difusion">Enviar difusión (email / WhatsApp)…</option>{% endif %}
+        {% if 'eliminar' in perms_crm %}<option value="eliminar">Eliminar</option>{% endif %}
+      </select>
+      <select name="destino_agente" class="form-select form-select-sm opc opc-reasignar" style="display:none;max-width:220px"><option value="">¿A quién?</option><option value="auto">Automático (regla del embudo)</option>{% for a in agentes %}<option value="{{ a.pk }}">{{ a.display_name }}</option>{% endfor %}</select>
+      <div class="opc opc-repartir" style="display:none">{% include "crm/_multi.html" with nombre="destino_agentes" titulo="Agentes" opciones=opciones.agente|slice:"1:" sel=None %}</div>
+      <select name="destino_etapa" class="form-select form-select-sm opc opc-mover" style="display:none;max-width:220px"><option value="">¿A qué etapa?</option>{% for e in etapas %}{% if e.tipo == 'normal' %}<option value="{{ e.pk }}">{{ e.nombre }}</option>{% endif %}{% endfor %}</select>
+      <select name="tipificacion" class="form-select form-select-sm opc opc-cerrar" style="display:none;max-width:300px" id="tipMasiva">
+        <option value="">Tipificación…</option>
+        {% regroup tipificaciones by get_resultado_display as grupos %}{% for g in grupos %}<optgroup label="{{ g.grouper }}">{% for t in g.list %}<option value="{{ t.pk }}" data-accion="{{ t.accion }}" data-nota="{{ t.requiere_nota|yesno:'1,0' }}">{{ t.categoria }}{% if t.categoria %}: {% endif %}{{ t.nombre }}</option>{% endfor %}</optgroup>{% endfor %}
+      </select>
+      <input type="datetime-local" name="fecha" class="form-control form-control-sm" id="fechaPostergar" style="display:none;max-width:210px" title="Fecha de recontacto">
+      <input name="titulo" class="form-control form-control-sm opc opc-tarea" style="display:none;max-width:260px" placeholder="Tarea (ej. Llamar por campaña X)">
+      <select name="tipo_tarea" class="form-select form-select-sm opc opc-tarea" style="display:none;max-width:140px"><option value="llamada">Llamar</option><option value="whatsapp">WhatsApp</option><option value="email">Email</option><option value="seguimiento">Seguimiento</option></select>
+      <input type="datetime-local" name="vence" class="form-control form-control-sm opc opc-tarea" style="display:none;max-width:210px" title="Vence (vacío = hoy 23 h)">
+      {% if user.ve_todo %}<select name="para" class="form-select form-select-sm opc opc-tarea" style="display:none;max-width:200px"><option value="">Para el vendedor de cada una</option><option value="yo">Para mí</option></select>{% endif %}
+      <input name="motivo" class="form-control form-control-sm opc opc-pausar opc-prioridad" style="display:none;max-width:220px" placeholder="Motivo">
+      <input type="datetime-local" name="hasta" class="form-control form-control-sm opc opc-pausar" style="display:none;max-width:210px" title="Reactivar automáticamente el">
+      <select name="destino_etiqueta" class="form-select form-select-sm opc opc-etiqueta" style="display:none;max-width:200px">{% for e in etiquetas %}<option value="{{ e.pk }}">{{ e }}</option>{% empty %}<option value="">No hay etiquetas</option>{% endfor %}</select>
+      <select name="campania" class="form-select form-select-sm opc opc-campania" style="display:none;max-width:220px">{% for c in campanias %}<option value="{{ c.pk }}">{{ c.nombre }}</option>{% empty %}<option value="">No hay campañas</option>{% endfor %}</select>
+      <input name="nota" class="form-control form-control-sm opc opc-reasignar opc-mover opc-cerrar opc-tarea" style="display:none;max-width:260px" placeholder="Nota (opcional)" id="notaMasiva">
+      <button class="btn btn-primary btn-sm">Aplicar</button>
+    </div>
+  </div></div>
+
+  <div class="card"><div class="table-responsive">
+  <table class="table table-hover table-sm mb-0">
+    <thead><tr>
+      <th style="width:30px"><input type="checkbox" class="form-check-input" id="chkTodos"></th>
+      <th>Prospecto</th><th>Teléfono</th>{% for c in campos_columna %}<th>{{ c.nombre }}</th>{% endfor %}<th>Etapa</th><th>Estado</th><th>Agente</th><th>Canal / pauta</th>
+      <th><a href="?{% qs_con orden='-puntaje' page='' %}" title="Puntaje del lead">★</a></th>
+      <th><a href="?{% qs_con orden='-intentos_contacto' page='' %}">Intentos</a></th>
+      <th><a href="?{% qs_con orden='etapa_desde' page='' %}">En la etapa desde</a></th>
+      <th><a href="?{% qs_con orden='ultima_actividad_at' page='' %}">Últ. actividad</a></th>
+      <th><a href="?{% qs_con orden='-created_at' page='' %}">Ingresó</a></th><th></th>
+    </tr></thead>
+    <tbody>
+    {% for o in page %}
+    <tr>
+      <td><input type="checkbox" class="form-check-input chk" name="ids" value="{{ o.pk }}"></td>
+      <td><a href="{% url 'crm:oportunidad_detalle' o.pk %}" class="fw-semibold text-decoration-none">{{ o.contacto.nombre }}</a>
+        {% if o.tiene_vencidas %}<i class="bi bi-alarm text-danger" title="Tareas vencidas"></i>{% endif %}
+        {% if o.contacto.no_contactar %}<i class="bi bi-slash-circle text-danger" title="No contactar"></i>{% endif %}
+        {% if o.prioritaria %}<span class="chip danger" title="{{ o.prioridad_motivo|default:'Prioridad' }}">🔥</span>{% endif %}
+        {% if o.ingresos > 1 %}<span class="chip warn" title="Ingresó {{ o.ingresos }} veces">×{{ o.ingresos }}</span>{% endif %}</td>
+      <td class="text-nowrap">{{ o.contacto.telefono|telefono }}</td>
+      {% for cp, val in o.campos_vista %}<td class="small">{{ val }}</td>{% endfor %}
+      <td><span class="dot" style="background:{{ o.etapa.color }}"></span> {{ o.etapa }}</td>
+      <td><span class="badge bg-{{ o.get_estado_badge }}">{{ o.get_estado_display }}</span>{% if o.tipificacion %}<div class="muted" style="font-size:11px">{{ o.tipificacion }}</div>{% endif %}</td>
+      <td>{{ o.agente.display_name|default:"—" }}</td>
+      <td class="small">{{ o.get_origen_display }}{% if o.pauta %}<div><a href="{% url 'pautas:detalle' o.pauta_id %}" class="chip info text-decoration-none">{{ o.pauta }}</a></div>{% elif o.origen_pauta %}<div class="muted" title="Origen sin pauta creada">{{ o.origen_pauta|truncatechars:24 }}</div>{% endif %}</td>
+      <td class="text-center">{{ o.puntaje|default:"·" }}</td>
+      <td class="text-center">{{ o.intentos_contacto }}</td>
+      <td class="small text-nowrap">{{ o.etapa_desde|date:"d/m/y" }}{% if o.estado == 'pausada' and o.proximo_contacto_at %}<div class="muted" title="Recontactar">↻ {{ o.proximo_contacto_at|date:"d/m/y" }}</div>{% endif %}</td>
+      <td class="small text-nowrap">{{ o.ultima_actividad_at|timesince }}</td>
+      <td class="small text-nowrap">{{ o.created_at|date:"d/m/y" }}</td>
+      <td class="text-nowrap">{% if o.contacto.telefono %}<button type="button" class="btn btn-xs btn-outline-primary" data-llamar data-op="{{ o.pk }}"><i class="bi bi-telephone"></i></button>{% endif %}</td>
+    </tr>
+    {% empty %}<tr><td colspan="20"><div class="empty-state"><div class="empty-icon"><i class="bi bi-inbox"></i></div>Sin oportunidades con estos filtros.</div></td></tr>{% endfor %}
+    </tbody>
+  </table>
+  </div></div>
+</form>
+{% include "_paginacion.html" %}
+{% endblock %}
+{% block extra_js %}
+<script>
+(function () {
+  const TOTAL = {{ total_filtrado }};
+  const chks = [...document.querySelectorAll('.chk')], barra = document.getElementById('barraMasiva'), todos = document.getElementById('todosFiltrados');
+  const seleccionadas = () => todos.value === '1' ? TOTAL : chks.filter(c => c.checked).length;
+  const upd = () => { const n = seleccionadas(); document.getElementById('nSel').textContent = n.toLocaleString('es-AR'); barra.style.display = n ? '' : 'none'; };
+  chks.forEach(c => c.addEventListener('change', () => { todos.value = '0'; upd(); }));
+  document.getElementById('chkTodos').addEventListener('change', e => { chks.forEach(c => c.checked = e.target.checked); todos.value = '0'; upd(); });
+  const st = document.getElementById('selTodos');
+  if (st) st.addEventListener('click', e => { e.preventDefault(); chks.forEach(c => c.checked = true); todos.value = '1'; upd(); });
+  document.getElementById('selNinguna').addEventListener('click', e => { e.preventDefault(); chks.forEach(c => c.checked = false); document.getElementById('chkTodos').checked = false; todos.value = '0'; upd(); });
+
+  // Acción elegida → mostrar solo sus campos
+  const acc = document.getElementById('accionMasiva'), tip = document.getElementById('tipMasiva'), fecha = document.getElementById('fechaPostergar');
+  const campos = () => {
+    document.querySelectorAll('.opc').forEach(o => o.style.display = o.classList.contains('opc-' + acc.value) ? '' : 'none');
+    const t = tip.selectedOptions[0];
+    fecha.style.display = acc.value === 'cerrar' && t && t.dataset.accion === 'postergar' ? '' : 'none';
+    document.getElementById('notaMasiva').placeholder = acc.value === 'cerrar' && t && t.dataset.nota === '1' ? 'Nota (obligatoria)' : 'Nota (opcional)';
+  };
+  acc.addEventListener('change', campos); tip.addEventListener('change', campos);
+
+  // Confirmación con la cantidad real
+  document.getElementById('formMasivo').addEventListener('submit', e => {
+    const n = seleccionadas(), nombre = acc.selectedOptions[0].textContent.trim();
+    let texto = `¿Aplicar «${nombre}» a ${n.toLocaleString('es-AR')} oportunidad${n === 1 ? '' : 'es'}?`;
+    if (acc.value === 'reasignar' || acc.value === 'mover') { const d = document.querySelector(`[name=${acc.value === 'mover' ? 'destino_etapa' : 'destino_agente'}]`).selectedOptions[0]; if (d && d.value) texto = texto.replace('?', ` → ${d.textContent.trim()}?`); }
+    if (acc.value === 'repartir') { const k = document.querySelectorAll('[name=destino_agentes]:checked').length; texto = texto.replace('?', ` entre ${k} agente${k === 1 ? '' : 's'} (${Math.ceil(n / Math.max(k, 1))} c/u aprox.)?`); }
+    if (acc.value === 'eliminar') texto += '\n\nSe borran definitivamente, con su historial.';
+    if (n > {{ 300 }}) texto += '\n\nSon muchas: se procesa en segundo plano y te avisamos al terminar.';
+    if (!confirm(texto)) e.preventDefault();
+  });
+
+  // Rangos rápidos de fecha
+  const f = d => d.toISOString().slice(0, 10), hoy = new Date(); hoy.setMinutes(hoy.getMinutes() - hoy.getTimezoneOffset());
+  document.querySelectorAll('.rango').forEach(b => b.addEventListener('click', () => {
+    const desde = new Date(hoy), hasta = new Date(hoy);
+    if (b.dataset.r === 'ayer') { desde.setDate(desde.getDate() - 1); hasta.setDate(hasta.getDate() - 1); }
+    if (b.dataset.r === 'semana') desde.setDate(desde.getDate() - ((desde.getDay() + 6) % 7));
+    if (b.dataset.r === 'mes') desde.setDate(1);
+    if (b.dataset.r === '30') desde.setDate(desde.getDate() - 29);
+    const form = document.getElementById('formFiltros');
+    form.desde.value = f(desde); form.hasta.value = f(hasta); form.submit();
+  }));
+
+  // Buscador dentro de los filtros múltiples
+  document.querySelectorAll('.multi-buscar').forEach(inp => inp.addEventListener('input', () => {
+    const q = inp.value.toLowerCase();
+    inp.closest('.dropdown-menu').querySelectorAll('.multi-op').forEach(l => l.style.display = l.textContent.toLowerCase().includes(q) ? '' : 'none');
+  }));
+})();
+</script>
+{% endblock %}

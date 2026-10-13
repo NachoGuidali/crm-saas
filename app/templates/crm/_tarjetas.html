@@ -1,0 +1,22 @@
+{% load crm_extras %}{% for o in cards %}
+<div class="tcard {% if o.estado == 'pausada' %}pausada{% endif %}" draggable="true" data-id="{{ o.pk }}" data-nombre="{{ o.contacto.nombre }}" data-etapa="{{ o.etapa_id }}">
+  <a class="nom" href="{% url 'crm:oportunidad_detalle' o.pk %}">{{ o.contacto.nombre }}</a>
+  <div class="tel">{{ o.contacto.telefono|telefono|default:o.contacto.email }}</div>
+  <div class="acc">
+    {% if o.contacto.telefono %}<button class="call" data-llamar data-op="{{ o.pk }}" title="Llamar con Anura"><i class="bi bi-telephone"></i></button>{% endif %}
+    {% if o.contacto.telefono %}<a class="wa" href="{% url 'crm:oportunidad_detalle' o.pk %}#whatsapp" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>{% endif %}
+  </div>
+  {% for cp, val in o.campos_vista %}{% if val %}<div class="tel"><span class="muted">{{ cp.nombre }}:</span> {{ val }}</div>{% endif %}{% endfor %}
+  <div class="meta">
+    {% if o.agente %}<span class="avatar-xs" title="{{ o.agente.display_name }}">{{ o.agente.iniciales }}</span>{% else %}<span class="chip warn">Sin asignar</span>{% endif %}
+    <span title="Días en esta etapa"><i class="bi bi-clock"></i> {{ o.dias_en_etapa }}d</span>
+    {% if o.intentos_contacto %}<span title="Intentos de contacto"><i class="bi bi-telephone-outbound"></i> {{ o.intentos_contacto }}</span>{% endif %}
+    {% if o.estado == 'pausada' %}<span class="chip warn" title="{{ o.motivo_pausa }}"><i class="bi bi-pause-fill"></i>{% if o.proximo_contacto_at %} {{ o.proximo_contacto_at|date:"d/m" }}{% endif %}</span>{% endif %}
+    {% if o.prioritaria %}<span class="chip danger" title="{{ o.prioridad_motivo|default:'Prioridad' }}">🔥</span>{% endif %}
+    {% if o.tiene_vencidas %}<span class="chip danger" title="Tiene tareas vencidas"><i class="bi bi-alarm"></i></span>{% endif %}
+    {% if o.contacto.no_contactar %}<span class="chip danger" title="No contactar"><i class="bi bi-slash-circle"></i></span>{% endif %}
+    {% if o.intentos_contacto == 0 and o.estado == 'abierta' %}<span class="chip info">Nuevo</span>{% endif %}
+    {% if o.puntaje %}<span class="chip {% if o.puntaje >= 50 %}ok{% elif o.puntaje < 0 %}danger{% endif %}" title="Puntaje del lead"><i class="bi bi-star-fill"></i> {{ o.puntaje }}</span>{% endif %}
+  </div>
+</div>
+{% endfor %}

@@ -1,0 +1,53 @@
+{% extends "clientes/_base.html" %}
+{% load humanize %}
+{% block title %}Clientes{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center mb-3">
+  <h1 class="h4 mb-0 me-auto">Clientes</h1>
+  <a href="{% url 'panel:cliente_nuevo' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Nuevo cliente</a>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3"><div class="card card-body py-2">
+    <div class="small text-secondary">Activos / en prueba</div><div class="fs-5 fw-semibold">{{ resumen.activos }} <span class="text-secondary fs-6">/ {{ resumen.prueba }}</span></div></div></div>
+  <div class="col-6 col-md-3"><div class="card card-body py-2">
+    <div class="small text-secondary">Ingreso mensual (activos)</div><div class="fs-5 fw-semibold">{{ moneda }} {{ resumen.mensual|floatformat:0|intcomma }}</div></div></div>
+  <div class="col-6 col-md-3"><a href="{% url 'panel:pagos' %}" class="card card-body py-2 text-decoration-none">
+    <div class="small text-secondary">Cobrado este mes</div><div class="fs-5 fw-semibold">{{ moneda }} {{ resumen.cobrado_mes|floatformat:0|intcomma }}</div></a></div>
+  <div class="col-6 col-md-3"><a href="?filtro=vencidos" class="card card-body py-2 text-decoration-none {% if resumen.vencidos %}border-danger{% endif %}">
+    <div class="small text-secondary">Vencidos / por vencer</div>
+    <div class="fs-5 fw-semibold"><span class="{% if resumen.vencidos %}text-danger{% endif %}">{{ resumen.vencidos }}</span> <span class="text-secondary fs-6">/</span> <span class="{% if resumen.por_vencer %}text-warning{% endif %}">{{ resumen.por_vencer }}</span></div></a></div>
+</div>
+
+<ul class="nav nav-pills small mb-2">
+  {% for clave, nombre in filtros %}
+  <li class="nav-item"><a class="nav-link py-1 {% if filtro == clave %}active{% endif %}" href="?filtro={{ clave }}">{{ nombre }}
+    {% if clave == 'vencidos' and resumen.vencidos %}<span class="badge text-bg-danger">{{ resumen.vencidos }}</span>{% endif %}
+    {% if clave == 'por_vencer' and resumen.por_vencer %}<span class="badge text-bg-warning">{{ resumen.por_vencer }}</span>{% endif %}
+    {% if clave == 'suspendidos' and resumen.suspendidos %}<span class="badge text-bg-secondary">{{ resumen.suspendidos }}</span>{% endif %}</a></li>
+  {% endfor %}
+</ul>
+
+<div class="card"><div class="table-responsive"><table class="table table-hover align-middle mb-0">
+  <thead><tr><th>Empresa</th><th>Plan</th><th class="text-end">Precio</th><th>Estado</th><th>Vencimiento</th><th>Cobro</th><th class="text-end">Usuarios</th><th class="text-end">Líneas WA</th></tr></thead>
+  <tbody>
+  {% for c in clientes %}
+    <tr>
+      <td><a href="{% url 'panel:cliente' c.pk %}">{{ c.nombre }}</a>
+        {% if c.url %}<div><a href="{{ c.url }}" target="_blank" class="small text-secondary">{{ c.dominio }} <i class="bi bi-box-arrow-up-right"></i></a></div>{% endif %}</td>
+      <td>{{ c.plan|default:"—" }}</td>
+      <td class="text-end">{% if c.precio %}{{ c.precio|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
+      <td><span class="badge {% if c.estado == 'activo' %}text-bg-success{% elif c.estado == 'prueba' %}text-bg-info{% else %}text-bg-danger{% endif %}">{{ c.get_estado_display }}</span>
+        {% if c.motivo_suspension == 'falta_pago' %}<div class="small text-secondary">por falta de pago</div>{% endif %}</td>
+      <td>{% include "clientes/_vence.html" %}</td>
+      <td class="small">{% if c.cobro == 'mercadopago' %}<i class="bi bi-credit-card"></i> MP{% if c.mp_suscripcion_estado == 'authorized' %} <i class="bi bi-check-circle text-success" title="Débito automático activo"></i>{% endif %}{% else %}Manual{% endif %}</td>
+      <td class="text-end">{% if c.uso %}{{ c.uso.usuarios }}{% if c.limite_usuarios %} / {{ c.limite_usuarios }}{% endif %}{% else %}—{% endif %}</td>
+      <td class="text-end">{% if c.uso %}{{ c.uso.lineas }}{% if c.limite_lineas_whatsapp %} / {{ c.limite_lineas_whatsapp }}{% endif %}{% else %}—{% endif %}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="8" class="text-center text-secondary py-4">{% if filtro %}No hay clientes en este filtro.{% else %}Todavía no hay clientes.{% endif %}</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div></div>
+<p class="small text-secondary mt-2">Los vencidos se suspenden solos {{ dias_gracia }} días después del vencimiento (salvo que tengan desactivada la suspensión automática).</p>
+{% endblock %}

@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Importar base{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-cloud-upload"></i> Importar base de prospectos</h1>
+  <a href="{% url 'crm:importacion_plantilla' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-file-earmark-excel"></i> Descargar plantilla Excel</a></div>
+<div class="row g-3">
+  <div class="col-lg-5"><div class="card"><div class="card-body">
+    <form method="post" enctype="multipart/form-data">{% csrf_token %}
+      {% for f in form %}<div class="mb-3"><label class="form-label">{{ f.label }}</label>{{ f }}{% if f.help_text %}<div class="form-text">{{ f.help_text }}</div>{% endif %}{{ f.errors }}</div>{% endfor %}
+      <button class="btn btn-primary"><i class="bi bi-arrow-right"></i> Siguiente: elegir columnas</button>
+    </form>
+    <div class="sep"></div>
+    <ul class="small muted mb-0 ps-3">
+      <li>Cada fila entra en la etapa inicial del embudo (o la que elijas).</li>
+      <li>No se duplican contactos: el teléfono se normaliza (011 15…, +54 9…, 11…).</li>
+      <li>Si la persona ya tiene una oportunidad en curso, no se crea otra.</li>
+      <li>Se asigna automáticamente a los agentes del embudo (rotativo).</li>
+      <li>Se procesa en segundo plano: podés seguir trabajando.</li>
+    </ul>
+  </div></div></div>
+  <div class="col-lg-7"><div class="card"><div class="card-header">Importaciones anteriores</div>
+    <div class="table-responsive"><table class="table table-sm mb-0">
+      <thead><tr><th>Archivo</th><th>Embudo</th><th>Estado</th><th class="text-end">Nuevos</th><th class="text-end">Ya existían</th><th class="text-end">Errores</th><th>Fecha</th></tr></thead>
+      <tbody>{% for l in lotes %}<tr>
+        <td><a href="{% url 'crm:importacion_detalle' l.pk %}">{{ l.fuente|default:l.nombre_archivo|truncatechars:34 }}</a></td>
+        <td class="small">{{ l.embudo }}</td>
+        <td><span class="chip {% if l.estado == 'completado' %}ok{% elif l.estado == 'error' %}danger{% else %}info{% endif %}">{{ l.get_estado_display }}</span></td>
+        <td class="text-end">{{ l.creados }}</td><td class="text-end">{{ l.ya_existentes }}</td><td class="text-end">{{ l.errores }}</td>
+        <td class="small text-nowrap">{{ l.created_at|date:"d/m/y H:i" }}<br><span class="muted">{{ l.creado_por.display_name }}</span></td>
+      </tr>{% empty %}<tr><td colspan="7" class="muted text-center py-3">Todavía no se importó nada.</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </div></div>
+</div>
+{% endblock %}

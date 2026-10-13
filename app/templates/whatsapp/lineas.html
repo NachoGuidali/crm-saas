@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Líneas de WhatsApp{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-phone"></i> Líneas de WhatsApp</h1><a href="{% url 'whatsapp:linea_nueva' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Conectar número</a></div>
+<div class="row g-3">{% for l in lineas %}
+  <div class="col-md-6 col-xl-4"><div class="card h-100"><div class="card-body">
+    <div class="d-flex justify-content-between align-items-start">
+      <div><h5 class="mb-0">{{ l.nombre }}</h5><div class="small muted">{{ l.telefono|default:"número sin cargar" }}</div></div>
+      <span class="chip {% if l.estado == 'conectada' %}ok{% elif l.estado == 'error' %}danger{% else %}warn{% endif %}">{{ l.get_estado_display }}</span>
+    </div>
+    <div class="small mt-2"><i class="bi bi-plug"></i> {{ l.get_proveedor_display }}</div>
+    <div class="small"><i class="bi bi-funnel"></i> Nuevos contactos → {{ l.embudo|default:"solo chat (sin oportunidad)" }}</div>
+    <div class="small"><i class="bi bi-chat-dots"></i> {{ l.n_convs }} conversaciones · <i class="bi bi-speedometer2"></i> {{ l.min_segundos_entre_envios }} s entre envíos automáticos</div>
+    {% if l.estado_detalle %}<div class="small muted mt-1">{{ l.estado_detalle|truncatechars:120 }}</div>{% endif %}
+    {% if not l.activa %}<span class="chip mt-2">Desactivada</span>{% endif %}
+    <a href="{% url 'whatsapp:linea_editar' l.pk %}" class="btn btn-sm btn-outline-secondary mt-3">Configurar</a>
+  </div></div></div>
+{% empty %}<div class="col-12"><div class="empty-state card"><div class="empty-icon"><i class="bi bi-whatsapp"></i></div>Todavía no hay números conectados.<a href="{% url 'whatsapp:linea_nueva' %}" class="btn btn-primary btn-sm">Conectar el primero</a></div></div>{% endfor %}</div>
+<div class="card mt-3"><div class="card-body small muted">
+  <b>¿Qué proveedor elijo?</b> <b>Evolution</b>: se vincula con QR como WhatsApp Web, sin trámites; ideal para arrancar (conviene espaciar los envíos masivos). <b>Meta Cloud API</b>: oficial, requiere verificación del negocio y plantillas aprobadas para escribir fuera de las 24 h. <b>Twilio</b>: oficial a través de un proveedor, útil mientras se tramita Meta. Cada línea puede usar un proveedor distinto y todas conviven en el mismo inbox.
+</div></div>
+{% endblock %}

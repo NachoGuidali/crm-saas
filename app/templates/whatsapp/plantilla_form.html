@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Plantilla{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-chat-square-text"></i> {{ p|default:"Nueva plantilla" }}</h1></div>
+<div class="row g-3"><div class="col-lg-7"><form method="post" class="card"><div class="card-body">{% csrf_token %}
+  <div class="row g-2">
+    <div class="col-md-6"><label class="form-label">Nombre</label>{{ form.nombre }}{{ form.nombre.errors }}</div>
+    <div class="col-md-6"><label class="form-label">Línea</label>{{ form.linea }}</div>
+    <div class="col-12"><label class="form-label">Texto</label>{{ form.cuerpo }}<div class="form-text">Usá {% templatetag openvariable %}1{% templatetag closevariable %}, {% templatetag openvariable %}2{% templatetag closevariable %}… y elegí abajo con qué dato se completa cada una.</div></div>
+    <div class="col-12" id="vars"></div>
+    <div class="col-md-4"><label class="form-label">Categoría (Meta)</label>{{ form.categoria }}</div>
+    <div class="col-md-4"><label class="form-label">Idioma</label>{{ form.idioma }}</div>
+    <div class="col-md-4"><label class="form-label">Nombre técnico en Meta</label>{{ form.meta_nombre }}</div>
+    <div class="col-md-8"><label class="form-label">Twilio ContentSid</label>{{ form.twilio_content_sid }}</div>
+    <div class="col-md-4 d-flex align-items-end"><label class="d-flex gap-2">{{ form.activa }} Activa</label></div>
+    {% if lineas_meta %}<div class="col-12"><label class="form-label">Enviar a aprobación de Meta al guardar</label><select name="enviar_meta" class="form-select"><option value="">No enviar</option>{% for l in lineas_meta %}<option value="{{ l.pk }}">Sí, por la línea {{ l }}</option>{% endfor %}</select></div>{% endif %}
+  </div>
+  <div class="mt-3 d-flex gap-2"><button class="btn btn-primary">Guardar</button>{% if p %}<button name="eliminar" value="1" class="btn btn-outline-danger" onclick="return confirm('¿Eliminar?')">Eliminar</button>{% endif %}</div>
+</div></form></div>
+<div class="col-lg-5"><div class="card"><div class="card-header">Vista previa</div><div class="card-body chat-msgs" style="min-height:140px"><div class="burbuja out" id="preview"></div></div></div>
+  <div class="small muted mt-2">En líneas <b>Evolution</b> la plantilla se envía como texto. En <b>Meta</b> tiene que estar aprobada; en <b>Twilio</b> necesita el ContentSid.</div></div></div>
+<script>
+(function () {
+  const disp = [{% for k, v in variables_disp %}['{{ k }}', '{{ v }}']{% if not forloop.last %},{% endif %}{% endfor %}];
+  const actuales = {{ p.variables|default:"[]"|safe }};
+  const ej = {nombre: 'María Gómez', primer_nombre: 'María', telefono: '+54 9 11 5555-1234', email: 'maria@mail.com', embudo: 'Doctor Flex', etapa: 'Prospecto', agente: 'Laura', fecha_atencion: '15/09/2026'};
+  const cuerpo = document.getElementById('id_cuerpo'), vars = document.getElementById('vars'), prev = document.getElementById('preview');
+  function render() {
+    const n = Math.max(0, ...[...cuerpo.value.matchAll(/\{\{(\d+)\}\}/g)].map(m => +m[1]));
+    const sel = [...vars.querySelectorAll('select')].map(s => s.value);
+    vars.innerHTML = Array.from({length: n}, (_, i) => `<div class="d-inline-flex gap-1 align-items-center me-3 mb-1"><code>{% templatetag openvariable %}${i + 1}{% templatetag closevariable %}</code><select name="variables" class="form-select form-select-sm">${disp.map(([k, v]) => `<option value="${k}" ${(sel[i] || actuales[i]) === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>`).join('');
+    vars.querySelectorAll('select').forEach(s => s.addEventListener('change', preview));
+    preview();
+  }
+  function preview() {
+    const sel = [...vars.querySelectorAll('select')].map(s => s.value);
+    prev.textContent = cuerpo.value.replace(/\{\{(\d+)\}\}/g, (m, i) => ej[sel[i - 1]] || m);
+  }
+  cuerpo.addEventListener('input', render); render();
+})();
+</script>
+{% endblock %}

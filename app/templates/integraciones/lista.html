@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Integraciones{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-plug"></i> Integraciones API</h1></div>
+{% if nueva_clave %}<div class="alert alert-success"><b>Clave nueva:</b> <code class="copiable">{{ nueva_clave }}</code><div class="small">Copiala ahora: no se vuelve a mostrar.</div></div>{% endif %}
+<div class="row g-3">
+<div class="col-lg-6"><div class="card"><div class="card-header">Claves</div><div class="card-body">
+  <table class="table table-sm"><tbody>{% for k in claves %}<tr class="{% if not k.activa %}opacity-50{% endif %}"><td><b>{{ k.nombre }}</b><div class="small muted"><code>{{ k.prefijo }}…</code> · {{ k.embudo|default:"embudo por defecto" }}{% if k.fuente %} · {{ k.fuente }}{% endif %}</div></td>
+    <td class="small muted">{% if k.ultimo_uso_at %}usada {{ k.ultimo_uso_at|timesince }}{% else %}sin uso{% endif %}</td>
+    <td>{% if k.activa %}<form method="post">{% csrf_token %}<button name="revocar" value="{{ k.pk }}" class="btn btn-xs btn-outline-danger" onclick="return confirm('¿Revocar?')">Revocar</button></form>{% else %}<span class="chip">Revocada</span>{% endif %}</td></tr>
+  {% empty %}<tr><td class="muted">Sin claves.</td></tr>{% endfor %}</tbody></table>
+  <form method="post" class="row g-2">{% csrf_token %}
+    <div class="col-md-6"><input name="nombre" class="form-control form-control-sm" placeholder="Nombre (ej: Landing Doctor Flex)" required></div>
+    <div class="col-md-6"><select name="embudo" class="form-select form-select-sm"><option value="">Embudo por defecto</option>{% for e in embudos %}<option value="{{ e.pk }}">{{ e }}</option>{% endfor %}</select></div>
+    <div class="col-md-8"><input name="fuente" class="form-control form-control-sm" placeholder="Fuente (queda en cada lead)"></div>
+    <div class="col-md-4"><button class="btn btn-sm btn-primary w-100">Crear clave</button></div>
+  </form>
+</div></div></div>
+<div class="col-lg-6"><div class="card"><div class="card-header">Cómo usarla</div><div class="card-body small">
+<p class="mb-1">Alta de prospecto (deduplicado, asignado y con automatizaciones):</p>
+<pre class="p-2 rounded" style="background:var(--bg3);font-size:11.5px;white-space:pre-wrap">POST {{ base_url }}/api/v1/leads/
+X-API-Key: crm_…
+Content-Type: application/json
+
+{"nombre": "María Gómez", "telefono": "11 5555-1234", "email": "maria@mail.com",
+ "fecha_atencion": "15/09/2026", "especialidad_atencion": "Clínica",
+ "fuente": "Sistema centro médico", "campania": "Día de la madre",
+ "etapa": "Contacto efectivo", "agente": "laura",
+ "cualquier_otro_campo": "se guarda como dato extra"}</pre>
+<p class="mb-1">Respuesta: <code>201</code> si creó la oportunidad, <code>200</code> si ya existía (con <code>motivo</code>: ya_activa / ya_cliente / no_contactar).</p>
+<p class="mb-1"><code>etapa</code> (nombre o id) y <code>agente</code> (usuario o email) son opcionales: sirven para que un bot o sistema externo cargue el lead ya calificado. Si el lead ya existía, se mueve a esa etapa (<code>"movida": true</code>).</p>
+<p class="mb-1 mt-2">Otros endpoints:</p>
+<ul class="mb-0"><li><code>GET /api/v1/leads/buscar/?telefono=…</code></li><li><code>POST /api/v1/whatsapp/enviar/</code> <span class="muted">{"telefono", "mensaje" o "plantilla", "linea"}</span></li></ul>
+</div></div></div>
+<div class="col-lg-6"><div class="card"><div class="card-header">SMS (Twilio)</div><div class="card-body">
+  <form method="post" class="row g-2">{% csrf_token %}<input type="hidden" name="accion" value="sms">
+    <div class="col-12"><label class="d-flex gap-2"><input type="checkbox" class="form-check-input" name="activo" {% if sms.activo %}checked{% endif %}> Activar SMS</label></div>
+    <div class="col-md-6"><label class="form-label">Account SID</label><input name="account_sid" value="{{ sms.account_sid }}" class="form-control form-control-sm"></div>
+    <div class="col-md-6"><label class="form-label">Auth token</label><input name="auth_token" type="password" placeholder="{% if sms.auth_token %}(guardado){% endif %}" class="form-control form-control-sm"></div>
+    <div class="col-12"><label class="form-label">Número remitente</label><input name="numero" value="{{ sms.numero }}" class="form-control form-control-sm" placeholder="+1… o MG…"></div>
+    <div class="col-12"><button class="btn btn-sm btn-primary">Guardar</button></div>
+  </form>
+  <div class="form-text mt-2">Para recibir respuestas, en Twilio configurá el webhook de mensajes del número (POST):<br><code class="copiable">{{ base_url }}/integraciones/sms/webhook/{{ sms.webhook_token }}/</code></div>
+</div></div></div>
+<div class="col-12"><div class="card"><div class="card-header">Últimas solicitudes</div><div class="table-responsive"><table class="table table-sm mb-0">
+  <thead><tr><th>Fecha</th><th>Clave</th><th>Endpoint</th><th>Estado</th><th>IP</th><th>Respuesta</th></tr></thead>
+  <tbody>{% for l in logs %}<tr><td class="small">{{ l.created_at|date:"d/m H:i:s" }}</td><td class="small">{{ l.api_key.nombre|default:"global" }}</td><td class="small">{{ l.metodo }} {{ l.endpoint }}</td>
+    <td><span class="chip {% if l.status < 300 %}ok{% else %}danger{% endif %}">{{ l.status }}</span></td><td class="small">{{ l.ip }}</td><td class="small muted">{{ l.response|truncatechars:90 }}</td></tr>
+  {% empty %}<tr><td colspan="6" class="muted text-center py-3">Sin solicitudes.</td></tr>{% endfor %}</tbody>
+</table></div></div></div>
+</div>
+{% endblock %}
