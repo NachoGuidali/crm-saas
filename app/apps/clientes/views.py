@@ -41,9 +41,12 @@ FILTROS = [
 
 
 def _url_cliente(request, dominio, ruta='/usuarios/login/'):
-    puerto = request.get_port()
-    puerto = '' if puerto in ('80', '443') else f':{puerto}'
-    return f'{request.scheme}://{dominio}{puerto}{ruta}'
+    # El esquema y el puerto salen de SITE_URL, no del request: detrás de nginx, request.get_port() devuelve
+    # el puerto interno de gunicorn (8000) y agregaría ":8000" a la URL pública.
+    from urllib.parse import urlsplit
+    partes = urlsplit(settings.SITE_URL)
+    puerto = f':{partes.port}' if partes.port else ''
+    return f'{partes.scheme}://{dominio}{puerto}{ruta}'
 
 
 class PanelMixin(UserPassesTestMixin):
