@@ -1,4 +1,4 @@
-name: crm-ventas
+name: crm-saas
 
 x-app: &app
   build: ./app
