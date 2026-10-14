@@ -301,7 +301,7 @@ class ConfigEmail(models.Model):
     seguridad = models.CharField(max_length=5, default='tls', choices=[('tls', 'STARTTLS (587)'), ('ssl', 'SSL (465)'),
                                                                       ('', 'Ninguna')])
     remitente = models.CharField(max_length=200, blank=True, verbose_name='Remitente',
-                                 help_text='Ej: "Roisa Ventas <ventas@roisa.com.ar>". Tiene que estar autorizado en el servidor.')
+                                 help_text='Ej: "Ventas <ventas@tuempresa.com>". Tiene que estar autorizado en el servidor.')
     por_minuto = models.PositiveSmallIntegerField(default=30, verbose_name='Emails por minuto en difusiones',
                                                   help_text='Gmail: no más de ~500 por día. Brevo / SES / Mailgun: más.')
 

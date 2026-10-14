@@ -25,7 +25,7 @@ class LineaWhatsApp(models.Model):
     PROV_TWILIO = 'twilio'
     PROV_DEMO = 'demo'
     PROVEEDOR_CHOICES = [
-        (PROV_EVOLUTION, 'Evolution API (QR, WhatsApp común o Business)'),
+        (PROV_EVOLUTION, 'WhatsApp por QR (común o Business)'),
         (PROV_META, 'Meta Cloud API (oficial)'),
         (PROV_TWILIO, 'Twilio (oficial vía BSP)'),
         (PROV_DEMO, 'Simulado (demostración, no envía)'),
@@ -61,10 +61,10 @@ class LineaWhatsApp(models.Model):
     webhook_key = models.CharField(max_length=64, unique=True, default=_nueva_clave, editable=False)
     min_segundos_entre_envios = models.PositiveSmallIntegerField(
         default=6, verbose_name='Segundos mínimos entre envíos automáticos',
-        help_text='Anti-bloqueo para envíos masivos/automáticos. Sugerido: Evolution 6–15 s, Meta/Twilio 1 s.',
+        help_text='Anti-bloqueo para envíos masivos/automáticos. Sugerido: por QR 6–15 s, Meta/Twilio 1 s.',
     )
 
-    # Evolution API
+    # Conexión por QR
     evolution_instancia = models.SlugField(max_length=100, blank=True, verbose_name='Nombre de instancia')
     evolution_api_url = models.CharField(max_length=300, blank=True, help_text='Vacío = valor global del .env')
     evolution_api_key = CampoCifrado(blank=True, help_text='Vacío = valor global del .env')

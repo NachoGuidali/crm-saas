@@ -16,7 +16,7 @@
     <div class="col-6"><label class="d-flex gap-2">{{ form.activa }} Activa</label></div>
     <div class="col-6"><label class="form-label">Orden</label>{{ form.orden }}</div>
   </div>
-  <div class="prov prov-evolution mt-3"><div class="section-title">Evolution API</div><div class="row g-2">
+  <div class="prov prov-evolution mt-3"><div class="section-title">Conexión por QR</div><div class="row g-2">
     <div class="col-md-4"><label class="form-label">Instancia</label>{{ form.evolution_instancia }}<div class="form-text">Vacío = se genera sola</div>{{ form.evolution_instancia.errors }}</div>
     <div class="col-md-8"><label class="form-label">URL (vacío = global)</label>{{ form.evolution_api_url }}</div>
     <div class="col-12"><label class="form-label">API key (vacío = global)</label>{{ form.evolution_api_key }}</div></div></div>
@@ -43,7 +43,7 @@
     <p class="muted mb-1">URL que recibe los mensajes de esta línea{% if linea.proveedor == 'meta' %} (pegala en Meta → WhatsApp → Configuración, con el verify token){% elif linea.proveedor == 'twilio' %} (Twilio → número → "A message comes in"){% endif %}:</p>
     <code class="copiable d-block">{{ linea.webhook_url }}</code>
     {% if linea.proveedor == 'meta' %}<p class="muted mb-1 mt-2">Verify token:</p><code class="copiable d-block">{{ linea.meta_verify_token }}</code>{% endif %}
-    {% if linea.proveedor == 'evolution' %}<form method="post" action="{% url 'whatsapp:linea_conexion' linea.pk %}" class="mt-2">{% csrf_token %}<button name="accion" value="webhook" class="btn btn-sm btn-outline-secondary">Configurarlo en Evolution</button></form>{% endif %}
+    {% if linea.proveedor == 'evolution' %}<form method="post" action="{% url 'whatsapp:linea_conexion' linea.pk %}" class="mt-2">{% csrf_token %}<button name="accion" value="webhook" class="btn btn-sm btn-outline-secondary">Configurar webhook</button></form>{% endif %}
     {% if linea.proveedor == 'meta' %}<form method="post" action="{% url 'whatsapp:linea_conexion' linea.pk %}" class="mt-2">{% csrf_token %}<button name="accion" value="sync_plantillas" class="btn btn-sm btn-outline-secondary">Sincronizar plantillas desde Meta</button></form>{% endif %}
   </div></div>
   {% if linea.proveedor == 'evolution' %}
