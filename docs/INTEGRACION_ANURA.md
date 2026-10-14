@@ -5,10 +5,10 @@ todas las llamadas, grabaciones, discador progresivo y **teléfono dentro del CR
 Anura). Escrita a partir de la documentación de Anura, de lo que confirmó su soporte (sep–oct 2026) y de las pruebas
 reales hechas en este proyecto.
 
-> **Estado (13/10/2026):** probado contra Anura real: Click2Dial, eventos START/TALK/END, entrantes y salientes,
-> teléfono dentro del CRM (JsSIP) con saliente, entrante y corte desde el CRM. Implementados también la bitácora
-> de avisos (`EventoAnura`, visible en la configuración) y el respaldo del teléfono (registro/corte desde el softphone
-> cuando el webhook de Anura no llega).
+> **Estado (14/10/2026):** probado contra Anura real: Click2Dial, eventos START/TALK/END, entrantes y salientes,
+> teléfono dentro del CRM (JsSIP) con saliente, entrante y corte desde el CRM. Implementados también los controles
+> durante la llamada (espera propia, transferir por REFER, disponible/no disponible) y el acceso temporal a la ficha
+> de otra cartera cuando se atiende una llamada de ese cliente (ver 7.5).
 
 **Índice:** 1. Arquitectura · 2. Qué pedirle al cliente · 3. Panel de Anura paso a paso · 4. Click2Dial ·
 5. Eventos (webhooks) · 6. Cómo procesar los eventos · 7. Teléfono dentro del CRM · 8. Discador progresivo ·
@@ -293,7 +293,17 @@ Si cada pantalla recarga la página, se corta la llamada. Solución usada:
   toma al cerrarse; también cubre el instante de una recarga).
 - Aviso `beforeunload` si hay una llamada en curso. `Sec-Fetch-*` solo se envía en **HTTPS** (o localhost).
 
-### 7.5 Respaldos que conviene tener
+### 7.5 Controles durante la llamada
+- **Espera:** la espera SIP estándar (re-INVITE `hold()`) **Anura la rechazó y cortó la llamada**. Se usa una espera
+  propia: `mute()` del micrófono + silenciar el audio entrante. El cliente escucha silencio (sin música).
+- **Transferir:** `session.refer('sip:<interno>@<dominio>')` (transferencia directa). Lista de agentes con interno y
+  estado en vivo (`GET /api/telephony/agentes/`). Si Anura rechaza el REFER, la llamada sigue y se muestra el motivo.
+  Alternativa si no la acepta: códigos de transferencia de Anura por teclado (DTMF), a pedir a Anura.
+- **No disponible:** `ua.unregister()` (la cola deja de ofrecerle llamadas); al tocar Llamar, `ua.register()` y se
+  espera el registro antes del Click2Dial; al terminar, se vuelve a desconectar. Al volver a Disponible, `register()`.
+- **Ficha de otra cartera:** quien atendió la llamada ve la ficha por un rato (nota, tarea para la dueña, transferirle).
+
+### 7.6 Respaldos que conviene tener
 - **Entrantes atendidas en el teléfono:** el teléfono avisa al CRM al atender y al cortar (`sip-<id>`). Si Anura no
   manda el evento igual queda registrada; cuando llega, se une a la misma llamada.
 - **Al cortar:** si a los 8 s Anura no avisó el END, el CRM cierra la llamada con la duración medida (si Anura avisó
@@ -364,6 +374,9 @@ Si cada pantalla recarga la página, se corta la llamada. Solución usada:
 | Barra "No se pudo registrar … usuario o contraseña" | Credenciales SIP o dominio mal | Revisar usuario de la terminal, contraseña y dominio |
 | No aparece el teléfono | Falta interno del usuario / teléfono no activo / sin HTTPS | La barra debe decir qué falta; usar HTTPS |
 | Al recargar dice "abierto en otra pestaña" | La página anterior no soltó el bloqueo | Esperar el bloqueo en vez de fallar (7.4) |
+| "Poner en espera" corta la llamada | Anura rechaza el re-INVITE de la espera SIP | Espera propia (silenciar en ambos sentidos) |
+| La cola le pasa llamadas a quien está en pausa | El teléfono sigue registrado | "No disponible" desregistra la terminal |
+| Un agente atiende un cliente de otra cartera y la ficha da 404 | Solo ve lo suyo | Acceso temporal por llamada (nota, tarea para la dueña, transferir) |
 | "Llamar" falla desde la oportunidad 1000 en adelante | IDs con separador de miles (`1.000`) en botones / JS | Nunca formatear IDs; separador solo para mostrar |
 
 **Herramienta de diagnóstico imprescindible:** guardar los últimos ~500 avisos de Anura con su resultado y mostrarlos
@@ -378,13 +391,13 @@ teléfono (`[teléfono] INVITE {auto, discando, callInfo}`, motivo de fallas).
 | Archivo | Qué hace |
 |---|---|
 | `app/apps/telefonia/client.py` | Click2Dial, verificar token, errores, descarga de grabaciones, cliente demo |
-| `app/apps/telefonia/services.py` | `normalizar_evento`, `procesar_evento_llamada`, registro de avisos, unión con el teléfono, `discar`, discador, `PLANTILLA_WEBHOOK`, teléfono (`credenciales_softphone`, `registrar_desde_softphone`, `cerrar_desde_softphone`), resultado de la gestión |
-| `app/apps/telefonia/views.py` | Webhook, `/api/telephony/dial`, estado, calificar, `softphone/` (credenciales), `softphone/registro/`, `softphone/corto/`, `quien/`, configuración (incluye la lista de "Últimos avisos de Anura") |
-| `app/apps/telefonia/models.py` | `ConfigAnura`, `InternoAnura` (interno, alias, usuario SIP, contraseña cifrada), `RutaAnura`, `Llamada`, `EventoAnura` (bitácora de avisos, poda a 500), campañas |
+| `app/apps/telefonia/services.py` | `normalizar_evento`, `procesar_evento_llamada`, registro de avisos, unión con el teléfono, `discar`, discador, `PLANTILLA_WEBHOOK`, teléfono (`credenciales_softphone`, `registrar_desde_softphone`, `cerrar_desde_softphone`), `agentes_para_transferir`, `acceso_por_llamada` (ficha de otra cartera por llamada), resultado de la gestión |
+| `app/apps/telefonia/views.py` | Webhook, `/api/telephony/dial`, estado, calificar, `softphone/` (credenciales), `softphone/registro/`, `softphone/corto/`, `quien/`, `agentes/` (transferencia), configuración |
+| `app/apps/telefonia/models.py` | `ConfigAnura`, `InternoAnura` (interno, alias, usuario SIP, contraseña cifrada), `RutaAnura`, `Llamada`, `EventoAnura`, campañas |
 | `app/core/marco.py` · `templates/telefonia/marco.html` | Marco fijo (middleware + barra + iframe) |
-| `app/static/js/telefono.js` · `static/vendor/jssip-3.13.8.min.js` | Teléfono JsSIP (incluye el respaldo: avisa `softphone/registro/` al atender y `softphone/corto/` 8 s después de cortar) |
+| `app/static/js/telefono.js` · `static/vendor/jssip-3.13.8.min.js` | Teléfono JsSIP (espera propia, transferir por REFER, disponible/no disponible, respaldo al atender/cortar) |
 | `app/static/js/app.js` | Llamar, aviso de llamada, integración con el teléfono del marco |
-| `app/core/cifrado.py` | Cifrado simétrico (Fernet, clave derivada de SECRET_KEY): contraseña SIP y, vía `CampoCifrado`, el resto de credenciales de integraciones |
+| `app/core/cifrado.py` | Cifrado de la contraseña SIP (Fernet, clave derivada de SECRET_KEY) |
 | `app/core/phone.py` | Normalización de teléfonos argentinos |
 | `app/apps/telefonia/tests.py` | Tests con la plantilla real (START → TALK → END, colas, teléfono, avisos) |
 

@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone as dt_tz
 
 from django.core.cache import cache
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from core.phone import normalizar_telefono
@@ -961,8 +962,47 @@ def quien_llama(user, numero):
     contacto = buscar_contacto(telefono=tel) if tel else None
     if contacto is None:
         return {'nombre': '', 'numero': tel or numero, 'url': ''}
-    ops = Oportunidad.objects.visibles_para(user).filter(contacto=contacto)
+    ops = Oportunidad.objects.filter(contacto=contacto)
     op = ops.filter(estado__in=Oportunidad.ESTADOS_ACTIVOS).order_by('-ultima_actividad_at').first() or \
         ops.order_by('-ultima_actividad_at').first()
-    url = op.get_absolute_url() if op else (contacto.get_absolute_url() if user.ve_todo else '')
+    # El dueño y quien ve todo siempre; otro agente solo si está atendiendo una llamada de este cliente.
+    puede = user.ve_todo or (op is not None and op.agente_id == user.pk) or acceso_por_llamada(user, contacto=contacto)
+    url = (op.get_absolute_url() if op else contacto.get_absolute_url()) if puede else ''
     return {'nombre': contacto.nombre, 'numero': contacto.telefono, 'url': url}
+
+
+# Un agente que atiende una llamada puede abrir la ficha del cliente aunque sea de otra cartera, por un rato.
+ACCESO_LLAMADA_HORAS = 2
+
+
+def acceso_por_llamada(user, oportunidad=None, contacto=None):
+    """¿El usuario atendió (o está atendiendo) una llamada ligada a esta oportunidad o contacto? Acceso temporal."""
+    if user.ve_todo:
+        return True
+    if oportunidad is None and contacto is None:
+        return False
+    qs = Llamada.objects.filter(agente=user, inicio_at__gte=timezone.now() - timedelta(hours=ACCESO_LLAMADA_HORAS))
+    if oportunidad is not None:
+        cond = Q(oportunidad=oportunidad)
+        if oportunidad.contacto_id:
+            cond |= Q(contacto_id=oportunidad.contacto_id)
+        qs = qs.filter(cond)
+    else:
+        qs = qs.filter(contacto=contacto)
+    return qs.exists()
+
+
+def agentes_para_transferir(user):
+    """Agentes con interno activo (menos uno mismo) para transferir la llamada, con su estado en vivo."""
+    config = ConfigAnura.get()
+    dominio = config.sip_dominio.strip()
+    internos = (InternoAnura.objects.filter(activo=True, usuario__is_active=True).exclude(usuario=user)
+                .select_related('usuario').order_by('usuario__first_name', 'usuario__last_name', 'usuario__username'))
+    ocupados = set(Llamada.objects.filter(estado__in=Llamada.ESTADOS_VIVOS, agente__isnull=False)
+                   .values_list('agente_id', flat=True))
+    return [{
+        'nombre': i.usuario.display_name,
+        'interno': i.interno,
+        'estado': 'en_llamada' if i.usuario_id in ocupados else 'libre',
+        'destino': f'sip:{i.interno}@{dominio}' if dominio else '',
+    } for i in internos]

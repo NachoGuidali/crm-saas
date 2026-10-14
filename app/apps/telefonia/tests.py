@@ -484,3 +484,54 @@ class RespaldoSoftphoneTests(AnuraBase):
         self.assertEqual(r.status_code, 200)
         r = self.client.post('/api/telephony/softphone/corto/', '{}', content_type='application/json')
         self.assertEqual(r.status_code, 200)
+
+
+class AccesoYTransferenciaTests(AnuraBase):
+    def _op_de_ana(self):
+        from apps.crm.services import ingresar_prospecto
+        res = ingresar_prospecto({'nombre': 'Cliente Ana', 'telefono': '1155557777'},
+                                 self.embudo, Oportunidad.ORIGEN_API)
+        op = res.oportunidad
+        self.assertEqual(op.agente, self.agente)  # la cartera es de Ana
+        return op
+
+    def test_acceso_por_llamada_abre_la_ficha_de_otra_cartera(self):
+        from .services import acceso_por_llamada
+        op = self._op_de_ana()
+        beto = User.objects.create_user('beto', password='x', first_name='Beto')
+        # Sin llamada, Beto no la ve
+        self.assertFalse(acceso_por_llamada(beto, oportunidad=op))
+        self.client.force_login(beto)
+        self.assertEqual(self.client.get(op.get_absolute_url()).status_code, 404)
+        # Con una llamada reciente suya a ese cliente, sí (acceso temporal)
+        Llamada.objects.create(direccion=Llamada.DIR_ENTRANTE, estado=Llamada.ESTADO_ATENDIDA,
+                               numero=op.contacto.telefono, agente=beto, contacto=op.contacto, oportunidad=op)
+        self.assertTrue(acceso_por_llamada(beto, oportunidad=op))
+        r = self.client.get(op.get_absolute_url())
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.context['op'].acceso_temporal)
+        # Puede dejar una nota, pero no mover/editar la oportunidad de otra cartera
+        nota = self.client.post(f'/oportunidades/{op.pk}/nota/', json.dumps({'texto': 'Llamó por una duda'}),
+                                content_type='application/json')
+        self.assertEqual(nota.status_code, 200)
+        mover = self.client.post(f'/oportunidades/{op.pk}/mover/', json.dumps({'etapa': op.etapa_id}),
+                                 content_type='application/json')
+        self.assertEqual(mover.status_code, 403)
+
+    def test_agentes_para_transferir_lista_internos_con_estado(self):
+        from .services import agentes_para_transferir
+        ConfigAnura.objects.filter(pk=1).update(sip_dominio='pbx.anura.dev')
+        beto = User.objects.create_user('beto', password='x', first_name='Beto')
+        InternoAnura.objects.create(usuario=beto, interno='202')
+        lista = agentes_para_transferir(self.agente)  # no se incluye a sí mismo
+        self.assertEqual([a['interno'] for a in lista], ['202'])
+        self.assertEqual(lista[0]['destino'], 'sip:202@pbx.anura.dev')
+        self.assertEqual(lista[0]['estado'], 'libre')
+        Llamada.objects.create(direccion=Llamada.DIR_ENTRANTE, estado=Llamada.ESTADO_EN_CURSO, agente=beto)
+        self.assertEqual(agentes_para_transferir(self.agente)[0]['estado'], 'en_llamada')
+
+    def test_endpoint_agentes(self):
+        self.client.force_login(self.agente)
+        r = self.client.get('/api/telephony/agentes/')
+        self.assertEqual(r.status_code, 200)
+        self.assertIn('agentes', r.json())

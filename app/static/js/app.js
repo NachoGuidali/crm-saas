@@ -326,7 +326,8 @@
 
   async function llamar(opciones) {
     const tel = telefono();
-    if (tel) tel.esperarSaliente();  // la terminal del CRM atiende sola cuando Anura la llame
+    // Avisa a la terminal que atienda sola; si el agente estaba "No disponible", la registra y espera antes de discar.
+    if (tel) await tel.esperarSaliente();
     try {
       const d = await api('/api/telephony/dial', {data: {oportunidadId: opciones.op || null, contactoId: opciones.contacto || null,
                                                           phoneNumber: opciones.tel || ''}});

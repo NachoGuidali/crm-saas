@@ -34,6 +34,15 @@
     #teclado { position: absolute; top: 46px; right: 14px; background: var(--bg2); border: 1px solid var(--border);
                border-radius: 10px; padding: 10px; display: grid; grid-template-columns: repeat(3, 48px); gap: 6px; }
     #teclado[hidden] { display: none; }
+    #transferir { position: absolute; top: 46px; right: 14px; background: var(--bg2); border: 1px solid var(--border);
+                  border-radius: 10px; padding: 8px; display: flex; flex-direction: column; gap: 5px; min-width: 240px;
+                  max-height: 60vh; overflow: auto; z-index: 6; color: var(--text2); font-size: 12.5px; }
+    #transferir[hidden] { display: none; }
+    #transferir .btn { display: flex; justify-content: space-between; gap: 10px; text-align: left; }
+    #tel .disponible { margin-left: auto; --bs-btn-padding-y: .2rem; --bs-btn-padding-x: .55rem; font-size: 13px;
+                       color: #22C97A; border: 1px solid #22C97A; background: transparent; }
+    #tel .disponible.en-pausa { color: #F59E0B; border-color: #F59E0B; }
+    #tel.en-llamada .disponible, #tel.sonando .disponible { display: none; }
     @keyframes titila { 50% { opacity: .3; } }
     @keyframes sonar { 50% { background: color-mix(in srgb, var(--bg2) 55%, #22C97A 45%); } }
     @media (prefers-reduced-motion: reduce) { #tel.sonando, #tel .estado .dot { animation: none !important; } }
@@ -51,12 +60,15 @@
       <button class="btn btn-success atender" hidden><i class="bi bi-telephone-inbound"></i> Atender</button>
       <button class="btn btn-outline-secondary silenciar" hidden title="Silenciar micrófono"><i class="bi bi-mic-mute"></i></button>
       <button class="btn btn-outline-secondary espera" hidden title="Poner en espera"><i class="bi bi-pause-circle"></i></button>
+      <button class="btn btn-outline-secondary transferir" hidden title="Transferir a otro agente"><i class="bi bi-arrow-left-right"></i></button>
       <button class="btn btn-outline-secondary abrir-teclado" hidden title="Teclado"><i class="bi bi-grid-3x3-gap"></i></button>
       <button class="btn btn-danger cortar"><i class="bi bi-telephone-x"></i> Cortar</button>
     </div>
   </div>
+  <button class="btn btn-sm disponible en-pausa" hidden title="Disponibilidad en la cola"><i class="bi bi-pause-circle"></i> No disponible</button>
   <button class="btn btn-sm btn-outline-secondary microfono" hidden><i class="bi bi-mic"></i> Permitir micrófono</button>
   <div id="teclado" hidden>{% for t in "123456789*0#" %}<button type="button" class="btn btn-outline-secondary" data-tono="{{ t }}">{{ t }}</button>{% endfor %}</div>
+  <div id="transferir" hidden></div>
 </div>
 <input type="hidden" id="csrf" value="{{ csrf_token }}">
 <iframe id="pantalla" src="{{ destino }}" title="CRM"></iframe>

@@ -48,12 +48,18 @@ def embudo_actual(request):
 
 
 def oportunidad_visible(request, pk, lock=False):
-    qs = Oportunidad.objects.visibles_para(request.user).select_related('contacto', 'embudo', 'etapa', 'agente',
-                                                                         'tipificacion')
-    op = qs.filter(pk=pk).first()
-    if op is None:
-        raise Http404('Oportunidad no encontrada')
-    return op
+    base = Oportunidad.objects.select_related('contacto', 'embudo', 'etapa', 'agente', 'tipificacion')
+    op = base.visibles_para(request.user).filter(pk=pk).first()
+    if op is not None:
+        return op
+    # Acceso temporal: el agente atendió una llamada de este cliente aunque la ficha sea de otra cartera.
+    op = base.filter(pk=pk).first()
+    if op is not None:
+        from apps.telefonia.services import acceso_por_llamada
+        if acceso_por_llamada(request.user, oportunidad=op):
+            op.acceso_temporal = True
+            return op
+    raise Http404('Oportunidad no encontrada')
 
 
 def _fecha_local(valor):
@@ -494,8 +500,13 @@ class OportunidadDetalleView(LoginRequiredMixin, View):
 class AccionOportunidadView(LoginRequiredMixin, View):
     """Endpoints AJAX de la ficha y del tablero: nunca recargan la página."""
 
+    # En una ficha de otra cartera abierta por una llamada solo se puede dejar una nota o una tarea (no editarla).
+    ACCESO_TEMPORAL_PERMITIDAS = {'nota', 'tarea'}
+
     def post(self, request, pk, accion):
         op = oportunidad_visible(request, pk)
+        if getattr(op, 'acceso_temporal', False) and accion not in self.ACCESO_TEMPORAL_PERMITIDAS:
+            return error('La oportunidad es de otra cartera: solo podés dejar una nota o una tarea para la dueña.', 403)
         data = json_body(request)
         user = request.user
         try:

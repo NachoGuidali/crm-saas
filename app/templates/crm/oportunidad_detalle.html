@@ -2,6 +2,14 @@
 {% load crm_extras %}
 {% block title %}{{ contacto.nombre }}{% endblock %}
 {% block content %}
+{% if op.acceso_temporal %}
+<div class="alert alert-warning py-2 d-flex align-items-center gap-2 mb-3">
+  <i class="bi bi-telephone-inbound"></i>
+  <span>Estás viendo esta ficha por una llamada. Es de la cartera de
+    <b>{% if op.agente %}{{ op.agente.display_name }}{% else %}otro agente{% endif %}</b>:
+    podés dejar una nota o crearle una tarea, pero no es tuya.</span>
+</div>
+{% endif %}
 <div class="ficha-head">
   <div class="d-flex justify-content-between gap-3 flex-wrap">
     <div style="min-width:0">

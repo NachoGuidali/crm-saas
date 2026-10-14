@@ -250,10 +250,11 @@ class PanelTests(BaseMultiCliente):
         self.assertEqual(self.otro.estado, Cliente.ESTADO_SUSPENDIDO)
 
     def test_ingresar_lleva_al_subdominio(self):
-        with self.settings(SAAS_DOMINIO='testserver'):
+        # La URL del cliente sale de SITE_URL (esquema y puerto públicos), no del request.
+        with self.settings(SAAS_DOMINIO='testserver', SITE_URL='https://testserver'):
             resp = self.pedir(Client(), 'post', '/ingresar/', PLATAFORMA, data={'empresa': 'otro'})
         self.assertEqual(resp.status_code, 302)
-        self.assertEqual(resp['Location'], 'http://otro.testserver/usuarios/login/')
+        self.assertEqual(resp['Location'], 'https://otro.testserver/usuarios/login/')
 
 
 class SubdominioTests(TestCase):

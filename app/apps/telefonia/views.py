@@ -97,6 +97,13 @@ class QuienLlamaView(LoginRequiredMixin, View):
         return ok(**services.quien_llama(request.user, request.GET.get('numero', '')))
 
 
+class AgentesView(LoginRequiredMixin, View):
+    """Agentes a los que transferir la llamada en curso (interno + estado en vivo)."""
+
+    def get(self, request):
+        return ok(agentes=services.agentes_para_transferir(request.user))
+
+
 @method_decorator(csrf_exempt, name='dispatch')
 class SoftphoneRegistroView(LoginRequiredMixin, View):
     """Respaldo: el teléfono (JsSIP) atendió una llamada; se registra por si no llega el webhook de Anura."""
