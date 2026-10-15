@@ -194,6 +194,24 @@ class CorreoYDifusionesTests(TestCase):
         self.assertRedirects(r, f'/automatizaciones/difusiones/{dif.pk}/')
         return dif
 
+    def test_plantilla_html_se_envia_tal_cual_con_texto_de_respaldo(self):
+        from django.core import mail
+        from .models import PlantillaEmail
+        from .services import enviar_email
+        pe = PlantillaEmail.objects.create(
+            nombre='Promo HTML', asunto='Oferta', es_html=True,
+            cuerpo='<h1>Hola {primer_nombre}</h1><img src="https://ejemplo.com/foto.jpg">'
+                   '<a href="https://ejemplo.com/plan">Ver plan</a>')
+        op = self.ops[0]
+        enviar_email(op.contacto, op, 'Oferta', pe.cuerpo.replace('{primer_nombre}', 'Persona0'), plantilla=pe)
+        m = mail.outbox[-1]
+        html = m.alternatives[0][0]
+        self.assertIn('<img src="https://ejemplo.com/foto.jpg">', html)  # el HTML se respeta
+        self.assertIn('/e/c/', html)  # el link se reescribe para medir clics
+        self.assertIn('/e/o/', html)  # píxel de apertura
+        self.assertNotIn('<h1>', m.body)  # la parte de texto va sin etiquetas
+        self.assertIn('Hola Persona0', m.body)
+
     def test_difusion_por_email_con_baja(self):
         from django.core import mail
         from .difusiones import tick

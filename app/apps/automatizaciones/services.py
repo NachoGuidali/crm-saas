@@ -36,31 +36,35 @@ def enviar_email(contacto, op, asunto, cuerpo, usuario=None, accion=None, difusi
     Envía un email (manual, automático o de difusión) con seguimiento de apertura y clics, y lo registra en la ficha.
     Los automáticos y las difusiones llevan link de baja (y el encabezado List-Unsubscribe).
     """
+    from django.utils.html import strip_tags
     from apps.crm.models import Actividad
+    es_html = bool(plantilla and getattr(plantilla, 'es_html', False))
     envio = EmailEnviado.objects.create(accion=accion, oportunidad=op, contacto=contacto, para=contacto.email,
                                         asunto=asunto[:200], token=secrets.token_urlsafe(24), enviado_por=usuario,
                                         difusion=difusion, plantilla=plantilla)
     con, remitente = conexion or conexion_email()
     con_baja = usuario is None
     headers = {}
+    # Parte de texto plano (fallback para clientes sin HTML): del HTML se saca el texto.
+    cuerpo_txt = strip_tags(cuerpo) if es_html else cuerpo
     if con_baja:
         url_baja = f'{tenancy.url_sitio()}/e/baja/{envio.token}/'
         headers['List-Unsubscribe'] = f'<{url_baja}>'
-        cuerpo_txt = cuerpo + f'\n\n—\nSi no querés recibir más emails: {url_baja}'
-    else:
-        cuerpo_txt = cuerpo
+        cuerpo_txt += f'\n\n—\nSi no querés recibir más emails: {url_baja}'
     mail = EmailMultiAlternatives(asunto, cuerpo_txt, remitente, [contacto.email], connection=con, headers=headers,
                                   reply_to=[usuario.email] if usuario is not None and usuario.email else None)
-    mail.attach_alternative(html_con_seguimiento(cuerpo, envio.token, con_baja=con_baja), 'text/html')
+    mail.attach_alternative(html_con_seguimiento(cuerpo, envio.token, con_baja=con_baja, es_html=es_html), 'text/html')
     mail.send(fail_silently=False)
     origen = ' (difusión)' if difusion else ' automático' if usuario is None else ''
+    resumen = (strip_tags(cuerpo) if es_html else cuerpo)[:500]
     Actividad.objects.create(contacto=contacto, oportunidad=op, tipo=Actividad.TIPO_EMAIL, usuario=usuario,
-                             texto=f'Email{origen}: {asunto}\n{cuerpo[:500]}')
+                             texto=f'Email{origen}: {asunto}\n{resumen}')
     return envio
 
 
-def html_con_seguimiento(cuerpo, token, con_baja=False):
-    """Cuerpo del email en HTML con los links redirigidos (clics), un píxel invisible (aperturas) y link de baja."""
+def html_con_seguimiento(cuerpo, token, con_baja=False, es_html=False):
+    """Cuerpo del email en HTML con los links redirigidos (clics), un píxel invisible (aperturas) y link de baja.
+    Si `es_html`, el cuerpo ya es HTML (diseño pegado) y se respeta tal cual; si no, se arma a partir del texto."""
     import re
     from django.core import signing
     from django.utils.html import urlize
@@ -69,7 +73,8 @@ def html_con_seguimiento(cuerpo, token, con_baja=False):
     def redirigir(m):
         firmado = signing.dumps(m.group(1), salt='email-clic')
         return f'href="{base}/e/c/{token}/?u={firmado}"'
-    html = re.sub(r'href="(https?://[^"]+)"', redirigir, urlize(linebreaks(escape(cuerpo))))
+    # Los links se miden igual (se reescribe el href); el pegado de HTML se deja intacto salvo eso.
+    html = re.sub(r'href="(https?://[^"]+)"', redirigir, cuerpo if es_html else urlize(linebreaks(escape(cuerpo))))
     if con_baja:
         html += (f'<p style="margin-top:28px;font-size:12px;color:#888">Si no querés recibir más emails, '
                  f'<a href="{base}/e/baja/{token}/" style="color:#888">date de baja acá</a>.</p>')

@@ -281,6 +281,9 @@ class PlantillaEmail(models.Model):
     asunto = models.CharField(max_length=200)
     cuerpo = models.TextField(help_text='Texto del email. Los links se miden solos. Variables: {nombre} {primer_nombre} '
                                         '{agente} {embudo} {etapa} y los campos personalizados.')
+    es_html = models.BooleanField(default=False, verbose_name='El cuerpo es HTML',
+                                  help_text='Marcalo si pegaste HTML (diseño, imágenes, botones). Se respeta tal cual; '
+                                            'igual se agregan el seguimiento y el link de baja.')
     activa = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

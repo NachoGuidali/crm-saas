@@ -26,7 +26,7 @@ def _estilizar(form):
 class PlantillaEmailForm(forms.ModelForm):
     class Meta:
         model = PlantillaEmail
-        fields = ['nombre', 'asunto', 'cuerpo', 'activa']
+        fields = ['nombre', 'asunto', 'cuerpo', 'es_html', 'activa']
         widgets = {'cuerpo': forms.Textarea(attrs={'rows': 12})}
 
     def __init__(self, *a, **kw):

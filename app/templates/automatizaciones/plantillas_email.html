@@ -14,6 +14,7 @@
       <div class="col-md-6 d-flex align-items-end"><label class="d-flex gap-2">{{ form.activa }} Activa</label></div>
       <div class="col-12"><label class="form-label">Asunto</label>{{ form.asunto }}{{ form.asunto.errors }}</div>
       <div class="col-12"><label class="form-label">Mensaje</label>{{ form.cuerpo }}{{ form.cuerpo.errors }}<div class="form-text">{{ form.cuerpo.help_text }} En difusiones y automáticos se agrega solo al pie el link "Darme de baja".</div></div>
+      <div class="col-12"><label class="d-flex gap-2">{{ form.es_html }} El cuerpo es HTML (diseño con imágenes/botones)</label><div class="form-text">{{ form.es_html.help_text }}</div></div>
     </div>
     <div class="mt-3 d-flex gap-2"><button class="btn btn-primary">Guardar</button>{% if plantilla %}<button name="eliminar" value="1" class="btn btn-outline-danger ms-auto" onclick="return confirm('¿Eliminar la plantilla?')">Eliminar</button>{% endif %}</div>
   </div></form></div>
