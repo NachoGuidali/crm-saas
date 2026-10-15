@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-head"><h1><i class="bi bi-envelope-at"></i> Configuración de email</h1></div>
 <div class="row g-3">
-  <div class="col-lg-7"><form method="post" class="card"><div class="card-body">{% csrf_token %}
+  <div class="col-lg-7"><form method="post" class="card" autocomplete="off"><div class="card-body">{% csrf_token %}
     <label class="d-flex gap-2 mb-2">{{ form.activo }} {{ form.activo.label }}</label>
     <div class="form-text mb-3">Apagado = se usa el servidor del archivo .env del servidor.</div>
     <div class="row g-2">

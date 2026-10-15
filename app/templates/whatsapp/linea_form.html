@@ -5,7 +5,7 @@
   {% if linea %}<span class="chip {% if linea.estado == 'conectada' %}ok{% elif linea.estado == 'error' %}danger{% else %}warn{% endif %}" id="chipEstado">{{ linea.get_estado_display }}</span>{% endif %}</div>
 <div class="row g-3">
 <div class="col-lg-7">
-<form method="post" class="card"><div class="card-body">{% csrf_token %}
+<form method="post" class="card" autocomplete="off"><div class="card-body">{% csrf_token %}
   {% if form.non_field_errors %}<div class="alert alert-danger py-2">{{ form.non_field_errors|join:" " }}</div>{% endif %}
   <div class="row g-2">
     <div class="col-md-6"><label class="form-label">Nombre</label>{{ form.nombre }}{{ form.nombre.errors }}</div>

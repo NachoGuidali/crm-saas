@@ -76,6 +76,10 @@ class UsuarioForm(forms.ModelForm):
         _estilizar(self)
         if 'modo_password' in self.fields:
             self.fields['modo_password'].widget.attrs['class'] = 'form-check-input'
+        # Que el navegador no rellene el alta con el usuario/contraseña del admin logueado.
+        self.fields['username'].widget.attrs['autocomplete'] = 'off'
+        if 'password_temporal' in self.fields:
+            self.fields['password_temporal'].widget.attrs['autocomplete'] = 'new-password'
 
     def clean_email(self):
         email = (self.cleaned_data.get('email') or '').strip().lower()

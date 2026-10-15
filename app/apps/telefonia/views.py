@@ -105,6 +105,19 @@ class AgentesView(LoginRequiredMixin, View):
 
 
 @method_decorator(csrf_exempt, name='dispatch')
+class PresenciaTelefonoView(LoginRequiredMixin, View):
+    """Latido del softphone: informa si está registrado y disponible (arma los tramos de pausa)."""
+
+    def post(self, request):
+        reason = _chequear_csrf(request)
+        if reason:
+            return reason
+        data = json_body(request)
+        services.marcar_presencia_telefono(request.user, bool(data.get('disponible', True)))
+        return ok()
+
+
+@method_decorator(csrf_exempt, name='dispatch')
 class SoftphoneRegistroView(LoginRequiredMixin, View):
     """Respaldo: el teléfono (JsSIP) atendió una llamada; se registra por si no llega el webhook de Anura."""
 
@@ -231,6 +244,9 @@ class ConfigForm(forms.ModelForm):
             w = f.widget
             w.attrs['class'] = ('form-check-input' if isinstance(w, forms.CheckboxInput)
                                 else 'form-select' if isinstance(w, forms.Select) else 'form-control')
+            # Que el navegador no rellene tokens/usuario de Anura con las credenciales del CRM.
+            if not isinstance(w, (forms.CheckboxInput, forms.Select)):
+                w.attrs.setdefault('autocomplete', 'new-password' if isinstance(w, forms.PasswordInput) else 'off')
 
 
 class ConfigView(PermisoRequeridoMixin, View):

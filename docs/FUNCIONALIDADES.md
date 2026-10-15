@@ -711,3 +711,35 @@ Permiso nuevo: **Difusiones** (incluido en Supervisor y en el rol Comercial / Ma
 | Gestión por pauta / base | Análisis de pautas → Gestión por pauta; Importaciones → detalle de la base | Llamadas, atendidas, minutos, llamadas por lead, WhatsApp y emails de cada campaña o base |
 | Filtros del tablero | Tablero | Pauta, base importada y prioridad |
 | API con etapa y vendedor | `POST /api/v1/leads/` | `etapa` (nombre o id) y `agente` (usuario o email); si el lead ya existe lo mueve de etapa (`movida`) |
+
+## 25. Teléfono dentro del CRM (Anura, sin abrir Anura)
+
+Detalle técnico y configuración de Anura: [`INTEGRACION_ANURA.md`](INTEGRACION_ANURA.md) (sección 7).
+
+| Función | Dónde | Cómo funciona |
+|---|---|---|
+| Barra del teléfono | Arriba de todas las pantallas (agentes con interno, si el teléfono está activo) | Verde = listo · naranja = No disponible · rojo = sin conexión o falta un dato (lo dice). En modo demostración muestra las llamadas simuladas |
+| Navegar sin cortar | Todo el CRM | Las pantallas cargan dentro de un marco fijo: cambiar de pantalla no corta la llamada. F5 o cerrar la pestaña avisan si hay una llamada |
+| Llamar | Botón Llamar (ficha, tablero, lista, Mi día) y discador | Anura llama primero a la terminal del CRM, que **atiende sola** solo si el CRM está discando; después se disca al cliente |
+| Recibir | Barra | Suena con el nombre del cliente y botón **Ficha**; **Atender** / **Rechazar** |
+| Durante la llamada | Barra | **Cortar**, **Silenciar**, **Espera** (el cliente no escucha y vos tampoco; sin música), **Teclado** (DTMF), **Transferir** |
+| Transferir | Barra → Transferir | Lista de agentes con teléfono y estado en vivo (en línea / en llamada / ausente / no disponible / desconectado) o un interno / número a mano. Transferencia directa; si Anura no la acepta, la llamada sigue |
+| No disponible | Botón Disponible / No disponible (arriba) | Además de no recibir leads, **desconecta el teléfono**: la cola no le pasa llamadas. Si toca Llamar, se reconecta para esa llamada |
+| Registro de llamadas | Llamadas, ficha | Con los avisos de Anura (START / TALK / END). Respaldo: el teléfono registra las entrantes que atiende y, si Anura no avisa el fin, cierra la llamada a los 8 s de cortar; el aviso tardío completa id y grabación |
+| Una sola pestaña | — | Solo una pestaña del CRM tiene el teléfono; si se cierra, pasa a la otra |
+| Últimos avisos de Anura | Telefonía Anura (abajo) | Cada aviso recibido y qué hizo el CRM (registrada, ignorada y por qué, sin agente). Botón Datos con el JSON |
+| Configuración | Telefonía Anura | "Teléfono dentro del CRM" + servidor WebSocket, dominio y puerto; en Internos, usuario y contraseña SIP de la terminal CRM (cifrada) |
+
+## 26. Cartera, pausas y prueba con vendedoras (octubre 2026)
+
+| Función | Dónde | Cómo funciona |
+|---|---|---|
+| Ficha de un cliente de otra vendedora | Al atender su llamada | Quien atiende ve la ficha durante 2 h con el aviso "Esta oportunidad es de…": nota, resultado de la gestión, **Dejarle una tarea** (prioridad alta + notificación) y **Transferirle la llamada**. No puede moverla, cerrarla ni editarla |
+| Aviso a la dueña | Notificaciones | Cuando otra vendedora habla con su cliente |
+| Pausas | Supervisión, Reportes → Telefonía por vendedora (columna En pausa), Mis números | Cada paso a "No disponible" queda registrado; se cuenta el tiempo en pausa con el CRM abierto. Supervisión muestra desde qué hora y los minutos del día |
+| Tarea de primer contacto | Mi día | Se completa sola cuando la vendedora le escribe por WhatsApp o habla con el cliente (resultado "habló") |
+| Landing de prueba | `/demo/formulario/` (con `DEMO_LANDING=1`) | Pide "¿Cómo preferís que te contactemos?": la tarea queda como "Escribirle por WhatsApp a…" o "Llamar a…". `?origen=…` define la pauta |
+| Usuario para pruebas | `python manage.py agente_demo --telefonos "11…, 11…"` | Crea "Agente Demo" con 10 prospectos en distintas situaciones (prioridad, reingreso, tarea vencida…), regla para que los leads de `?origen=Landing Prueba` le lleguen a ella y una campaña de discador con los números reales. `--borrar` limpia todo |
+| Etiquetas | Configuración → Etiquetas | Crear etiquetas; se usan en la ficha, acciones masivas, automatizaciones (poner etiqueta / condición) y al cerrar una venta |
+| Formularios de configuración | WhatsApp, Anura, email, SMS, usuarios | El navegador no los autocompleta con el usuario y la contraseña del CRM |
+| Números con miles | Todo el CRM | Los IDs ya no se escriben con punto de miles (rompía Llamar y las acciones masivas desde el ID 1000) |

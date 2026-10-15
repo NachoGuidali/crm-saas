@@ -1244,6 +1244,9 @@ class SupervisionView(PermisoRequeridoMixin, View):
         ids |= {k for k, r in por_agente.items() if r['abiertas']}
         en_llamada = set(Llamada.objects.filter(estado__in=Llamada.ESTADOS_VIVOS,
                                                 inicio_at__gte=ahora - timedelta(hours=3)).values_list('agente_id', flat=True))
+        from apps.telefonia.services import estado_telefono, pausas_hoy
+        pausa_seg = pausas_hoy(ids)
+        estados_tel = estado_telefono(ids)
         llamadas_hoy = dict(Llamada.objects.filter(inicio_at__gte=hoy).values_list('agente').annotate(n=Count('pk'))
                             .values_list('agente', 'n'))
         from apps.telefonia.services import q_sin_calificar
@@ -1271,6 +1274,8 @@ class SupervisionView(PermisoRequeridoMixin, View):
                           'wa': wa.get(a.pk, 0), 'online': a.pk in online, 'desde': sesion_desde.get(a.pk),
                           'ausente_desde': ausentes.get(a.pk), 'sin_calificar': sin_calificar.get(a.pk, 0),
                           'prioritarias': prioritarias.get(a.pk, 0),
+                          'en_pausa': estados_tel.get(a.pk) == 'no_disponible',
+                          'pausa_min': round(pausa_seg.get(a.pk, 0) / 60),
                           'ultima_vez': ultima_vez.get(a.pk)})
         filas.sort(key=lambda f: (not f['online'], f['u'].display_name.lower()))
         return render(request, 'crm/supervision.html', {

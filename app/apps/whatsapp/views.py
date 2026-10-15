@@ -359,6 +359,8 @@ class LineaForm(forms.ModelForm):
                 w.attrs['class'] = 'form-select'
             else:
                 w.attrs['class'] = 'form-control'
+                # Que el navegador no rellene tokens/keys con el usuario y contraseña del CRM.
+                w.attrs.setdefault('autocomplete', 'new-password' if isinstance(w, forms.PasswordInput) else 'off')
 
     def clean(self):
         d = super().clean()

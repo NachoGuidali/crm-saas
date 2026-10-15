@@ -424,6 +424,8 @@ def _al_finalizar(llamada, config):
         return
     if op is not None:
         op.refresh_from_db()
+        if llamada.estado == Llamada.ESTADO_ATENDIDA:
+            _avisar_duenia_llamada(llamada)  # atendida fuera del softphone del CRM (deduplicado)
         crm.tocar(op)
         if llamada.direccion == Llamada.DIR_SALIENTE or llamada.estado == Llamada.ESTADO_ATENDIDA:
             crm.marcar_primer_contacto(op, llamada.inicio_at)
@@ -598,6 +600,7 @@ def registrar_desde_softphone(user, numero='', direccion='IN'):
         if not viva.atendida_at:
             viva.estado, viva.atendida_at = Llamada.ESTADO_EN_CURSO, ahora
         viva.save()
+        _avisar_duenia_llamada(viva)
         invalidar_llamada_activa(user.pk)
         return viva
     interno = InternoAnura.objects.filter(usuario=user, activo=True).values_list('interno', flat=True).first()
@@ -608,6 +611,7 @@ def registrar_desde_softphone(user, numero='', direccion='IN'):
     _vincular_crm(llamada, None, ConfigAnura.get())
     llamada.save()
     _registrar_actividad(llamada)
+    _avisar_duenia_llamada(llamada)
     invalidar_llamada_activa(user.pk)
     return llamada
 
@@ -993,16 +997,96 @@ def acceso_por_llamada(user, oportunidad=None, contacto=None):
 
 
 def agentes_para_transferir(user):
-    """Agentes con interno activo (menos uno mismo) para transferir la llamada, con su estado en vivo."""
+    """Agentes con interno activo (menos uno mismo) para transferir la llamada, con su estado de presencia."""
     config = ConfigAnura.get()
     dominio = config.sip_dominio.strip()
     internos = (InternoAnura.objects.filter(activo=True, usuario__is_active=True).exclude(usuario=user)
                 .select_related('usuario').order_by('usuario__first_name', 'usuario__last_name', 'usuario__username'))
-    ocupados = set(Llamada.objects.filter(estado__in=Llamada.ESTADOS_VIVOS, agente__isnull=False)
-                   .values_list('agente_id', flat=True))
+    estados = estado_telefono([i.usuario_id for i in internos])
     return [{
         'nombre': i.usuario.display_name,
         'interno': i.interno,
-        'estado': 'en_llamada' if i.usuario_id in ocupados else 'libre',
+        'estado': estados.get(i.usuario_id, 'desconectado'),
         'destino': f'sip:{i.interno}@{dominio}' if dominio else '',
     } for i in internos]
+
+
+# ── Presencia y pausas del teléfono ─────────────────────────────────────────
+PRESENCIA_TEL_TTL = 70  # el teléfono late cada ~30 s; sin latido en este tiempo = desconectado
+
+
+def _clave_presencia_tel(uid):
+    return f'telefono_presencia:{uid}'
+
+
+def marcar_presencia_telefono(user, disponible):
+    """El softphone late con su estado (registrado y disponible / en pausa) y así se arma el tramo de pausa."""
+    from .models import PausaTelefono
+    cache.set(_clave_presencia_tel(user.pk), 'disponible' if disponible else 'pausa', PRESENCIA_TEL_TTL)
+    abierta = PausaTelefono.objects.filter(agente=user, fin_at__isnull=True).order_by('-inicio_at').first()
+    ahora = timezone.now()
+    if disponible:
+        if abierta:
+            abierta.fin_at = abierta.visto_at = ahora
+            abierta.save(update_fields=['fin_at', 'visto_at'])
+    elif abierta:
+        abierta.visto_at = ahora  # sigue en pausa: el tramo crece hasta el último latido
+        abierta.save(update_fields=['visto_at'])
+    else:
+        PausaTelefono.objects.create(agente=user)
+
+
+def estado_telefono(uids):
+    """{uid: estado} para transferir: desconectado / no_disponible / en_llamada / ausente / libre."""
+    from core import presencia
+    uids = list(uids)
+    if not uids:
+        return {}
+    pres = cache.get_many([_clave_presencia_tel(i) for i in uids])
+    en_llamada = set(Llamada.objects.filter(estado__in=Llamada.ESTADOS_VIVOS, agente_id__in=uids,
+                     inicio_at__gte=timezone.now() - timedelta(hours=3)).values_list('agente_id', flat=True))
+    ausentes = presencia.ausentes(uids, en_llamada=en_llamada)
+    out = {}
+    for i in uids:
+        p = pres.get(_clave_presencia_tel(i))
+        if i in en_llamada:
+            out[i] = 'en_llamada'
+        elif p is None:
+            out[i] = 'desconectado'
+        elif p == 'pausa':
+            out[i] = 'no_disponible'
+        elif i in ausentes:
+            out[i] = 'ausente'
+        else:
+            out[i] = 'libre'
+    return out
+
+
+def pausas_hoy(uids):
+    """{uid: segundos en pausa hoy} (tramos cerrados + el abierto hasta su último latido)."""
+    from .models import PausaTelefono
+    uids = list(uids)
+    if not uids:
+        return {}
+    hoy = timezone.localtime().replace(hour=0, minute=0, second=0, microsecond=0)
+    out = {}
+    qs = PausaTelefono.objects.filter(agente_id__in=uids).filter(Q(fin_at__isnull=True) | Q(fin_at__gte=hoy))
+    for p in qs:
+        out[p.agente_id] = out.get(p.agente_id, 0) + p.segundos(desde=hoy)
+    return out
+
+
+def _avisar_duenia_llamada(llamada):
+    """Si otro agente atiende una llamada de un cliente de otra cartera, avisar a la dueña (una sola vez)."""
+    op = getattr(llamada, 'oportunidad', None)
+    if op is None or op.agente_id is None or llamada.agente_id is None or op.agente_id == llamada.agente_id:
+        return
+    if not cache.add(f'aviso_duenia:{llamada.pk}', 1, 60 * 60 * 6):
+        return
+    from apps.users.models import NotificacionInterna
+    from apps.users.services import notificar
+    quien = llamada.agente.display_name if llamada.agente_id else 'Otro agente'
+    cliente = op.contacto.nombre if op.contacto_id else (llamada.numero or 'un cliente')
+    notificar(op.agente, NotificacionInterna.TIPO_LLAMADA_AJENA, f'{quien} habló con {cliente}',
+              cuerpo='Atendió una llamada de un cliente de tu cartera (acceso temporal a la ficha).',
+              url=op.get_absolute_url())

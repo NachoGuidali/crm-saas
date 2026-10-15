@@ -417,3 +417,24 @@ class EventoAnura(models.Model):
 
     def __str__(self):
         return f'{self.created_at:%d/%m %H:%M} {self.evento} {self.direccion} {self.resultado}'
+
+
+class PausaTelefono(models.Model):
+    """Tramo en que un agente puso el teléfono en 'No disponible': la cola no le ofrece llamadas.
+    `visto_at` avanza con cada latido del teléfono; si se cierra el navegador en pausa, el tramo deja de crecer."""
+    agente = models.ForeignKey(User, on_delete=models.CASCADE, related_name='pausas_telefono')
+    inicio_at = models.DateTimeField(default=timezone.now, db_index=True)
+    fin_at = models.DateTimeField(null=True, blank=True)
+    visto_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['-inicio_at']
+
+    @property
+    def abierta(self):
+        return self.fin_at is None
+
+    def segundos(self, desde=None):
+        fin = self.fin_at or self.visto_at
+        ini = max(self.inicio_at, desde) if desde else self.inicio_at
+        return max(0, int((fin - ini).total_seconds()))

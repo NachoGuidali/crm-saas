@@ -5,7 +5,7 @@
   <span class="chip {% if config.operativa %}ok{% else %}warn{% endif %}">{% if not config.activo %}Desactivada{% elif config.modo_demo %}Modo demostración{% else %}Conectada a Anura{% endif %}</span></div>
 <div class="row g-3">
 <div class="col-lg-6">
-  <form method="post" class="card"><div class="card-header">Conexión</div><div class="card-body">{% csrf_token %}<input type="hidden" name="accion" value="guardar">
+  <form method="post" class="card" autocomplete="off"><div class="card-header">Conexión</div><div class="card-body">{% csrf_token %}<input type="hidden" name="accion" value="guardar">
     <div class="d-flex gap-4 mb-2"><label class="d-flex gap-2">{{ form.activo }} Integración activa</label><label class="d-flex gap-2">{{ form.modo_demo }} Modo demostración</label></div>
     <div class="form-text mb-2">En modo demostración las llamadas se simulan (sin costo) para capacitar y presentar el circuito.</div>
     <div class="row g-2">

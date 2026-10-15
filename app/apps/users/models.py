@@ -176,6 +176,7 @@ class NotificacionInterna(models.Model):
     TIPO_ESTANCADO = 'estancado'
     TIPO_MENCION = 'mencion'
     TIPO_WHATSAPP = 'whatsapp'
+    TIPO_LLAMADA_AJENA = 'llamada_ajena'
     TIPO_SISTEMA = 'sistema'
     TIPO_CHOICES = [
         (TIPO_ASIGNACION, 'Prospecto asignado'),
@@ -185,12 +186,13 @@ class NotificacionInterna(models.Model):
         (TIPO_ESTANCADO, 'Prospecto estancado'),
         (TIPO_MENCION, 'Mención'),
         (TIPO_WHATSAPP, 'WhatsApp'),
+        (TIPO_LLAMADA_AJENA, 'Llamada a un cliente tuyo'),
         (TIPO_SISTEMA, 'Sistema'),
     ]
     ICONOS = {
         TIPO_ASIGNACION: 'person-plus', TIPO_TAREA: 'calendar-check', TIPO_LLAMADA_PERDIDA: 'telephone-x',
         TIPO_VENTA: 'trophy', TIPO_ESTANCADO: 'hourglass-split', TIPO_MENCION: 'at',
-        TIPO_WHATSAPP: 'whatsapp', TIPO_SISTEMA: 'info-circle',
+        TIPO_WHATSAPP: 'whatsapp', TIPO_LLAMADA_AJENA: 'telephone-inbound', TIPO_SISTEMA: 'info-circle',
     }
 
     destinatario = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notificaciones')

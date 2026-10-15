@@ -519,14 +519,16 @@ class AccesoYTransferenciaTests(AnuraBase):
         self.assertEqual(mover.status_code, 403)
 
     def test_agentes_para_transferir_lista_internos_con_estado(self):
-        from .services import agentes_para_transferir
+        from .services import agentes_para_transferir, marcar_presencia_telefono
         ConfigAnura.objects.filter(pk=1).update(sip_dominio='pbx.anura.dev')
         beto = User.objects.create_user('beto', password='x', first_name='Beto')
         InternoAnura.objects.create(usuario=beto, interno='202')
         lista = agentes_para_transferir(self.agente)  # no se incluye a sí mismo
         self.assertEqual([a['interno'] for a in lista], ['202'])
         self.assertEqual(lista[0]['destino'], 'sip:202@pbx.anura.dev')
-        self.assertEqual(lista[0]['estado'], 'libre')
+        self.assertEqual(lista[0]['estado'], 'desconectado')  # sin latido del teléfono
+        marcar_presencia_telefono(beto, True)
+        self.assertEqual(agentes_para_transferir(self.agente)[0]['estado'], 'libre')
         Llamada.objects.create(direccion=Llamada.DIR_ENTRANTE, estado=Llamada.ESTADO_EN_CURSO, agente=beto)
         self.assertEqual(agentes_para_transferir(self.agente)[0]['estado'], 'en_llamada')
 
@@ -535,3 +537,33 @@ class AccesoYTransferenciaTests(AnuraBase):
         r = self.client.get('/api/telephony/agentes/')
         self.assertEqual(r.status_code, 200)
         self.assertIn('agentes', r.json())
+
+    def test_pausa_se_registra_y_se_cierra(self):
+        from .models import PausaTelefono
+        from .services import estado_telefono, marcar_presencia_telefono, pausas_hoy
+        marcar_presencia_telefono(self.agente, False)  # pone "No disponible"
+        self.assertTrue(PausaTelefono.objects.filter(agente=self.agente, fin_at__isnull=True).exists())
+        self.assertEqual(estado_telefono([self.agente.pk])[self.agente.pk], 'no_disponible')
+        marcar_presencia_telefono(self.agente, True)   # vuelve a Disponible: cierra el tramo
+        p = PausaTelefono.objects.get(agente=self.agente)
+        self.assertIsNotNone(p.fin_at)
+        self.assertIn(self.agente.pk, pausas_hoy([self.agente.pk]))
+
+    def test_presencia_endpoint(self):
+        self.client.force_login(self.agente)
+        r = self.client.post('/api/telephony/presencia/', json.dumps({'disponible': False}),
+                             content_type='application/json')
+        self.assertEqual(r.status_code, 200)
+        from .models import PausaTelefono
+        self.assertTrue(PausaTelefono.objects.filter(agente=self.agente, fin_at__isnull=True).exists())
+
+    def test_aviso_a_la_duenia_cuando_otro_atiende(self):
+        from apps.users.models import NotificacionInterna
+        from .services import registrar_desde_softphone
+        op = self._op_de_ana()  # cartera de Ana
+        beto = User.objects.create_user('beto', password='x', first_name='Beto')
+        registrar_desde_softphone(beto, numero=op.contacto.telefono, direccion='IN')  # Beto atiende
+        aviso = NotificacionInterna.objects.filter(destinatario=self.agente,
+                                                   tipo=NotificacionInterna.TIPO_LLAMADA_AJENA).first()
+        self.assertIsNotNone(aviso)
+        self.assertIn('Beto', aviso.titulo)

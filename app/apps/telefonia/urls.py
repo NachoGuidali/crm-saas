@@ -26,5 +26,6 @@ api_urlpatterns = [
     path('api/telephony/softphone/corto/', views.SoftphoneCortoView.as_view(), name='softphone_corto'),
     path('api/telephony/quien/', views.QuienLlamaView.as_view(), name='quien'),
     path('api/telephony/agentes/', views.AgentesView.as_view(), name='agentes'),
+    path('api/telephony/presencia/', views.PresenciaTelefonoView.as_view(), name='presencia'),
     path('telefono/', views.MarcoView.as_view(), name='marco'),
 ]

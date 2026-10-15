@@ -70,6 +70,9 @@ class ConfigEmailForm(forms.ModelForm):
     def __init__(self, *a, **kw):
         super().__init__(*a, **kw)
         _estilizar(self)
+        # Que el navegador no rellene la casilla SMTP con el usuario/contraseña del CRM.
+        self.fields['usuario'].widget.attrs['autocomplete'] = 'off'
+        self.fields['password'].widget.attrs['autocomplete'] = 'new-password'
 
     def save(self, commit=True):
         nueva = self.cleaned_data.get('password')

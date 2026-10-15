@@ -237,16 +237,23 @@
       panel.textContent = '';
       const lista = (d.agentes || []).filter(a => a.destino);
       if (!lista.length) { panel.textContent = 'No hay agentes con interno para transferir.'; return; }
+      const ESTADOS = {
+        libre: {txt: 'en línea', clase: 'text-success'},
+        en_llamada: {txt: 'en llamada', clase: 'text-warning'},
+        ausente: {txt: 'ausente', clase: 'text-warning'},
+        no_disponible: {txt: 'no disponible', clase: 'text-muted'},
+        desconectado: {txt: 'desconectado', clase: 'text-muted'},
+      };
       lista.forEach(a => {
+        const e = ESTADOS[a.estado] || ESTADOS.desconectado;
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'btn btn-sm btn-outline-secondary';
-        const libre = a.estado === 'libre';
         const nom = document.createElement('span');
         nom.textContent = `${a.nombre} · ${a.interno}`;
         const est = document.createElement('span');
-        est.className = libre ? 'text-success' : 'text-warning';
-        est.textContent = libre ? 'libre' : 'en llamada';
+        est.className = e.clase;
+        est.textContent = e.txt;
         b.append(nom, est);
         b.addEventListener('click', () => transferir(a.destino, a.nombre));
         panel.appendChild(b);
@@ -282,7 +289,18 @@
     disponible = v;
     try { v ? ua.register() : ua.unregister(); } catch (e) { /* */ }
     pintarDisponible();
+    latirPresencia();
   }
+  // Late al servidor con el estado del teléfono: arma los tramos de pausa y la presencia para transferencias.
+  function latirPresencia() {
+    if (!ua) return;
+    fetch('/api/telephony/presencia/', {
+      method: 'POST', credentials: 'same-origin',
+      headers: {'X-CSRFToken': csrf(), 'Content-Type': 'application/json'},
+      body: JSON.stringify({disponible: disponible && ua.isRegistered()}),
+    }).catch(() => {});
+  }
+  setInterval(latirPresencia, 30000);
   // Antes de una saliente: si está en pausa, registrar y esperar el registro antes de disparar el Click2Dial.
   function asegurarRegistrado() {
     return new Promise(resolve => {
@@ -428,6 +446,7 @@
       disponible = true;
       const b = $('#tel .disponible'); if (b && !sesion) b.hidden = false;
       pintarDisponible();
+      latirPresencia();
     });
     // "No disponible" es un unregister a propósito: ahí no es un error, es que el agente se puso en pausa.
     ua.on('unregistered', () => {

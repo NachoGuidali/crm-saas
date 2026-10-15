@@ -33,11 +33,11 @@ Content-Type: application/json
 <ul class="mb-0"><li><code>GET /api/v1/leads/buscar/?telefono=…</code></li><li><code>POST /api/v1/whatsapp/enviar/</code> <span class="muted">{"telefono", "mensaje" o "plantilla", "linea"}</span></li></ul>
 </div></div></div>
 <div class="col-lg-6"><div class="card"><div class="card-header">SMS (Twilio)</div><div class="card-body">
-  <form method="post" class="row g-2">{% csrf_token %}<input type="hidden" name="accion" value="sms">
+  <form method="post" class="row g-2" autocomplete="off">{% csrf_token %}<input type="hidden" name="accion" value="sms">
     <div class="col-12"><label class="d-flex gap-2"><input type="checkbox" class="form-check-input" name="activo" {% if sms.activo %}checked{% endif %}> Activar SMS</label></div>
-    <div class="col-md-6"><label class="form-label">Account SID</label><input name="account_sid" value="{{ sms.account_sid }}" class="form-control form-control-sm"></div>
-    <div class="col-md-6"><label class="form-label">Auth token</label><input name="auth_token" type="password" placeholder="{% if sms.auth_token %}(guardado){% endif %}" class="form-control form-control-sm"></div>
-    <div class="col-12"><label class="form-label">Número remitente</label><input name="numero" value="{{ sms.numero }}" class="form-control form-control-sm" placeholder="+1… o MG…"></div>
+    <div class="col-md-6"><label class="form-label">Account SID</label><input name="account_sid" value="{{ sms.account_sid }}" class="form-control form-control-sm" autocomplete="off"></div>
+    <div class="col-md-6"><label class="form-label">Auth token</label><input name="auth_token" type="password" placeholder="{% if sms.auth_token %}(guardado){% endif %}" class="form-control form-control-sm" autocomplete="new-password"></div>
+    <div class="col-12"><label class="form-label">Número remitente</label><input name="numero" value="{{ sms.numero }}" class="form-control form-control-sm" placeholder="+1… o MG…" autocomplete="off"></div>
     <div class="col-12"><button class="btn btn-sm btn-primary">Guardar</button></div>
   </form>
   <div class="form-text mt-2">Para recibir respuestas, en Twilio configurá el webhook de mensajes del número (POST):<br><code class="copiable">{{ base_url }}/integraciones/sms/webhook/{{ sms.webhook_token }}/</code></div>
