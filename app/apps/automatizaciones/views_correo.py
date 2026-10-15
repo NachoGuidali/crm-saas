@@ -12,7 +12,7 @@ from core.permisos import PermisoRequeridoMixin
 from core.utils import paginar
 
 from . import difusiones
-from .models import ConfigEmail, Difusion, DifusionDestinatario, EmailEnviado, PlantillaEmail
+from .models import ConfigEmail, Difusion, DifusionDestinatario, EmailEnviado, ImagenEmail, PlantillaEmail
 
 
 def _estilizar(form):
@@ -56,7 +56,34 @@ class PlantillasEmailView(PermisoRequeridoMixin, View):
 
     def _render(self, request, p, form):
         return render(request, 'automatizaciones/plantillas_email.html',
-                      {'plantilla': p, 'form': form, 'plantillas': PlantillaEmail.objects.all()})
+                      {'plantilla': p, 'form': form, 'plantillas': PlantillaEmail.objects.all(),
+                       'imagenes': ImagenEmail.objects.all()[:60]})
+
+
+class ImagenesEmailView(PermisoRequeridoMixin, View):
+    """Sube/borra imágenes públicas (flyers) para pegar en los emails. Devuelve la URL lista para el HTML."""
+    permiso = ('automatizaciones', 'difusiones', 'plantillas')
+    MAX_BYTES = 5 * 1024 * 1024
+
+    def post(self, request):
+        from django.http import JsonResponse
+        archivo = request.FILES.get('imagen')
+        if archivo is None:
+            return JsonResponse({'error': 'Elegí una imagen.'}, status=400)
+        if not (archivo.content_type or '').startswith('image/'):
+            return JsonResponse({'error': 'El archivo tiene que ser una imagen.'}, status=400)
+        if archivo.size > self.MAX_BYTES:
+            return JsonResponse({'error': 'La imagen no puede superar los 5 MB.'}, status=400)
+        img = ImagenEmail.objects.create(nombre=archivo.name[:160], archivo=archivo, creada_por=request.user)
+        return JsonResponse({'id': img.pk, 'nombre': img.nombre, 'url': img.url,
+                             'snippet': f'<img src="{img.url}" width="600" style="max-width:100%" alt="">'})
+
+    def delete(self, request, pk):
+        img = get_object_or_404(ImagenEmail, pk=pk)
+        img.archivo.delete(save=False)
+        img.delete()
+        from django.http import JsonResponse
+        return JsonResponse({'ok': True})
 
 
 class ConfigEmailForm(forms.ModelForm):

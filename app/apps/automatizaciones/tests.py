@@ -212,6 +212,24 @@ class CorreoYDifusionesTests(TestCase):
         self.assertNotIn('<h1>', m.body)  # la parte de texto va sin etiquetas
         self.assertIn('Hola Persona0', m.body)
 
+    def test_subir_imagen_email_y_acceso_publico(self):
+        import io
+        import tempfile
+        from urllib.parse import urlsplit
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from django.test import override_settings
+        from PIL import Image
+        buf = io.BytesIO(); Image.new('RGB', (4, 4), 'red').save(buf, 'PNG')
+        up = SimpleUploadedFile('flyer.png', buf.getvalue(), content_type='image/png')
+        with override_settings(MEDIA_ROOT=tempfile.mkdtemp()):
+            r = self.client.post('/automatizaciones/plantillas-email/imagenes/', {'imagen': up})
+            self.assertEqual(r.status_code, 200)
+            url = r.json()['url']
+            self.assertIn('/media/email/', url)
+            self.client.logout()  # un cliente de correo no tiene sesión en el CRM
+            pub = self.client.get(urlsplit(url).path)
+            self.assertEqual(pub.status_code, 200)  # la imagen de email es pública
+
     def test_difusion_por_email_con_baja(self):
         from django.core import mail
         from .difusiones import tick

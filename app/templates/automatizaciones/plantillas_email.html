@@ -17,6 +17,75 @@
       <div class="col-12"><label class="d-flex gap-2">{{ form.es_html }} El cuerpo es HTML (diseño con imágenes/botones)</label><div class="form-text">{{ form.es_html.help_text }}</div></div>
     </div>
     <div class="mt-3 d-flex gap-2"><button class="btn btn-primary">Guardar</button>{% if plantilla %}<button name="eliminar" value="1" class="btn btn-outline-danger ms-auto" onclick="return confirm('¿Eliminar la plantilla?')">Eliminar</button>{% endif %}</div>
-  </div></form></div>
+  </div></form>
+
+  <div class="card mt-3" id="imgsEmail"><div class="card-header d-flex align-items-center gap-2">
+    <i class="bi bi-image"></i> Imágenes para los emails (flyers)
+    <label class="btn btn-sm btn-outline-primary ms-auto mb-0"><i class="bi bi-upload"></i> Subir imagen
+      <input type="file" accept="image/*" hidden id="subirImg"></label>
+  </div><div class="card-body">
+    <p class="small muted">Subí el flyer y copiá la URL (o el <code>&lt;img&gt;</code>) para pegarlo en el HTML. Son públicas: las ve quien reciba el email. Máximo 5 MB.</p>
+    <div class="row g-2" id="galeriaImg">
+      {% for img in imagenes %}
+      <div class="col-6 col-md-4" data-id="{{ img.pk }}">
+        <div class="border rounded p-2 h-100 d-flex flex-column gap-1">
+          <img src="{{ img.url }}" alt="" style="width:100%;height:92px;object-fit:contain;background:var(--bg3);border-radius:6px">
+          <div class="d-flex gap-1">
+            <button type="button" class="btn btn-xs btn-outline-secondary flex-fill copiar-url" data-url="{{ img.url }}" title="Copiar URL">URL</button>
+            <button type="button" class="btn btn-xs btn-outline-secondary flex-fill copiar-img" data-url="{{ img.url }}" title="Copiar etiqueta &lt;img&gt;">&lt;img&gt;</button>
+            <button type="button" class="btn btn-xs btn-outline-danger borrar-img" data-url="{% url 'automatizaciones:imagen_email' img.pk %}" title="Borrar"><i class="bi bi-trash"></i></button>
+          </div>
+        </div>
+      </div>
+      {% empty %}<div class="col-12 small muted" id="sinImgs">Todavía no subiste imágenes.</div>{% endfor %}
+    </div>
+  </div></div>
 </div>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function () {
+  const csrf = () => document.querySelector('[name=csrfmiddlewaretoken]').value;
+  const galeria = document.getElementById('galeriaImg');
+  const copiar = (txt, btn) => {
+    navigator.clipboard.writeText(txt).then(() => {
+      const antes = btn.textContent; btn.textContent = '¡Copiado!';
+      setTimeout(() => { btn.textContent = antes; }, 1200);
+    }).catch(() => CRM && CRM.toast && CRM.toast('No se pudo copiar', 'error'));
+  };
+  const etiqueta = url => `<img src="${url}" width="600" style="max-width:100%" alt="">`;
+
+  galeria.addEventListener('click', async e => {
+    const u = e.target.closest('.copiar-url'); if (u) return copiar(u.dataset.url, u);
+    const i = e.target.closest('.copiar-img'); if (i) return copiar(etiqueta(i.dataset.url), i);
+    const b = e.target.closest('.borrar-img');
+    if (b && confirm('¿Borrar esta imagen? Los emails ya enviados que la usen dejarán de verla.')) {
+      const r = await fetch(b.dataset.url, {method: 'DELETE', headers: {'X-CSRFToken': csrf()}, credentials: 'same-origin'});
+      if (r.ok) b.closest('[data-id]').remove();
+    }
+  });
+
+  document.getElementById('subirImg').addEventListener('change', async e => {
+    const f = e.target.files[0]; if (!f) return;
+    const fd = new FormData(); fd.append('imagen', f);
+    const r = await fetch("{% url 'automatizaciones:imagenes_email' %}", {
+      method: 'POST', body: fd, headers: {'X-CSRFToken': csrf()}, credentials: 'same-origin'});
+    const d = await r.json();
+    e.target.value = '';
+    if (!r.ok) { CRM && CRM.toast && CRM.toast(d.error || 'No se pudo subir', 'error'); return; }
+    const sin = document.getElementById('sinImgs'); if (sin) sin.remove();
+    const col = document.createElement('div');
+    col.className = 'col-6 col-md-4'; col.dataset.id = d.id;
+    col.innerHTML = `<div class="border rounded p-2 h-100 d-flex flex-column gap-1">
+      <img src="${d.url}" alt="" style="width:100%;height:92px;object-fit:contain;background:var(--bg3);border-radius:6px">
+      <div class="d-flex gap-1">
+        <button type="button" class="btn btn-xs btn-outline-secondary flex-fill copiar-url" data-url="${d.url}">URL</button>
+        <button type="button" class="btn btn-xs btn-outline-secondary flex-fill copiar-img" data-url="${d.url}">&lt;img&gt;</button>
+        <button type="button" class="btn btn-xs btn-outline-danger borrar-img" data-url="/automatizaciones/plantillas-email/imagenes/${d.id}/"><i class="bi bi-trash"></i></button>
+      </div></div>`;
+    galeria.prepend(col);
+    copiar(d.url, col.querySelector('.copiar-url'));
+  });
+})();
+</script>
 {% endblock %}

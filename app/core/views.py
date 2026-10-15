@@ -29,8 +29,10 @@ def media_protegida(request, ruta):
     # el agente los ve con su sesión. Ya no son públicos permanentes.
     from core.media_firmada import ruta_firmada_valida
     saliente = ruta.startswith('whatsapp/salientes/')
+    # Imágenes de emails/difusiones (flyers): públicas, las tiene que abrir el cliente de correo sin login.
+    publico = ruta.startswith('email/')
     firmada = saliente and ruta_firmada_valida(request.GET.get('sig', ''), ruta)
-    if not firmada and not request.user.is_authenticated:
+    if not firmada and not publico and not request.user.is_authenticated:
         if saliente:
             raise Http404
         return redirect(f'{settings.LOGIN_URL}?next={request.path}')
@@ -41,5 +43,5 @@ def media_protegida(request, ruta):
         raise Http404
     tipo, _ = mimetypes.guess_type(completa)
     resp = FileResponse(open(completa, 'rb'), content_type=tipo or 'application/octet-stream')
-    resp['Cache-Control'] = 'private, max-age=3600'
+    resp['Cache-Control'] = 'public, max-age=86400' if publico else 'private, max-age=3600'
     return resp

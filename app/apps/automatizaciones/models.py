@@ -275,6 +275,36 @@ class EmailEnviado(models.Model):
 
 
 
+def _ruta_imagen_email(instance, filename):
+    import os
+    import secrets
+    ext = os.path.splitext(filename)[1].lower() or '.jpg'
+    # Carpeta "email/": core.views.media_protegida la sirve pública (sin login), para que la abran los correos.
+    return f'email/{secrets.token_hex(8)}{ext}'
+
+
+class ImagenEmail(models.Model):
+    """Imagen pública (flyers) para pegar en emails/difusiones. Se sirve sin login; aislada por cliente."""
+    nombre = models.CharField(max_length=160, blank=True)
+    archivo = models.ImageField(upload_to=_ruta_imagen_email)
+    creada_por = models.ForeignKey('users.User', null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name='+')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Imagen de email'
+        verbose_name_plural = 'Imágenes de email'
+
+    def __str__(self):
+        return self.nombre or self.archivo.name
+
+    @property
+    def url(self):
+        from core.tenancy import url_sitio
+        return f'{url_sitio()}{self.archivo.url}'
+
+
 class PlantillaEmail(models.Model):
     """Email reutilizable: en la ficha, en automatizaciones y en difusiones. Variables: {nombre} {primer_nombre}…"""
     nombre = models.CharField(max_length=120, unique=True)
