@@ -439,3 +439,19 @@ class AutomatizacionPorCampoTests(TestCase):
         self._marcar(es_socio=True)  # autorizaciones sigue vacío
         self.op.refresh_from_db()
         self.assertEqual(self.op.embudo, socios)
+
+    def test_el_chat_de_whatsapp_sigue_al_nuevo_agente(self):
+        from apps.whatsapp.models import Conversacion, LineaWhatsApp
+        beto = User.objects.create_user('beto_campo', password='x')
+        socios = self._embudo('Socios')
+        socios.agentes.set([beto])
+        linea = LineaWhatsApp.objects.create(nombre='L', proveedor='demo')
+        conv = Conversacion.objects.create(linea=linea, telefono=self.op.contacto.telefono,
+                                           contacto=self.op.contacto, agente=self.ana)
+        self._automatizacion(socios, [(self.socio, 'true')])
+        self._marcar(es_socio=True)
+        self.op.refresh_from_db()
+        conv.refresh_from_db()
+        self.assertEqual(self.op.embudo, socios)
+        self.assertEqual(self.op.agente, beto)      # repartida entre los agentes del embudo Socios
+        self.assertEqual(conv.agente, beto)         # el chat lo sigue

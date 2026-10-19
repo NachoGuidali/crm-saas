@@ -733,6 +733,9 @@ def pasar_a_embudo(op, embudo, etapa=None, modo='mover', asignar=ASIGNAR_MISMO, 
     except IntegrityError:
         raise ErrorNegocio(f'El contacto ya tiene una oportunidad en curso en "{embudo}".')
     _asignar_tras_pase(op, asignar, usuario_destino, agente_anterior)
+    # El chat de WhatsApp sigue a la tarjeta: queda con su nuevo dueño (o libre, para que lo tome el equipo del embudo).
+    from apps.whatsapp.models import Conversacion
+    Conversacion.objects.filter(contacto_id=op.contacto_id).update(agente=op.agente)
     invalidar_tareas(op.agente) if op.agente else None
     _disparar_entrada_etapa(op, historial)
     return op
