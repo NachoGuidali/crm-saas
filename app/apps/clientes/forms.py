@@ -5,12 +5,22 @@ from .models import Cliente, Pago, Plan
 from .services import validar_subdominio
 
 
+def _campo_funciones(label, help_text):
+    """Checkboxes con las funciones extra definidas en el registro (vacío = no se muestra ninguna)."""
+    return forms.MultipleChoiceField(
+        required=False, label=label, help_text=help_text, widget=forms.CheckboxSelectMultiple)
+
+
 class _Bootstrap:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Las opciones de funciones extra se leen en cada request: sumar una al registro no toca el form.
+        if 'funciones_extra' in self.fields:
+            from . import models
+            self.fields['funciones_extra'].choices = models.FUNCIONES_EXTRA
         for field in self.fields.values():
             css = 'form-select' if isinstance(field.widget, forms.Select) else 'form-control'
-            if isinstance(field.widget, forms.CheckboxInput):
+            if isinstance(field.widget, (forms.CheckboxInput, forms.CheckboxSelectMultiple)):
                 css = 'form-check-input'
             field.widget.attrs.setdefault('class', css)
 
@@ -39,11 +49,14 @@ class NuevoClienteForm(_Bootstrap, forms.Form):
 
 
 class ClienteForm(_Bootstrap, forms.ModelForm):
+    funciones_extra = _campo_funciones('Funciones extra para este cliente',
+                                       'Se suman a las que ya trae el plan. Para habilitarle algo puntual a este cliente.')
+
     class Meta:
         model = Cliente
         fields = ['nombre', 'estado', 'plan', 'max_usuarios', 'max_lineas_whatsapp', 'max_wa_dia', 'prueba_hasta',
                   'cobro', 'precio_acordado', 'pagado_hasta', 'suspension_automatica',
-                  'contacto_nombre', 'contacto_email', 'contacto_telefono', 'notas']
+                  'contacto_nombre', 'contacto_email', 'contacto_telefono', 'funciones_extra', 'notas']
         widgets = {'prueba_hasta': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
                    'pagado_hasta': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
                    'notas': forms.Textarea(attrs={'rows': 3})}
@@ -72,9 +85,13 @@ class LinkPagoMPForm(_Bootstrap, forms.Form):
 
 
 class PlanForm(_Bootstrap, forms.ModelForm):
+    funciones_extra = _campo_funciones('Funciones extra incluidas',
+                                       'Quedan habilitadas para todos los clientes de este plan.')
+
     class Meta:
         model = Plan
-        fields = ['nombre', 'precio_mensual', 'max_usuarios', 'max_lineas_whatsapp', 'max_wa_dia', 'activo']
+        fields = ['nombre', 'precio_mensual', 'max_usuarios', 'max_lineas_whatsapp', 'max_wa_dia',
+                  'funciones_extra', 'activo']
 
 
 class IngresarForm(_Bootstrap, forms.Form):

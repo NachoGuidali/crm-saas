@@ -15,6 +15,19 @@ SUBDOMINIOS_RESERVADOS = frozenset({
     'soporte', 'ayuda', 'status', 'blog', 'ingresar', 'login', 'evolution', 'test', 'demo',
 })
 
+# ── Funciones extra (opcionales, para habilitar o cobrar aparte) ─────────────
+# Funciones que NO vienen por defecto: se prenden por plan (para todos sus clientes)
+# o por cliente puntual (solo para uno). Para sumar una función nueva:
+#   1) Agregá una línea acá: ('clave', 'Nombre que ves en el panel').
+#   2) En el código, encerrá la función con `tiene_funcion('clave')` (core.tenancy),
+#      o en un template con `{% if 'clave' in funciones_cliente %}`.
+#   3) Tildala en el plan o en la ficha del cliente desde el panel.
+# Con la lista vacía no hay funciones extra: el CRM funciona igual para todos.
+FUNCIONES_EXTRA = [
+    # ('reportes_avanzados', 'Reportes avanzados'),
+    # ('marca_blanca', 'Marca blanca (logo propio en el CRM)'),
+]
+
 
 class Plan(models.Model):
     nombre = models.CharField(max_length=60, unique=True)
@@ -23,6 +36,8 @@ class Plan(models.Model):
     max_lineas_whatsapp = models.PositiveIntegerField(default=1, help_text='0 = sin límite.')
     max_wa_dia = models.PositiveIntegerField(default=0, verbose_name='WhatsApp por día',
                                              help_text='Mensajes de WhatsApp automáticos y difusiones por día. 0 = sin límite. Las respuestas 1 a 1 de los agentes no cuentan.')
+    funciones_extra = models.JSONField(default=list, blank=True,
+                                       help_text='Funciones opcionales incluidas en este plan.')
     activo = models.BooleanField(default=True, help_text='Si se puede elegir para clientes nuevos.')
 
     class Meta:
@@ -63,6 +78,9 @@ class Cliente(TenantMixin):
                                                       help_text='Vacío = el del plan. 0 = sin límite.')
     max_wa_dia = models.PositiveIntegerField(null=True, blank=True, verbose_name='WhatsApp por día',
                                              help_text='Vacío = el del plan. 0 = sin límite.')
+    # Funciones extra habilitadas solo a este cliente: se SUMAN a las del plan (no lo pisan).
+    funciones_extra = models.JSONField(default=list, blank=True,
+                                       help_text='Funciones extra para este cliente (además de las del plan).')
     contacto_nombre = models.CharField(max_length=150, blank=True)
     contacto_email = models.EmailField(blank=True)
     contacto_telefono = models.CharField(max_length=40, blank=True)
@@ -173,6 +191,18 @@ class Cliente(TenantMixin):
     def limite_wa_dia(self):
         """Mensajes de WhatsApp automáticos/difusiones por día. 0 = sin límite."""
         return self._limite('max_wa_dia')
+
+    # ── Funciones extra ──
+    @property
+    def funciones_habilitadas(self):
+        """Claves de funciones extra activas: las del plan + las habilitadas al cliente."""
+        claves = set(self.funciones_extra or [])
+        if self.plan_id:
+            claves |= set(self.plan.funciones_extra or [])
+        return claves
+
+    def tiene_funcion(self, clave):
+        return clave in self.funciones_habilitadas
 
 
 class Dominio(DomainMixin):

@@ -21,6 +21,8 @@ def crm(request):
         'tareas_hoy': contar_tareas_hoy(user),
         'wa_no_leidos': contar_no_leidos_usuario(user),
         'tiene_interno_anura': usuario_tiene_interno(user),
+        # Funciones extra habilitadas: en templates -> {% if 'clave' in funciones_cliente %}
+        'funciones_cliente': cliente.funciones_habilitadas,
     })
     if user.is_admin:
         ctx['aviso_suscripcion'] = _aviso_suscripcion(cliente)

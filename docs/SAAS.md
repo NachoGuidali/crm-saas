@@ -65,6 +65,32 @@ pendiente sigue al día siguiente (protege el número ante Meta y te deja cobrar
 **Suspender a mano**: ficha del cliente → *Suspender*. Se corta pantalla, API y webhooks, y beat deja de correr
 sus tareas. *Reactivar* lo vuelve a habilitar sin perder nada.
 
+## Funciones extra (habilitar o cobrar algo a ciertos clientes)
+
+El código es **uno solo** para todos los clientes: una función nueva o un arreglo le sirve a todos a la vez.
+No hay "una versión distinta por cliente". Lo que sí se puede es **prender/apagar** una función por plan o por
+cliente puntual (útil cuando un cliente pide algo extra y se lo cobrás aparte), sin tocar a los demás.
+
+El mecanismo son flags:
+
+- Registro central en `apps/clientes/models.py` → `FUNCIONES_EXTRA` (clave + nombre que se ve en el panel).
+- `Plan.funciones_extra`: lo que trae el plan (para **todos** sus clientes).
+- `Cliente.funciones_extra`: extras habilitadas **solo a ese cliente** (se **suman** a las del plan, no lo pisan).
+
+**Para agregar una función que no todos tienen:**
+
+1. Sumá una línea al registro: `FUNCIONES_EXTRA = [('reportes_avanzados', 'Reportes avanzados'), ...]`.
+2. En el código, encerrá la parte opcional con el flag:
+   - Python/vistas: `from core.tenancy import tiene_funcion` → `if tiene_funcion('reportes_avanzados'): ...`
+   - Templates: `{% if 'reportes_avanzados' in funciones_cliente %}...{% endif %}`
+3. Deploy. Después, desde el panel, tildala en el **plan** (para todos sus clientes) o en la **ficha del cliente**
+   (para uno solo).
+
+Con el registro vacío no hay funciones extra: el CRM funciona igual para todos. Fuera del modo multi-cliente
+(schema público, comandos, tests) `tiene_funcion()` devuelve `False`, así que lo opcional queda apagado por
+defecto. **Ojo:** no envuelvas una función que los clientes ya usan en un flag, porque se les apagaría hasta
+tildarla; los flags son para funciones nuevas u opcionales.
+
 ## Cobros
 
 Cada cliente tiene **Pagado hasta** (vencimiento) y un **precio** (el del plan o uno acordado). Cada pago corre el

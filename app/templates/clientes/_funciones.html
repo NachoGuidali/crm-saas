@@ -1,0 +1,5 @@
+<div class="mb-3"><label class="form-label small">{{ f.label }}</label>
+{% if f.field.choices %}{{ f }}
+  {% if f.help_text %}<div class="form-text">{{ f.help_text }}</div>{% endif %}
+{% else %}<div class="form-text text-muted">Todavía no hay funciones extra definidas. Se agregan desde el código (lista <code>FUNCIONES_EXTRA</code>) y acá se tildan por cliente.</div>{% endif %}
+{% for e in f.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>

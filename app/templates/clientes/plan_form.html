@@ -9,6 +9,7 @@
   {% include "clientes/_campo.html" with f=form.max_usuarios %}
   {% include "clientes/_campo.html" with f=form.max_lineas_whatsapp %}
   {% include "clientes/_campo.html" with f=form.max_wa_dia %}
+  {% include "clientes/_funciones.html" with f=form.funciones_extra %}
   <div class="form-check mb-3">{{ form.activo }} <label class="form-check-label small" for="{{ form.activo.id_for_label }}">{{ form.activo.label }}</label>
     <div class="form-text">{{ form.activo.help_text }}</div></div>
   <button class="btn btn-primary">Guardar</button>

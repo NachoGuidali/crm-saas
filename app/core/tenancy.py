@@ -91,3 +91,16 @@ def limite_alcanzado(recurso):
     else:  # pragma: no cover
         raise ValueError(recurso)
     return bool(limite) and usados >= limite, limite
+
+
+# ── Funciones extra del cliente ────────────────────────────────────────────
+
+def funciones_cliente():
+    """Set de claves de funciones extra habilitadas para el cliente actual (vacío en el schema público)."""
+    cliente = cliente_actual()
+    return cliente.funciones_habilitadas if cliente is not None else set()
+
+
+def tiene_funcion(clave):
+    """¿El cliente actual tiene habilitada la función extra `clave`? (False fuera del modo multi-cliente)."""
+    return clave in funciones_cliente()

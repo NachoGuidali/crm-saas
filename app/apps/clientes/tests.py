@@ -212,6 +212,62 @@ class LimitesDelPlanTests(BaseMultiCliente):
         self.assertIsNone(wa.wa_dia_restante())
 
 
+class FuncionesExtraTests(BaseMultiCliente):
+    def _refrescar(self):  # el middleware refresca el tenant en cada request real; acá a mano
+        connection.set_tenant(Cliente.objects.get(pk=self.cliente.pk))
+
+    def test_union_de_plan_y_cliente(self):
+        plan = Plan.objects.create(nombre='Pro', funciones_extra=['reportes'])
+        cli = Cliente(plan=plan, funciones_extra=['marca_blanca'])
+        self.assertEqual(cli.funciones_habilitadas, {'reportes', 'marca_blanca'})
+        self.assertTrue(cli.tiene_funcion('reportes'))        # viene del plan
+        self.assertTrue(cli.tiene_funcion('marca_blanca'))    # habilitada al cliente
+        self.assertFalse(cli.tiene_funcion('otra'))
+
+    def test_sin_plan_y_sin_extras(self):
+        cli = Cliente(funciones_extra=[])
+        self.assertEqual(cli.funciones_habilitadas, set())
+        self.assertFalse(cli.tiene_funcion('reportes'))
+
+    def test_helper_del_tenant_actual(self):
+        plan = Plan.objects.create(nombre='Pro', funciones_extra=['reportes'])
+        Cliente.objects.filter(pk=self.cliente.pk).update(plan=plan, funciones_extra=['marca_blanca'])
+        self._refrescar()
+        self.assertTrue(tenancy.tiene_funcion('reportes'))
+        self.assertTrue(tenancy.tiene_funcion('marca_blanca'))
+        self.assertFalse(tenancy.tiene_funcion('inexistente'))
+        self.assertEqual(tenancy.funciones_cliente(), {'reportes', 'marca_blanca'})
+
+    def test_no_se_filtra_a_otro_cliente(self):
+        Cliente.objects.filter(pk=self.cliente.pk).update(funciones_extra=['marca_blanca'])
+        Cliente.objects.filter(pk=self.otro.pk).update(funciones_extra=[])
+        self._refrescar()
+        self.assertTrue(tenancy.tiene_funcion('marca_blanca'))
+        connection.set_tenant(Cliente.objects.get(pk=self.otro.pk))
+        self.assertFalse(tenancy.tiene_funcion('marca_blanca'))
+
+    def test_sin_funciones_en_el_schema_publico(self):
+        with schema_context(get_public_schema_name()):
+            self.assertEqual(tenancy.funciones_cliente(), set())
+            self.assertFalse(tenancy.tiene_funcion('reportes'))
+
+    def test_el_form_toma_las_opciones_del_registro(self):
+        from unittest.mock import patch
+
+        from . import models
+        from .forms import ClienteForm
+        with patch.object(models, 'FUNCIONES_EXTRA', [('reportes', 'Reportes avanzados')]):
+            form = ClienteForm(instance=self.cliente)
+            self.assertEqual(list(form.fields['funciones_extra'].choices), [('reportes', 'Reportes avanzados')])
+            datos = {'nombre': self.cliente.nombre, 'estado': self.cliente.estado,
+                     'cobro': self.cliente.cobro, 'funciones_extra': ['reportes']}
+            form = ClienteForm(datos, instance=self.cliente)
+            self.assertTrue(form.is_valid(), form.errors)
+            form.save()
+        self._refrescar()
+        self.assertEqual(Cliente.objects.get(pk=self.cliente.pk).funciones_extra, ['reportes'])
+
+
 class PanelTests(BaseMultiCliente):
     def setUp(self):
         super().setUp()
