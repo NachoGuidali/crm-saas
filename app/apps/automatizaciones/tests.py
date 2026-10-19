@@ -10,8 +10,8 @@ from apps.crm.models import Embudo, Etapa
 from apps.users.models import User
 from apps.whatsapp.models import LineaWhatsApp, Mensaje
 
-from .models import AccionEtapa, EjecucionAccion
-from .services import ejecutar, proxima_apertura, revisar_inactividad
+from .models import AccionEtapa, CondicionCampo, EjecucionAccion
+from .services import campos_cambiaron, ejecutar, proxima_apertura, revisar_inactividad
 
 
 class AutomatizacionTests(TestCase):
@@ -327,3 +327,115 @@ class CorreoYDifusionesTests(TestCase):
         self.assertTrue(f.is_valid(), f.errors)
         acc = f.save()
         self.assertEqual((acc.etapa, acc.demora_minutos), (self.embudo.etapa_inicial, 3 * 1440))
+
+
+class CondicionCampoCumpleTests(TestCase):
+    """La comparación de un campo del contacto contra un valor (sin tocar la base de embudos)."""
+
+    def _cond(self, operador, valor=''):
+        from apps.crm.models import CampoPersonalizado
+        campo = CampoPersonalizado(slug='es_socio', nombre='Es socio', tipo=CampoPersonalizado.TIPO_SINO)
+        return CondicionCampo(campo=campo, operador=operador, valor=valor)
+
+    class _C:
+        def __init__(self, extra):
+            self.datos_extra = extra
+
+    def test_igual_sino(self):
+        c = self._cond(CondicionCampo.OP_IGUAL, 'Sí')  # el usuario escribe "Sí"; guardado es booleano True
+        self.assertTrue(c.cumple(self._C({'es_socio': True})))
+        self.assertFalse(c.cumple(self._C({'es_socio': False})))
+        self.assertFalse(c.cumple(self._C({})))
+
+    def test_distinto(self):
+        c = self._cond(CondicionCampo.OP_DISTINTO, 'Sí')
+        self.assertTrue(c.cumple(self._C({'es_socio': False})))
+        self.assertTrue(c.cumple(self._C({})))  # vacío es distinto de Sí
+        self.assertFalse(c.cumple(self._C({'es_socio': True})))
+
+    def test_lleno_vacio(self):
+        self.assertTrue(self._cond(CondicionCampo.OP_LLENO).cumple(self._C({'es_socio': False})))
+        self.assertFalse(self._cond(CondicionCampo.OP_LLENO).cumple(self._C({'es_socio': ''})))
+        self.assertTrue(self._cond(CondicionCampo.OP_VACIO).cumple(self._C({})))
+
+    def test_contiene(self):
+        c = self._cond(CondicionCampo.OP_CONTIENE, 'oro')
+        c.campo.tipo = 'texto'
+        self.assertTrue(c.cumple(self._C({'es_socio': 'Plan Oro'})))
+        self.assertFalse(c.cumple(self._C({'es_socio': 'Plan Plata'})))
+
+
+class AutomatizacionPorCampoTests(TestCase):
+    """Disparador "cuando cambia un campo": el agente/bot solo marca el campo y la tarjeta se mueve sola."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command('setup_inicial', '--sin-admin', verbosity=0)
+        cls.embudo = Embudo.objects.get()
+        cls.ana = User.objects.create_user('ana_campo', password='x')
+        cls.embudo.agentes.set([cls.ana])
+        cls.inicial = cls.embudo.etapas.filter(tipo='normal').order_by('orden').first()
+
+    def setUp(self):
+        super().setUp()
+        from apps.crm.models import CampoPersonalizado
+        AccionEtapa.objects.all().delete()
+        self.socio = CampoPersonalizado.objects.create(nombre='Es socio', tipo=CampoPersonalizado.TIPO_SINO)
+        self.auth = CampoPersonalizado.objects.create(nombre='Autorizaciones', tipo=CampoPersonalizado.TIPO_SINO)
+        self.op = crm.ingresar_prospecto({'telefono': '1190000001', 'nombre': 'Campo'}, self.embudo, 'web').oportunidad
+
+    def _embudo(self, nombre):
+        e = Embudo.objects.create(nombre=nombre)
+        Etapa.objects.create(embudo=e, nombre='Nuevo', orden=0, tipo=Etapa.TIPO_NORMAL)
+        e.agentes.set([self.ana])
+        return e
+
+    def _automatizacion(self, destino, condiciones, orden=0):
+        acc = AccionEtapa.objects.create(
+            embudo=self.embudo, etapa=self.inicial, nombre=f'A {destino}', disparador=AccionEtapa.DISP_CAMPO,
+            tipo=AccionEtapa.TIPO_EMBUDO, modo_embudo=AccionEtapa.MODO_MOVER, embudo_destino=destino,
+            asignar_destino='embudo', solo_en_horario=False, orden=orden)
+        for campo, valor in condiciones:
+            CondicionCampo.objects.create(accion=acc, campo=campo, operador=CondicionCampo.OP_IGUAL, valor=valor)
+        return acc
+
+    def _marcar(self, **campos):
+        contacto = self.op.contacto
+        extra_antes = dict(contacto.datos_extra or {})
+        contacto.datos_extra = {**extra_antes, **campos}
+        contacto.save(update_fields=['datos_extra'])
+        with self.captureOnCommitCallbacks(execute=True):
+            crm.avisar_campos_cambiados(contacto, extra_antes, self.ana)
+
+    def test_marcar_socio_mueve_al_embudo_socios(self):
+        socios = self._embudo('Socios')
+        self._automatizacion(socios, [(self.socio, 'true')])
+        self._marcar(es_socio=True)
+        self.op.refresh_from_db()
+        self.assertEqual(self.op.embudo, socios)
+
+    def test_filtro_no_se_cumple_no_mueve(self):
+        socios = self._embudo('Socios')
+        self._automatizacion(socios, [(self.socio, 'true')])
+        self._marcar(es_socio=False)
+        self.op.refresh_from_db()
+        self.assertEqual(self.op.embudo, self.embudo)  # sigue en el de ventas
+
+    def test_dos_campos_gana_la_mas_especifica(self):
+        socios = self._embudo('Socios')
+        autorizaciones = self._embudo('Autorizaciones')
+        # Más específica primero (orden 0): socio Y autorizaciones -> Autorizaciones. La general después.
+        self._automatizacion(autorizaciones, [(self.socio, 'true'), (self.auth, 'true')], orden=0)
+        self._automatizacion(socios, [(self.socio, 'true')], orden=1)
+        self._marcar(es_socio=True, autorizaciones=True)
+        self.op.refresh_from_db()
+        self.assertEqual(self.op.embudo, autorizaciones)
+
+    def test_solo_socio_va_a_socios(self):
+        socios = self._embudo('Socios')
+        autorizaciones = self._embudo('Autorizaciones')
+        self._automatizacion(autorizaciones, [(self.socio, 'true'), (self.auth, 'true')], orden=0)
+        self._automatizacion(socios, [(self.socio, 'true')], orden=1)
+        self._marcar(es_socio=True)  # autorizaciones sigue vacío
+        self.op.refresh_from_db()
+        self.assertEqual(self.op.embudo, socios)

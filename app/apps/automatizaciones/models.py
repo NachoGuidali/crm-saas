@@ -25,6 +25,7 @@ class AccionEtapa(models.Model):
     DISP_SIN_ACTIVIDAD = 'sin_actividad'
     DISP_DESPUES_DE = 'despues_de'
     DISP_REINGRESO = 'reingreso'
+    DISP_CAMPO = 'campo'
     DISPARADORES = [
         (DISP_ENTRADA, 'Al entrar a la etapa'),
         (DISP_SIN_RESPUESTA, 'Si el cliente no responde (en el tiempo de demora desde que entró a la etapa)'),
@@ -32,6 +33,7 @@ class AccionEtapa(models.Model):
         (DISP_SIN_ACTIVIDAD, 'Si no hay ninguna actividad durante el tiempo de demora'),
         (DISP_DESPUES_DE, 'Después de que se ejecutó otra automatización (secuencia)'),
         (DISP_REINGRESO, 'Cuando el lead reingresa (vuelve a escribir, llenar un formulario o se importa de nuevo)'),
+        (DISP_CAMPO, 'Cuando se completa o cambia un campo del contacto'),
     ]
     TIPO_CHOICES = [
         (TIPO_WHATSAPP, 'Enviar WhatsApp al prospecto'),
@@ -174,7 +176,7 @@ class AccionEtapa(models.Model):
         return q | Q(todas_las_etapas=True, embudo_id=embudo_id) if normal else q
 
     def condiciones_ok(self, op):
-        """(cumple, motivo) según las condiciones de pauta y etiquetas."""
+        """(cumple, motivo) según las condiciones de pauta, etiquetas y campos del contacto."""
         pautas = {p.pk for p in self.solo_pautas.all()}
         if pautas and op.pauta_id not in pautas:
             return False, 'El lead no es de las pautas elegidas.'
@@ -184,6 +186,9 @@ class AccionEtapa(models.Model):
             return False, 'El contacto no tiene las etiquetas requeridas.'
         if {e.pk for e in self.excluir_etiquetas.all()} & etiquetas:
             return False, 'El contacto tiene una etiqueta excluida.'
+        for c in self.condiciones_campo.all():
+            if not c.cumple(op.contacto):
+                return False, f'No cumple la condición del campo "{c.campo}".'
         return True, ''
 
     def resumen_condiciones(self):
@@ -193,6 +198,9 @@ class AccionEtapa(models.Model):
             nombres = [str(x) for x in rel.all()]
             if nombres:
                 partes.append(f'{titulo}: {", ".join(nombres)}')
+        campos = [str(c) for c in self.condiciones_campo.all()]
+        if campos:
+            partes.append('si ' + ' y '.join(campos))
         return ' · '.join(partes)
 
     def resumen_etapas(self):
@@ -224,6 +232,64 @@ class AccionEtapa(models.Model):
         if m % 60 == 0:
             return f'{m // 60} h después'
         return f'{m} min después'
+
+
+class CondicionCampo(models.Model):
+    """
+    Condición sobre un campo personalizado del contacto (ej. "es socio = Sí"). Varias en la misma automatización
+    se combinan con Y: tienen que cumplirse todas. Se usan como filtro de cualquier automatización y, en especial,
+    con el disparador "Cuando cambia un campo".
+    """
+    OP_IGUAL = '='
+    OP_DISTINTO = '!='
+    OP_CONTIENE = 'contiene'
+    OP_LLENO = 'lleno'
+    OP_VACIO = 'vacio'
+    OPERADORES = [
+        (OP_IGUAL, 'es igual a'),
+        (OP_DISTINTO, 'es distinto de'),
+        (OP_CONTIENE, 'contiene'),
+        (OP_LLENO, 'tiene algún valor'),
+        (OP_VACIO, 'está vacío'),
+    ]
+    SIN_VALOR = (OP_LLENO, OP_VACIO)
+
+    accion = models.ForeignKey(AccionEtapa, on_delete=models.CASCADE, related_name='condiciones_campo')
+    campo = models.ForeignKey('crm.CampoPersonalizado', on_delete=models.CASCADE, related_name='+')
+    operador = models.CharField(max_length=10, choices=OPERADORES, default=OP_IGUAL)
+    valor = models.CharField(max_length=200, blank=True)
+
+    class Meta:
+        ordering = ['pk']
+
+    @staticmethod
+    def _norm(v):
+        """Normaliza para comparar: Sí/No a 'true'/'false', el resto a texto en minúsculas."""
+        if isinstance(v, bool):
+            return 'true' if v else 'false'
+        s = str(v).strip().lower() if v is not None else ''
+        return {'sí': 'true', 'si': 'true', 'yes': 'true', '1': 'true',
+                'no': 'false', '0': 'false'}.get(s, s)
+
+    def cumple(self, contacto):
+        actual = (contacto.datos_extra or {}).get(self.campo.slug)
+        vacio = actual in (None, '', [], {})
+        if self.operador == self.OP_VACIO:
+            return vacio
+        if self.operador == self.OP_LLENO:
+            return not vacio
+        a, b = self._norm(actual), self._norm(self.valor)
+        if self.operador == self.OP_IGUAL:
+            return a == b
+        if self.operador == self.OP_DISTINTO:
+            return a != b
+        if self.operador == self.OP_CONTIENE:
+            return bool(b) and b in a
+        return False
+
+    def __str__(self):
+        etq = dict(self.OPERADORES).get(self.operador, self.operador)
+        return f'{self.campo} {etq}' + ('' if self.operador in self.SIN_VALOR else f' {self.valor}')
 
 
 class EjecucionAccion(models.Model):

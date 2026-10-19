@@ -61,6 +61,32 @@
   </div>
 
   <div class="paso"><h6><b>4.</b> Condiciones</h6>
+    <div id="boxCondCampos" class="mb-3">
+      <label class="form-label small">Condiciones por campos del contacto</label>
+      <div class="form-text mb-2">Se cumplen <b>todas</b> a la vez (Y). Obligatorias para el disparador "cuando cambia un campo";
+        en los demás disparadores sirven como filtro extra. Ej.: <b>es socio = Sí</b> y <b>autorizaciones = Sí</b> → pasar al embudo Autorizaciones.</div>
+      {{ condforms.management_form }}
+      {% if condforms.non_form_errors %}<div class="text-danger small">{{ condforms.non_form_errors|join:" " }}</div>{% endif %}
+      <div id="condCampos">
+        {% for cf in condforms %}
+        <div class="row g-1 mb-2 cond-row align-items-center">{{ cf.id }}
+          <div class="col-5 col-md-5">{{ cf.campo }}{% for e in cf.campo.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>
+          <div class="col-4 col-md-3">{{ cf.operador }}</div>
+          <div class="col-6 col-md-3">{{ cf.valor }}</div>
+          <div class="col-2 col-md-1 text-center"><span class="d-none">{{ cf.DELETE }}</span>
+            <button type="button" class="btn btn-sm btn-link text-danger p-0 quitar-cond" title="Quitar">✕</button></div>
+        </div>
+        {% endfor %}
+      </div>
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="addCond"><i class="bi bi-plus-lg"></i> Agregar condición</button>
+      <template id="condTpl"><div class="row g-1 mb-2 cond-row align-items-center">{{ condforms.empty_form.id }}
+        <div class="col-5 col-md-5">{{ condforms.empty_form.campo }}</div>
+        <div class="col-4 col-md-3">{{ condforms.empty_form.operador }}</div>
+        <div class="col-6 col-md-3">{{ condforms.empty_form.valor }}</div>
+        <div class="col-2 col-md-1 text-center"><span class="d-none">{{ condforms.empty_form.DELETE }}</span>
+          <button type="button" class="btn btn-sm btn-link text-danger p-0 quitar-cond" title="Quitar">✕</button></div>
+      </div></template>
+    </div>
     <div class="small">
       <label class="d-flex gap-2">{{ form.activa }} Activa</label>
       <label class="d-flex gap-2">{{ form.solo_si_sigue_en_etapa }} {{ form.solo_si_sigue_en_etapa.label }}</label>
@@ -108,6 +134,7 @@
     sin_actividad: ['Sin ninguna actividad durante', 'Si la tarjeta no tiene movimientos (llamadas, mensajes, notas, cambios) durante ese tiempo.'],
     reingreso: ['Cuánto esperar después de que reingresa', 'Cuando la persona vuelve a entrar (escribe de nuevo, llena otro formulario, se importa de nuevo) y no se duplicó porque ya tenía la tarjeta.'],
     despues_de: ['Cuánto esperar después de esa automatización', 'Cuando la automatización elegida se ejecutó (por ejemplo, se envió el mensaje de bienvenida).'],
+    campo: ['Cuánto esperar después de cambiar el campo', 'Cuando el agente (o una integración como n8n) completa o cambia un campo del contacto y se cumplen las condiciones de campo de más abajo.'],
   };
   const updDisp = () => {
     const d = DISP[disp.value] || DISP.entrada;
@@ -116,7 +143,7 @@
     $('boxPrevia').style.display = disp.value === 'despues_de' ? '' : 'none';
     $('boxTodas').style.display = $('boxOtras').style.display = disp.value === 'despues_de' ? 'none' : '';
     etapa.disabled = $('id_todas_las_etapas').checked;
-    $('ayudaDemora').textContent = ['entrada', 'respuesta', 'despues_de', 'reingreso'].includes(disp.value) ? '0 = enseguida.' : '';
+    $('ayudaDemora').textContent = ['entrada', 'respuesta', 'despues_de', 'reingreso', 'campo'].includes(disp.value) ? '0 = enseguida.' : '';
   };
 
   const ACC = {whatsapp: 'enviar un WhatsApp', email: 'enviar un email', sms: 'enviar un SMS', tarea: 'crear una tarea para el vendedor',
@@ -133,8 +160,9 @@
       sin_actividad: `Si la tarjeta lleva <b>${espera || '…'} sin actividad</b> en <b>${et}</b>`,
       despues_de: `Después de la automatización <b>${esc(sel(previa)) || '…'}</b>`,
       reingreso: `Cuando el lead <b>reingresa</b> estando en <b>${et}</b>`,
+      campo: `Cuando <b>cambia un campo</b> (según las condiciones) estando en <b>${et}</b>`,
     }[disp.value];
-    if (espera && ['entrada', 'respuesta', 'despues_de', 'reingreso'].includes(disp.value)) cuando += `, esperar <b>${espera}</b> y`;
+    if (espera && ['entrada', 'respuesta', 'despues_de', 'reingreso', 'campo'].includes(disp.value)) cuando += `, esperar <b>${espera}</b> y`;
     let que = ACC[tipo.value] || '';
     if (tipo.value === 'whatsapp' && sel(pl)) que += ` (plantilla «${esc(sel(pl))}»)`;
     if (tipo.value === 'email' && sel(pe)) que += ` (plantilla «${esc(sel(pe))}»)`;
@@ -170,6 +198,25 @@
   $('id_todas_las_etapas').addEventListener('change', updDisp);
   document.querySelector('form').addEventListener('input', () => { prev(); resumen(); });
   document.querySelector('form').addEventListener('change', () => { prev(); resumen(); });
+
+  // Condiciones por campo (formset): agregar y quitar filas.
+  const PREFIX = "{{ condforms.prefix }}", total = $('id_' + PREFIX + '-TOTAL_FORMS');
+  $('addCond').addEventListener('click', () => {
+    const i = parseInt(total.value || '0');
+    const tpl = $('condTpl').innerHTML.replace(/__prefix__/g, i);
+    const wrap = document.createElement('div'); wrap.innerHTML = tpl.trim();
+    $('condCampos').appendChild(wrap.firstElementChild);
+    total.value = i + 1;
+  });
+  $('condCampos').addEventListener('click', e => {
+    const b = e.target.closest('.quitar-cond'); if (!b) return;
+    const row = b.closest('.cond-row');
+    const idf = row.querySelector('input[name$="-id"]');
+    const del = row.querySelector('input[type=checkbox][name$="-DELETE"]');
+    if (idf && idf.value) { if (del) del.checked = true; row.style.display = 'none'; }  // existente: marcar borrar
+    else { row.remove(); }  // fila nueva: sacar del DOM
+  });
+
   upd(); filtrarEtapas(); updEmbudo(); updDisp(); prev(); resumen();
 })();
 </script>

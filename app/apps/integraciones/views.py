@@ -154,6 +154,10 @@ class LeadCrearView(ApiBase):
             from apps.crm.models import Actividad
             Actividad.objects.create(contacto=res.contacto, oportunidad=res.oportunidad, tipo=Actividad.TIPO_NOTA,
                                      texto=f'[API] {d["nota"]}'[:2000])
+        # Campos personalizados que mandó la integración (ej. el bot marca "es socio"): dispara automatizaciones por campo.
+        if extra and res.contacto:
+            from apps.automatizaciones.services import campos_cambiaron
+            campos_cambiaron(res.contacto, set(extra))
         op = res.oportunidad
         return self._resp(request, {
             'ok': True, 'contacto_id': res.contacto.pk, 'contacto_nuevo': res.contacto_nuevo,

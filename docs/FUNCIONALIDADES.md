@@ -414,6 +414,8 @@ Se configuran **por etapa**, con un disparador:
 | Si el cliente no responde en X tiempo | "Si no respondió en 2 días → mandar recordatorio" |
 | Cuando el cliente responde (WhatsApp o llamada atendida) | "Respondió → pasar a En gestión y avisar a la vendedora" |
 | Si no hay actividad durante X tiempo | "7 días sin movimiento → cerrar como Sin respuesta" |
+| Cuando reingresa (vuelve a escribir / formulario / importación) | "Reingresó → avisar a la vendedora" |
+| **Cuando se completa o cambia un campo del contacto** | "Marcan **es socio = Sí** → pasar al embudo Socios"; "**es socio = Sí** y **autorizaciones = Sí** → embudo Autorizaciones" |
 
 | Acción | Detalle |
 |---|---|
@@ -430,6 +432,12 @@ Opciones de cada automatización:
 - **Demora** (0 = inmediato; ej. 1440 = al día siguiente).
 - **Solo si sigue en esa etapa** al momento de ejecutar (no manda un seguimiento si ya avanzó).
 - **Solo en horario de atención** (si cae de madrugada, se posterga a la apertura).
+- **Condiciones por campos del contacto**: una o varias (se cumplen todas, Y). Obligatorias para el disparador
+  "cuando cambia un campo"; en los demás disparadores son un filtro extra. Operadores: es igual / distinto /
+  contiene / tiene algún valor / está vacío. El agente (o una integración como n8n por la API) solo cambia el
+  campo y la automatización hace el resto (ej. mover de embudo). Si varias coinciden, poné primero la más
+  específica: al mover la tarjeta, las demás ya no aplican.
+- **Solo para ciertas campañas / etiquetas** (filtros de pauta y etiqueta).
 - Nunca se ejecuta sobre contactos "no contactar" ni oportunidades pausadas o cerradas.
 - Variables: nombre, primer nombre, vendedor, embudo, campos personalizados.
 - Registro de cada ejecución (programada, ejecutada, omitida con motivo, fallida) en la ficha y en

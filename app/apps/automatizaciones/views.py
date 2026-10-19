@@ -8,7 +8,7 @@ from django.views import View
 from core.permisos import PermisoRequeridoMixin
 from core.utils import paginar, query_sin_page
 
-from .models import AccionEtapa, EjecucionAccion
+from .models import AccionEtapa, CondicionCampo, EjecucionAccion
 
 
 class AccionForm(forms.ModelForm):
@@ -131,6 +131,26 @@ class AccionForm(forms.ModelForm):
         return super().save(commit)
 
 
+class CondicionCampoForm(forms.ModelForm):
+    class Meta:
+        model = CondicionCampo
+        fields = ['campo', 'operador', 'valor']
+
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        from apps.crm.models import CampoPersonalizado
+        self.fields['campo'].queryset = CampoPersonalizado.objects.filter(activo=True).exclude(
+            tipo=CampoPersonalizado.TIPO_ARCHIVO).order_by('nombre')
+        self.fields['campo'].empty_label = '— elegí un campo —'
+        for f in self.fields.values():
+            f.widget.attrs['class'] = 'form-select' if isinstance(f.widget, forms.Select) else 'form-control'
+        self.fields['valor'].widget.attrs['placeholder'] = 'valor (ej. Sí)'
+
+
+CondicionCampoFormSet = forms.inlineformset_factory(
+    AccionEtapa, CondicionCampo, form=CondicionCampoForm, extra=1, can_delete=True)
+
+
 class AccionListView(PermisoRequeridoMixin, View):
     permiso = 'automatizaciones'
 
@@ -155,7 +175,8 @@ class AccionEditarView(PermisoRequeridoMixin, View):
         accion = get_object_or_404(AccionEtapa, pk=pk) if pk else None
         embudo = accion.embudo if accion else embudo_actual(request)[0]
         inicial = {'etapa': request.GET.get('etapa')} if not accion else None
-        return self._render(request, accion, embudo, AccionForm(instance=accion, embudo=embudo, initial=inicial))
+        return self._render(request, accion, embudo, AccionForm(instance=accion, embudo=embudo, initial=inicial),
+                            CondicionCampoFormSet(instance=accion))
 
     def post(self, request, pk=None):
         from apps.crm.views import embudo_actual
@@ -171,17 +192,28 @@ class AccionEditarView(PermisoRequeridoMixin, View):
             messages.success(request, f'"{accion}" {"activada" if accion.activa else "desactivada"}.')
             return redirect('automatizaciones:lista')
         form = AccionForm(request.POST, instance=accion, embudo=embudo)
-        if not form.is_valid():
-            return self._render(request, accion, embudo, form)
-        form.save()
+        formset = CondicionCampoFormSet(request.POST, instance=accion)
+        ok = form.is_valid() & formset.is_valid()
+        # El disparador "cuando cambia un campo" necesita al menos una condición de campo.
+        if ok and form.cleaned_data.get('disparador') == AccionEtapa.DISP_CAMPO:
+            vivas = [f for f in formset.forms if f.cleaned_data and not f.cleaned_data.get('DELETE')
+                     and f.cleaned_data.get('campo')]
+            if not vivas:
+                form.add_error('disparador', 'Para disparar por un campo, agregá al menos una condición de campo abajo.')
+                ok = False
+        if not ok:
+            return self._render(request, accion, embudo, form, formset)
+        accion = form.save()
+        formset.instance = accion
+        formset.save()
         messages.success(request, 'Automatización guardada.')
         return redirect('automatizaciones:lista')
 
-    def _render(self, request, accion, embudo, form):
+    def _render(self, request, accion, embudo, form, formset):
         from apps.whatsapp.models import Plantilla
         from .models import PlantillaEmail
         return render(request, 'automatizaciones/form.html', {
-            'accion': accion, 'embudo': embudo, 'form': form,
+            'accion': accion, 'embudo': embudo, 'form': form, 'condforms': formset,
             'plantillas_texto': json.dumps({str(p.pk): p.cuerpo for p in Plantilla.objects.filter(activa=True)}).replace('</', '<\\/'),
             'plantillas_email_texto': json.dumps({str(p.pk): f'{p.asunto}\n\n{p.cuerpo}' for p in PlantillaEmail.objects.filter(activa=True)}).replace('</', '<\\/'),
         })

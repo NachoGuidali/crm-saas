@@ -179,6 +179,38 @@ def lead_reingreso(op):
     return n
 
 
+def campos_cambiaron(contacto, slugs, usuario=None):
+    """
+    Dispara las automatizaciones "Cuando cambia un campo" cuyas condiciones miran alguno de los campos que cambiaron.
+    Se llama al guardar campos personalizados del contacto (ficha, API). El valor exacto de cada condición se vuelve
+    a revisar al ejecutar. Idempotente unos segundos por (automatización, oportunidad) para no dispararla dos veces.
+    """
+    from django.core.cache import cache
+    from apps.crm.models import Oportunidad
+    slugs = {s for s in slugs if s}
+    if contacto is None or not slugs:
+        return 0
+    ops = list(Oportunidad.objects.filter(contacto=contacto, estado__in=Oportunidad.ESTADOS_ACTIVOS)
+               .select_related('embudo'))
+    if not ops:
+        return 0
+    ahora, n = timezone.now(), 0
+    for op in ops:
+        acciones = list(AccionEtapa.objects.filter(
+            AccionEtapa.q_etapa(op.etapa_id, op.embudo_id), activa=True, disparador=AccionEtapa.DISP_CAMPO,
+            condiciones_campo__campo__slug__in=slugs).distinct().select_related('embudo').order_by('orden', 'pk'))
+        for accion in acciones:
+            if not cache.add(f'campo_{accion.pk}_{op.pk}', 1, 20):
+                continue
+            cuando = ahora + timedelta(minutes=accion.demora_minutos)
+            if accion.solo_en_horario:
+                cuando = proxima_apertura(op.embudo, cuando)
+            ejec = EjecucionAccion.objects.create(accion=accion, oportunidad=op, historial=None, programada_para=cuando)
+            _encolar(ejec, cuando, ahora)
+            n += 1
+    return n
+
+
 def revisar_sin_actividad():
     """Cada 5 min: automatizaciones "Si no hay actividad durante X" sobre las oportunidades en esa etapa."""
     from apps.crm.models import Oportunidad

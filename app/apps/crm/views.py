@@ -568,6 +568,7 @@ class AccionOportunidadView(LoginRequiredMixin, View):
         if not form.is_valid():
             return error(' · '.join(f'{campos[k].label}: {v[0]}' for k, v in form.errors.items()))
         contacto, cambios_c, extra = op.contacto, [], dict(op.contacto.datos_extra or {})
+        extra_antes = dict(op.contacto.datos_extra or {})
         antes = {**auditoria.foto_contacto(contacto), **auditoria.foto_oportunidad(op)}
         for clave, valor in form.cleaned_data.items():
             if clave.startswith('cp:'):
@@ -586,6 +587,8 @@ class AccionOportunidadView(LoginRequiredMixin, View):
             cambios_c.append('datos_extra')
         if cambios_c:
             contacto.save(update_fields=cambios_c + ['updated_at'])
+        if 'datos_extra' in cambios_c:
+            crm.avisar_campos_cambiados(contacto, extra_antes, user)
         auditoria.registrar_cambios(antes, {**auditoria.foto_contacto(contacto), **auditoria.foto_oportunidad(op)},
                                     user, contacto, op, contexto='Datos completados para cambiar de etapa')
         return ok(mensaje='Datos guardados')
@@ -724,6 +727,7 @@ class ContactoEditarView(LoginRequiredMixin, View):
     def post(self, request, pk):
         contacto = get_object_or_404(Contacto.objects.visibles_para(request.user), pk=pk)
         antes = auditoria.foto_contacto(contacto)
+        extra_antes = dict(contacto.datos_extra or {})
         form = ContactoForm(request.POST, instance=contacto)
         destino = request.POST.get('next') or contacto.get_absolute_url()
         if form.is_valid():
@@ -731,6 +735,7 @@ class ContactoEditarView(LoginRequiredMixin, View):
             contacto.refresh_from_db()
             op = Oportunidad.objects.filter(pk=request.POST.get('oportunidad') or 0, contacto=contacto).first()
             auditoria.registrar_cambios(antes, auditoria.foto_contacto(contacto), request.user, contacto, op)
+            crm.avisar_campos_cambiados(contacto, extra_antes, request.user)
             messages.success(request, 'Datos del contacto actualizados.')
         else:
             for campo, errs in form.errors.items():

@@ -303,6 +303,17 @@ def marcar_prioridad(op, motivo='', usuario=None, prioritaria=True):
     return True
 
 
+def avisar_campos_cambiados(contacto, extra_antes, usuario=None):
+    """Dispara las automatizaciones "Cuando cambia un campo" para los campos que cambiaron respecto de `extra_antes`."""
+    if contacto is None:
+        return
+    extra_ahora = contacto.datos_extra or {}
+    cambiados = {k for k in set(extra_antes) | set(extra_ahora) if extra_antes.get(k) != extra_ahora.get(k)}
+    if cambiados:
+        from apps.automatizaciones.services import campos_cambiaron
+        campos_cambiaron(contacto, cambiados, usuario)
+
+
 def responsable_cliente(contacto):
     """Si la persona ya es cliente (venta cerrada): quién la atiende según el embudo de esa venta (o None)."""
     if contacto is None:
