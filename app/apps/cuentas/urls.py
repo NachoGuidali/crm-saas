@@ -18,4 +18,5 @@ urlpatterns = [
     path('aviso/<int:pk>/', views.AvisoAccionView.as_view(), name='aviso_accion'),
     path('<int:pk>/', views.CuentaDetailView.as_view(), name='detalle'),
     path('<int:pk>/editar/', views.CuentaEditarView.as_view(), name='editar'),
+    path('<int:pk>/contacto/', views.CuentaContactoView.as_view(), name='contacto'),
 ]

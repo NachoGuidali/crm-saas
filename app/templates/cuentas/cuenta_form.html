@@ -10,9 +10,7 @@
     <div class="col-md-6"><label class="form-label">{{ form.responsable.label }}</label>{{ form.responsable }}</div>
     <div class="col-md-6"><label class="form-label">{{ form.telefono.label }}</label>{{ form.telefono }}</div>
     <div class="col-12"><label class="form-label">Email</label>{{ form.email }}{{ form.email.errors }}</div>
-    {% if cuenta %}
-    <div class="col-12"><label class="form-label">{{ form.contactos.label }}</label>{{ form.contactos }}<div class="form-text">{{ form.contactos.help_text }}</div></div>
-    {% endif %}
+    {% if cuenta %}<div class="col-12"><div class="form-text">Los contactos se asocian desde la ficha de la cuenta.</div></div>{% endif %}
     <div class="col-12"><label class="d-flex gap-2">{{ form.activa }} Cuenta activa</label></div>
     <div class="col-12"><label class="form-label">Notas</label>{{ form.notas }}</div>
   </div>

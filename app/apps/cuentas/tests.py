@@ -167,6 +167,27 @@ class AccesoYVistasTests(BasePostventa):
         self.assertEqual(r.status_code, 302)
         self.assertTrue(Cuenta.objects.filter(nombre='Nueva SA').exists())
 
+    def test_asociar_y_quitar_contacto(self):
+        self.client.force_login(self.admin)
+        cuenta = Cuenta.objects.create(nombre='Acme SA')
+        contacto = self._contacto(nombre='Juan Pérez')
+        url = reverse('cuentas:contacto', args=[cuenta.pk])
+        # Buscar: encuentra el contacto no asociado.
+        r = self.client.post(url, {'accion': 'buscar', 'q': 'Juan'})
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(contacto, r.context['candidatos'])
+        # Asociar.
+        r = self.client.post(url, {'accion': 'agregar', 'contacto': contacto.pk})
+        self.assertEqual(r.status_code, 302)
+        self.assertIn(contacto, cuenta.contactos.all())
+        # Ya asociado: no vuelve a aparecer en la búsqueda.
+        r = self.client.post(url, {'accion': 'buscar', 'q': 'Juan'})
+        self.assertNotIn(contacto, r.context['candidatos'])
+        # Quitar.
+        r = self.client.post(url, {'accion': 'quitar', 'contacto': contacto.pk})
+        self.assertEqual(r.status_code, 302)
+        self.assertNotIn(contacto, cuenta.contactos.all())
+
     def test_completar_tarea(self):
         self.client.force_login(self.admin)
         cuenta = Cuenta.objects.create(nombre='Acme SA')

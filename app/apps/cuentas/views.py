@@ -41,20 +41,52 @@ class CuentaListView(PostventaMixin, View):
         return render(request, 'cuentas/lista.html', {'cuentas': cuentas, 'q': q, 'ver_baja': ver_baja})
 
 
+def _contexto_detalle(cuenta, **extra):
+    tareas = cuenta.tareas.select_related('asignado_a', 'proyecto')
+    ctx = {
+        'cuenta': cuenta,
+        'proyectos': cuenta.proyectos.select_related('estado', 'responsable'),
+        'tareas_pend': tareas.filter(estado=TareaPostventa.ESTADO_PENDIENTE),
+        'tareas_hechas': tareas.exclude(estado=TareaPostventa.ESTADO_PENDIENTE)[:20],
+        'contactos': cuenta.contactos.all(),
+        'form_tarea': TareaPostventaForm(cuenta=cuenta),
+        'avisos': cuenta.avisos.select_related('contacto', 'linea', 'plantilla'),
+        'form_aviso': AvisoRecurrenteForm(cuenta=cuenta),
+    }
+    ctx.update(extra)
+    return ctx
+
+
 class CuentaDetailView(PostventaMixin, View):
     def get(self, request, pk):
         cuenta = get_object_or_404(Cuenta.objects.select_related('responsable'), pk=pk)
-        proyectos = cuenta.proyectos.select_related('estado', 'responsable')
-        tareas = cuenta.tareas.select_related('asignado_a', 'proyecto')
-        return render(request, 'cuentas/detalle.html', {
-            'cuenta': cuenta, 'proyectos': proyectos,
-            'tareas_pend': tareas.filter(estado=TareaPostventa.ESTADO_PENDIENTE),
-            'tareas_hechas': tareas.exclude(estado=TareaPostventa.ESTADO_PENDIENTE)[:20],
-            'contactos': cuenta.contactos.all(),
-            'form_tarea': TareaPostventaForm(cuenta=cuenta),
-            'avisos': cuenta.avisos.select_related('contacto', 'linea', 'plantilla'),
-            'form_aviso': AvisoRecurrenteForm(cuenta=cuenta),
-        })
+        return render(request, 'cuentas/detalle.html', _contexto_detalle(cuenta))
+
+
+class CuentaContactoView(PostventaMixin, View):
+    """Asociar o quitar contactos de una cuenta (con buscador)."""
+    def post(self, request, pk):
+        cuenta = get_object_or_404(Cuenta, pk=pk)
+        accion = request.POST.get('accion')
+        from apps.crm.models import Contacto
+        if accion == 'agregar' and request.POST.get('contacto'):
+            contacto = get_object_or_404(Contacto, pk=request.POST['contacto'])
+            cuenta.contactos.add(contacto)
+            messages.success(request, f'{contacto.nombre} asociado a la cuenta.')
+            return redirect('cuentas:detalle', pk=cuenta.pk)
+        if accion == 'quitar' and request.POST.get('contacto'):
+            cuenta.contactos.remove(request.POST['contacto'])
+            messages.success(request, 'Contacto quitado de la cuenta.')
+            return redirect('cuentas:detalle', pk=cuenta.pk)
+        # Buscar: muestra candidatos para elegir (no redirige, re-renderiza la ficha).
+        q = (request.POST.get('q') or '').strip()
+        candidatos = []
+        if q:
+            candidatos = list(Contacto.objects.filter(
+                Q(nombre__icontains=q) | Q(telefono__icontains=q) | Q(email__icontains=q)
+            ).exclude(cuentas=cuenta)[:15])
+        return render(request, 'cuentas/detalle.html',
+                      _contexto_detalle(cuenta, candidatos=candidatos, q_contacto=q, buscado=True))
 
 
 class CuentaEditarView(PostventaMixin, View):

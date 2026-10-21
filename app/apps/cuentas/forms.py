@@ -22,21 +22,13 @@ def _bootstrap(form):
 class CuentaForm(forms.ModelForm):
     class Meta:
         model = Cuenta
-        fields = ['nombre', 'responsable', 'email', 'telefono', 'contactos', 'activa', 'notas']
-        widgets = {
-            'contactos': forms.SelectMultiple(attrs={'size': 6}),
-            'notas': forms.Textarea(attrs={'rows': 3}),
-        }
+        fields = ['nombre', 'responsable', 'email', 'telefono', 'activa', 'notas']
+        widgets = {'notas': forms.Textarea(attrs={'rows': 3})}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        from apps.crm.models import Contacto
         self.fields['responsable'].queryset = User.objects.filter(is_active=True)
-        # No listamos todos los contactos del CRM: solo los ya asociados (para no cargar miles).
-        asociados = self.instance.contactos.all() if self.instance.pk else Contacto.objects.none()
-        self.fields['contactos'].queryset = asociados
-        self.fields['contactos'].required = False
-        self.fields['contactos'].help_text = 'Agregá más contactos desde la ficha de la cuenta.'
+        # Los contactos se asocian/quitan desde la ficha de la cuenta (con buscador), no en este form.
         _bootstrap(self)
 
 
