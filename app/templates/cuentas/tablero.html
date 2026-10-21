@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Proyectos{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1><i class="bi bi-kanban"></i> Proyectos</h1>
+  <div class="toolbar">
+    <a href="{% url 'cuentas:lista' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-building"></i> Cuentas</a>
+    {% if 'embudos' in perms_crm %}<a href="{% url 'cuentas:estados' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-sliders"></i> Estados</a>{% endif %}
+  </div>
+</div>
+
+<form class="toolbar mb-3" method="get">
+  <input type="search" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Proyecto o cuenta…" style="min-width:240px">
+  <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-search"></i> Buscar</button>
+  {% if q %}<a href="{% url 'cuentas:tablero' %}" class="btn btn-link btn-sm">Limpiar</a>{% endif %}
+</form>
+
+<div class="board-wrap"><div class="board" id="board">
+  {% for col in columnas %}
+  <div class="col" style="--c:{{ col.estado.color }}">
+    <div class="col-head">
+      <span class="t">{{ col.estado.nombre }}</span>
+      <span class="n" data-count="{{ col.estado.pk }}">{{ col.proyectos|length }}</span>
+    </div>
+    <div class="col-body" data-estado="{{ col.estado.pk }}">
+      {% for p in col.proyectos %}
+        {% include "cuentas/_tarjeta_proyecto.html" with p=p %}
+      {% endfor %}
+      {% if not col.proyectos %}<div class="text-center muted small py-3 vacio">Sin proyectos</div>{% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div></div>
+
+{% if sin_estado %}
+<div class="card mt-3"><div class="card-header">Sin estado</div><div class="card-body">
+  <div class="d-flex flex-wrap gap-2">
+    {% for p in sin_estado %}<a href="{% url 'cuentas:proyecto_editar' p.pk %}" class="chip">{{ p.cuenta.nombre }} · {{ p.nombre }}</a>{% endfor %}
+  </div>
+</div></div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  const board = document.getElementById('board');
+  if (!board) return;
+  let arrastrada = null, origen = null;
+
+  function conteo(estado, delta) {
+    const n = board.querySelector(`[data-count="${estado}"]`);
+    if (n) n.textContent = Math.max(0, (parseInt(n.textContent) || 0) + delta);
+  }
+
+  board.addEventListener('dragstart', e => {
+    const card = e.target.closest('.tcard');
+    if (!card) return;
+    arrastrada = card; origen = card.parentElement;
+    card.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+  });
+  board.addEventListener('dragend', () => {
+    if (arrastrada) arrastrada.classList.remove('dragging');
+    board.querySelectorAll('.over').forEach(c => c.classList.remove('over'));
+  });
+  board.querySelectorAll('.col-body').forEach(col => {
+    col.addEventListener('dragover', e => { if (arrastrada) { e.preventDefault(); col.classList.add('over'); } });
+    col.addEventListener('dragleave', () => col.classList.remove('over'));
+    col.addEventListener('drop', async e => {
+      e.preventDefault(); col.classList.remove('over');
+      if (!arrastrada || col === origen) return;
+      const card = arrastrada, estado = col.dataset.estado, desde = origen.dataset.estado;
+      col.insertBefore(card, col.firstChild);
+      const vacio = col.querySelector('.vacio'); if (vacio) vacio.remove();
+      conteo(desde, -1); conteo(estado, 1);
+      try {
+        await CRM.api('{% url "cuentas:proyecto_mover" 0 %}'.replace('/0/', '/' + card.dataset.id + '/'), {data: {estado}});
+      } catch (err) {
+        origen.insertBefore(card, origen.firstChild); conteo(estado, -1); conteo(desde, 1);
+      }
+    });
+  });
+})();
+</script>
+{% endblock %}

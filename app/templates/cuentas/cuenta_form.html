@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}{{ cuenta.nombre|default:"Nueva cuenta" }}{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-building"></i> {{ cuenta.nombre|default:"Nueva cuenta" }}</h1></div>
+<div class="row g-3"><div class="col-lg-7">
+<form method="post" class="card"><div class="card-body">{% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert alert-danger py-2">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+  <div class="row g-2">
+    <div class="col-12"><label class="form-label">{{ form.nombre.label }}</label>{{ form.nombre }}{{ form.nombre.errors }}</div>
+    <div class="col-md-6"><label class="form-label">{{ form.responsable.label }}</label>{{ form.responsable }}</div>
+    <div class="col-md-6"><label class="form-label">{{ form.telefono.label }}</label>{{ form.telefono }}</div>
+    <div class="col-12"><label class="form-label">Email</label>{{ form.email }}{{ form.email.errors }}</div>
+    {% if cuenta %}
+    <div class="col-12"><label class="form-label">{{ form.contactos.label }}</label>{{ form.contactos }}<div class="form-text">{{ form.contactos.help_text }}</div></div>
+    {% endif %}
+    <div class="col-12"><label class="d-flex gap-2">{{ form.activa }} Cuenta activa</label></div>
+    <div class="col-12"><label class="form-label">Notas</label>{{ form.notas }}</div>
+  </div>
+  <div class="mt-3 d-flex gap-2">
+    <button class="btn btn-primary">Guardar</button>
+    <a href="{% if cuenta %}{{ cuenta.get_absolute_url }}{% else %}{% url 'cuentas:lista' %}{% endif %}" class="btn btn-link">Cancelar</a>
+  </div>
+</div></form>
+</div></div>
+{% endblock %}

@@ -24,6 +24,7 @@ SUBDOMINIOS_RESERVADOS = frozenset({
 #   3) Tildala en el plan o en la ficha del cliente desde el panel.
 # Con la lista vacía no hay funciones extra: el CRM funciona igual para todos.
 FUNCIONES_EXTRA = [
+    ('postventa', 'Clientes / Postventa (cuentas, proyectos y tareas)'),
     # ('reportes_avanzados', 'Reportes avanzados'),
     # ('marca_blanca', 'Marca blanca (logo propio en el CRM)'),
 ]

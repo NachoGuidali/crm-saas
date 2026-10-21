@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Cuentas{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1><i class="bi bi-building"></i> Cuentas</h1>
+  <div class="toolbar">
+    <a href="{% url 'cuentas:tablero' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-kanban"></i> Proyectos</a>
+    {% if 'embudos' in perms_crm %}<a href="{% url 'cuentas:estados' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-sliders"></i> Estados</a>{% endif %}
+    <a href="{% url 'cuentas:nueva' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Nueva cuenta</a>
+  </div>
+</div>
+
+<form class="toolbar mb-3" method="get">
+  <input type="search" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Empresa, email, teléfono…" style="min-width:240px">
+  <label class="btn btn-sm btn-outline-secondary {% if ver_baja %}active{% endif %}"><input type="checkbox" name="baja" value="1" class="d-none" onchange="this.form.submit()" {% if ver_baja %}checked{% endif %}> Incluir dadas de baja</label>
+  <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-search"></i> Buscar</button>
+  {% if q or ver_baja %}<a href="{% url 'cuentas:lista' %}" class="btn btn-link btn-sm">Limpiar</a>{% endif %}
+</form>
+
+<div class="row g-3">{% for c in cuentas %}
+  <div class="col-md-6 col-xl-4"><div class="card h-100"><div class="card-body">
+    <div class="d-flex justify-content-between align-items-start">
+      <h5 class="mb-1"><a href="{{ c.get_absolute_url }}" class="text-reset text-decoration-none">{{ c.nombre }}</a></h5>
+      {% if not c.activa %}<span class="chip">Baja</span>{% endif %}
+    </div>
+    <div class="small muted">{% if c.email %}{{ c.email }}{% endif %}{% if c.email and c.telefono %} · {% endif %}{{ c.telefono }}</div>
+    <div class="small mt-2"><i class="bi bi-folder"></i> {{ c.n_proyectos }} proyecto{{ c.n_proyectos|pluralize }} · <i class="bi bi-check2-square"></i> {{ c.n_tareas }} tarea{{ c.n_tareas|pluralize }} pendiente{{ c.n_tareas|pluralize }}</div>
+    {% if c.responsable %}<div class="small muted mt-1"><i class="bi bi-person"></i> {{ c.responsable.display_name }}</div>{% endif %}
+    <a href="{{ c.get_absolute_url }}" class="btn btn-sm btn-outline-secondary mt-3">Abrir</a>
+  </div></div></div>
+{% empty %}
+  <div class="col-12"><div class="empty-state card"><div class="empty-icon"><i class="bi bi-building"></i></div>
+    Todavía no hay cuentas. Se crean solas al ganar una venta, o podés cargarlas a mano.
+    <a href="{% url 'cuentas:nueva' %}" class="btn btn-primary btn-sm">Crear la primera</a></div></div>
+{% endfor %}</div>
+{% endblock %}

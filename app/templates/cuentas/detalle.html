@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}{{ cuenta.nombre }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1><i class="bi bi-building"></i> {{ cuenta.nombre }}{% if not cuenta.activa %} <span class="chip">Baja</span>{% endif %}</h1>
+  <div class="toolbar">
+    <a href="{% url 'cuentas:editar' cuenta.pk %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil"></i> Editar cuenta</a>
+    <a href="{% url 'cuentas:proyecto_nuevo' %}?cuenta={{ cuenta.pk }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Nuevo proyecto</a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card mb-3"><div class="card-header d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-folder"></i> Proyectos</span></div>
+      <div class="card-body">
+      {% for p in proyectos %}
+        <div class="d-flex justify-content-between align-items-center py-2 {% if not forloop.last %}border-bottom{% endif %}">
+          <div>
+            <a href="{% url 'cuentas:proyecto_editar' p.pk %}" class="fw-semibold text-reset text-decoration-none">{{ p.nombre }}</a>
+            {% if p.estado %}<span class="chip ms-1" style="border-color:{{ p.estado.color }}">{{ p.estado.nombre }}</span>{% endif %}
+            <div class="small muted">
+              {% if p.monto %}${{ p.monto|floatformat:"0" }} · {% endif %}
+              {% if p.fecha_entrega %}Entrega {{ p.fecha_entrega|date:"d/m/Y" }}{% if p.entrega_vencida %} <span class="text-danger">(vencida)</span>{% endif %}{% else %}Sin fecha de entrega{% endif %}
+              {% if p.responsable %} · {{ p.responsable.display_name }}{% endif %}
+            </div>
+          </div>
+          <a href="{% url 'cuentas:proyecto_editar' p.pk %}" class="btn btn-sm btn-outline-secondary">Abrir</a>
+        </div>
+      {% empty %}<div class="muted small py-2">Sin proyectos todavía.</div>{% endfor %}
+      </div>
+    </div>
+
+    <div class="card"><div class="card-header"><i class="bi bi-check2-square"></i> Tareas</div><div class="card-body">
+      <form method="post" action="{% url 'cuentas:tarea_nueva' %}" class="row g-2 align-items-end mb-3">{% csrf_token %}
+        <input type="hidden" name="cuenta" value="{{ cuenta.pk }}">
+        <div class="col-md-5"><label class="form-label small">Tarea</label>{{ form_tarea.titulo }}</div>
+        <div class="col-md-3"><label class="form-label small">Asignar a</label>{{ form_tarea.asignado_a }}</div>
+        <div class="col-md-3"><label class="form-label small">Vence</label>{{ form_tarea.vence_at }}</div>
+        <div class="col-md-1"><button class="btn btn-primary w-100"><i class="bi bi-plus-lg"></i></button></div>
+      </form>
+      {% for t in tareas_pend %}
+        <div class="d-flex justify-content-between align-items-center py-2 border-top">
+          <div>
+            <span class="fw-semibold">{{ t.titulo }}</span>
+            {% if t.proyecto %}<span class="chip ms-1">{{ t.proyecto.nombre }}</span>{% endif %}
+            <div class="small {% if t.vencida %}text-danger{% else %}muted{% endif %}">
+              {% if t.vence_at %}Vence {{ t.vence_at|date:"d/m/Y H:i" }}{% else %}Sin fecha{% endif %}
+              {% if t.asignado_a %} · {{ t.asignado_a.display_name }}{% endif %}
+            </div>
+          </div>
+          <form method="post" action="{% url 'cuentas:tarea_completar' t.pk %}">{% csrf_token %}
+            <button class="btn btn-sm btn-outline-success" title="Marcar hecha"><i class="bi bi-check-lg"></i></button>
+          </form>
+        </div>
+      {% empty %}<div class="muted small">Sin tareas pendientes.</div>{% endfor %}
+      {% if tareas_hechas %}
+      <details class="mt-2"><summary class="small muted">Tareas completadas ({{ tareas_hechas|length }})</summary>
+        {% for t in tareas_hechas %}<div class="small muted py-1 border-top"><s>{{ t.titulo }}</s> · {{ t.completada_at|date:"d/m/Y" }}</div>{% endfor %}
+      </details>
+      {% endif %}
+    </div></div>
+
+    <div class="card mt-3"><div class="card-header"><i class="bi bi-whatsapp"></i> Avisos automáticos de WhatsApp</div><div class="card-body">
+      <p class="small muted">Mensajes que salen solos cada tanto (mensualidades, recordatorios). En líneas oficiales con la ventana de 24 h cerrada hay que usar una plantilla aprobada.</p>
+      <form method="post" action="{% url 'cuentas:aviso_nuevo' %}" class="row g-2 mb-3">{% csrf_token %}
+        <input type="hidden" name="cuenta" value="{{ cuenta.pk }}">
+        <div class="col-md-6"><label class="form-label small">Enviar a</label>{{ form_aviso.contacto }}</div>
+        <div class="col-md-6"><label class="form-label small">Línea</label>{{ form_aviso.linea }}</div>
+        <div class="col-md-6"><label class="form-label small">Plantilla (opcional)</label>{{ form_aviso.plantilla }}</div>
+        <div class="col-md-3"><label class="form-label small">Cada (meses)</label>{{ form_aviso.cada_meses }}</div>
+        <div class="col-md-3"><label class="form-label small">Día del mes</label>{{ form_aviso.dia_mes }}</div>
+        <div class="col-12"><label class="form-label small">Texto libre {{ form_aviso.mensaje.help_text }}</label>{{ form_aviso.mensaje }}</div>
+        <div class="col-12"><button class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Programar aviso</button></div>
+      </form>
+      {% for a in avisos %}
+        <div class="d-flex justify-content-between align-items-start py-2 border-top">
+          <div>
+            <span class="fw-semibold">{% if a.plantilla %}Plantilla: {{ a.plantilla }}{% else %}{{ a.mensaje|truncatechars:60 }}{% endif %}</span>
+            {% if not a.activo %}<span class="chip ms-1">Pausado</span>{% endif %}
+            <div class="small muted">Cada {{ a.cada_meses }} mes{{ a.cada_meses|pluralize }} (día {{ a.dia_mes }}) · próximo {{ a.proximo_envio|date:"d/m/Y" }}{% if a.linea %} · {{ a.linea.nombre }}{% endif %}</div>
+            {% if a.ultimo_envio_at %}<div class="small muted">Último: {{ a.ultimo_envio_at|date:"d/m/Y H:i" }} · {{ a.ultimo_detalle }}</div>{% endif %}
+          </div>
+          <form method="post" action="{% url 'cuentas:aviso_accion' a.pk %}" class="d-flex gap-1">{% csrf_token %}
+            <button name="accion" value="toggle" class="btn btn-sm btn-outline-secondary" title="{% if a.activo %}Pausar{% else %}Reactivar{% endif %}"><i class="bi bi-{% if a.activo %}pause{% else %}play{% endif %}"></i></button>
+            <button name="accion" value="borrar" class="btn btn-sm btn-outline-danger" title="Eliminar" onclick="return confirm('¿Eliminar este aviso?')"><i class="bi bi-trash"></i></button>
+          </form>
+        </div>
+      {% empty %}<div class="muted small">Sin avisos programados.</div>{% endfor %}
+    </div></div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card mb-3"><div class="card-body small">
+      {% if cuenta.responsable %}<div><span class="muted">Responsable:</span> {{ cuenta.responsable.display_name }}</div>{% endif %}
+      {% if cuenta.email %}<div><span class="muted">Email:</span> {{ cuenta.email }}</div>{% endif %}
+      {% if cuenta.telefono %}<div><span class="muted">Teléfono:</span> {{ cuenta.telefono }}</div>{% endif %}
+      {% if cuenta.origen_oportunidad %}<div class="mt-1"><span class="muted">Origen:</span> <a href="{{ cuenta.origen_oportunidad.get_absolute_url }}">venta ganada</a></div>{% endif %}
+      {% if cuenta.notas %}<hr class="my-2"><div style="white-space:pre-wrap">{{ cuenta.notas }}</div>{% endif %}
+    </div></div>
+    <div class="card"><div class="card-header"><i class="bi bi-person-lines-fill"></i> Contactos</div><div class="card-body">
+      {% for ct in contactos %}
+        <div class="py-1 {% if not forloop.last %}border-bottom{% endif %}">
+          <a href="{% url 'crm:contacto_detalle' ct.pk %}" class="text-reset text-decoration-none">{{ ct.nombre }}</a>
+          <div class="small muted">{{ ct.telefono }}{% if ct.email %} · {{ ct.email }}{% endif %}</div>
+        </div>
+      {% empty %}<div class="muted small">Sin contactos asociados. Agregalos desde "Editar cuenta".</div>{% endfor %}
+    </div></div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Estados de proyecto{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-sliders"></i> Estados de proyecto</h1>
+  <div class="toolbar"><a href="{% url 'cuentas:tablero' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-kanban"></i> Ver tablero</a></div>
+</div>
+<p class="muted">Son las columnas del tablero de proyectos. Podés renombrarlas, agregar o quitar, igual que las etapas de un embudo.</p>
+
+<div class="row g-3"><div class="col-lg-7">
+  <div class="card mb-3"><div class="card-body">
+    {% for e in estados %}
+    <div class="d-flex justify-content-between align-items-center py-2 {% if not forloop.last %}border-bottom{% endif %}">
+      <div><span class="dot" style="background:{{ e.color }};width:10px;height:10px"></span> <b>{{ e.nombre }}</b>
+        {% if e.final %}<span class="chip ms-1">Final</span>{% endif %}
+        <span class="small muted ms-2">{{ e.n }} proyecto{{ e.n|pluralize }}</span></div>
+      <form method="post" onsubmit="return confirm('¿Eliminar el estado «{{ e.nombre }}»? Los proyectos quedarán sin estado.')">{% csrf_token %}
+        <input type="hidden" name="accion" value="borrar"><input type="hidden" name="pk" value="{{ e.pk }}">
+        <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+      </form>
+    </div>
+    {% empty %}<div class="muted small">Sin estados.</div>{% endfor %}
+  </div></div>
+
+  <form method="post" class="card"><div class="card-body">{% csrf_token %}
+    <input type="hidden" name="accion" value="nuevo">
+    <div class="section-title">Agregar estado</div>
+    <div class="row g-2 align-items-end">
+      <div class="col-md-5"><label class="form-label">Nombre</label><input name="nombre" class="form-control" required></div>
+      <div class="col-md-4"><label class="form-label">Color</label>
+        <select name="color" class="form-select">
+          <option value="#6B7280">Gris</option><option value="#3B7EF6" selected>Azul</option>
+          <option value="#8B5CF6">Violeta</option><option value="#F59E0B">Ámbar</option>
+          <option value="#16A34A">Verde</option><option value="#EF4444">Rojo</option>
+          <option value="#0EA5E9">Celeste</option><option value="#EC4899">Rosa</option>
+        </select></div>
+      <div class="col-md-3"><label class="d-flex gap-2 mt-4"><input type="checkbox" name="final" class="form-check-input"> Es final</label></div>
+    </div>
+    <button class="btn btn-primary mt-3">Agregar</button>
+  </div></form>
+</div></div>
+{% endblock %}

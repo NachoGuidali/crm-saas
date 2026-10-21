@@ -55,6 +55,16 @@
         <span class="nav-icon"><i class="bi bi-telephone-forward"></i></span> Discador
       </a>
 
+      {% if 'postventa' in funciones_cliente and 'postventa' in perms_crm %}
+      <div class="nav-section">Clientes</div>
+      <a href="{% url 'cuentas:lista' %}" class="nav-item {% if seccion == 'cuentas' and url_name != 'tablero' and url_name != 'estados' %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-building"></i></span> Cuentas
+      </a>
+      <a href="{% url 'cuentas:tablero' %}" class="nav-item {% if seccion == 'cuentas' and url_name == 'tablero' %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-kanban"></i></span> Proyectos
+      </a>
+      {% endif %}
+
       {% if 'supervision' in perms_crm or 'reportes' in perms_crm or 'importar' in perms_crm or 'pautas' in perms_crm or 'difusiones' in perms_crm %}
       <div class="nav-section">Gestión</div>
       {% endif %}

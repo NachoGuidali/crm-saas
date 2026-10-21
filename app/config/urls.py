@@ -30,6 +30,7 @@ urlpatterns = [
     path('automatizaciones/', include('apps.automatizaciones.urls')),
     path('integraciones/', include('apps.integraciones.urls')),
     path('pautas/', include('apps.pautas.urls')),
+    path('clientes/', include('apps.cuentas.urls')),
     path('', include('apps.crm.urls')),
 ] + api_telefonia + api_integraciones
 

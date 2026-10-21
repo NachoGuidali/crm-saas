@@ -91,6 +91,16 @@ Con el registro vacío no hay funciones extra: el CRM funciona igual para todos.
 defecto. **Ojo:** no envuelvas una función que los clientes ya usan en un flag, porque se les apagaría hasta
 tildarla; los flags son para funciones nuevas u opcionales.
 
+### Funciones extra disponibles
+
+- **`postventa` — Clientes / Postventa** (`apps/cuentas`). Módulo para gestionar al cliente *después* de la venta:
+  **cuentas** (la empresa, asociada a uno o más contactos), **proyectos** por cuenta en un kanban de estados
+  parametrizable (con monto y fecha de entrega), **tareas** de postventa y **avisos de WhatsApp recurrentes**
+  (mensualidades / suscripciones, con plantilla o texto libre; tarea diaria `cuentas.enviar_avisos_recurrentes`).
+  La conversión "al ganar una venta → crear cuenta" es **opcional por embudo** (`Embudo.crear_cuenta_al_ganar`,
+  apagado por defecto; ver `apps/crm/services.py` → `mover_etapa`). Se ve solo si el cliente tiene la función
+  `postventa` **y** el usuario tiene el permiso `postventa` en su rol. Menú: "Clientes" → Cuentas / Proyectos.
+
 ## Cobros
 
 Cada cliente tiene **Pagado hasta** (vencimiento) y un **precio** (el del plan o uno acordado). Cada pago corre el

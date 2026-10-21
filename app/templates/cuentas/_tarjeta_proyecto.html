@@ -1,0 +1,9 @@
+<div class="tcard" draggable="true" data-id="{{ p.pk }}" onclick="if(!event.target.closest('a')) location.href='{% url 'cuentas:proyecto_editar' p.pk %}'">
+  <div class="fw-semibold">{{ p.nombre }}</div>
+  <div class="small muted">{{ p.cuenta.nombre }}</div>
+  <div class="small mt-1">
+    {% if p.monto %}<span class="chip">${{ p.monto|floatformat:"0" }}</span>{% endif %}
+    {% if p.fecha_entrega %}<span class="chip {% if p.entrega_vencida %}danger{% endif %}"><i class="bi bi-calendar-event"></i> {{ p.fecha_entrega|date:"d/m" }}</span>{% endif %}
+  </div>
+  {% if p.responsable %}<div class="small muted mt-1"><i class="bi bi-person"></i> {{ p.responsable.display_name }}</div>{% endif %}
+</div>

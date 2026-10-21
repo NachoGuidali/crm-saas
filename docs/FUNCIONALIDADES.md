@@ -751,3 +751,19 @@ Detalle técnico y configuración de Anura: [`INTEGRACION_ANURA.md`](INTEGRACION
 | Etiquetas | Configuración → Etiquetas | Crear etiquetas; se usan en la ficha, acciones masivas, automatizaciones (poner etiqueta / condición) y al cerrar una venta |
 | Formularios de configuración | WhatsApp, Anura, email, SMS, usuarios | El navegador no los autocompleta con el usuario y la contraseña del CRM |
 | Números con miles | Todo el CRM | Los IDs ya no se escriben con punto de miles (rompía Llamar y las acciones masivas desde el ID 1000) |
+
+## 27. Clientes / Postventa (función extra opcional)
+
+Módulo opcional (función extra `postventa`, ver SAAS.md) para gestionar al cliente **después** de la venta. Se
+activa por cliente/plan y se ve solo para usuarios con el permiso `postventa`. Menú lateral: **Clientes**.
+
+| Función | Dónde | Cómo funciona |
+|---|---|---|
+| Cuentas | Clientes → Cuentas | Una cuenta = la empresa/cliente, asociada a uno o más contactos del CRM. Con responsable, email, teléfono y notas |
+| Alta automática al ganar | — | Cuando una oportunidad se cierra como Venta, el contacto pasa a ser una cuenta (si no la tenía). No duplica |
+| Proyectos | Ficha de la cuenta / Clientes → Proyectos | Cada cuenta puede tener varios proyectos, con **monto** y **fecha de entrega**. Un tablero kanban los muestra por estado |
+| Estados de proyecto | Clientes → Proyectos → Estados | Columnas del kanban **parametrizables** (nombre, color, "final"), como las etapas de un embudo. Requiere permiso `embudos` |
+| Tareas de postventa | Ficha de la cuenta | Tareas por cuenta o por proyecto, asignadas a un usuario, con vencimiento; se marcan como hechas |
+| Avisos de WhatsApp recurrentes | Ficha de la cuenta → "Avisos automáticos" | Mensajes que salen solos cada N meses (mensualidades, recordatorios de suscripción). Se elige contacto, línea y frecuencia (cada cuántos meses + día del mes). Con **plantilla aprobada** (variables) o **texto libre** con `{primer_nombre}`, `{empresa}`… En líneas oficiales con la ventana de 24 h cerrada hay que usar plantilla; por QR sale el texto libre. Una tarea diaria (`cuentas.enviar_avisos_recurrentes`, 10:00) los manda y agenda el próximo. Se pueden pausar/reactivar |
+
+> El toggle **"Al ganar una venta, crear una cuenta"** se configura por embudo (Configuración → Embudo), apagado por defecto: si no lo prendés, la venta solo queda cerrada y no se crea ninguna cuenta.

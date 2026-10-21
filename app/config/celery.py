@@ -8,4 +8,5 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.local')
 # la corre dentro de ese schema (sin esto, una tarea de un cliente leería las tablas del schema público).
 app = CeleryApp('crm_ventas')
 app.config_from_object('django.conf:settings', namespace='CELERY')
-app.autodiscover_tasks(['core', 'apps.clientes', 'apps.crm', 'apps.whatsapp', 'apps.telefonia', 'apps.automatizaciones'])
+app.autodiscover_tasks(['core', 'apps.clientes', 'apps.crm', 'apps.whatsapp', 'apps.telefonia',
+                        'apps.automatizaciones', 'apps.cuentas'])

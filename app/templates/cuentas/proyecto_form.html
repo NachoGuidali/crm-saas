@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}{{ proyecto.nombre|default:"Nuevo proyecto" }}{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-folder"></i> {{ proyecto.nombre|default:"Nuevo proyecto" }}</h1>
+  <div class="toolbar"><a href="{{ cuenta.get_absolute_url }}" class="btn btn-outline-secondary btn-sm">{{ cuenta.nombre }}</a></div>
+</div>
+<div class="row g-3"><div class="col-lg-7">
+<form method="post" class="card"><div class="card-body">{% csrf_token %}
+  {% if not proyecto %}<input type="hidden" name="cuenta" value="{{ cuenta.pk }}">{% endif %}
+  {% if form.non_field_errors %}<div class="alert alert-danger py-2">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+  <div class="row g-2">
+    <div class="col-12"><label class="form-label">Nombre del proyecto</label>{{ form.nombre }}{{ form.nombre.errors }}</div>
+    <div class="col-md-6"><label class="form-label">Estado</label>{{ form.estado }}</div>
+    <div class="col-md-6"><label class="form-label">Responsable</label>{{ form.responsable }}</div>
+    <div class="col-md-4"><label class="form-label">Monto ($)</label>{{ form.monto }}{{ form.monto.errors }}</div>
+    <div class="col-md-4"><label class="form-label">Inicio</label>{{ form.fecha_inicio }}</div>
+    <div class="col-md-4"><label class="form-label">{{ form.fecha_entrega.label }}</label>{{ form.fecha_entrega }}</div>
+    <div class="col-12"><label class="form-label">Descripción</label>{{ form.descripcion }}</div>
+  </div>
+  <div class="mt-3 d-flex gap-2">
+    <button class="btn btn-primary">Guardar</button>
+    <a href="{{ cuenta.get_absolute_url }}" class="btn btn-link">Cancelar</a>
+  </div>
+</div></form>
+</div></div>
+{% endblock %}
