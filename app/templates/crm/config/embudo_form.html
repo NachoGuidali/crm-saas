@@ -52,6 +52,9 @@
       <div class="col-6"><label class="form-label">{{ form.dias_estancado_alerta.label }}</label>{{ form.dias_estancado_alerta }}</div>
       <div class="col-12"><label class="form-label">{{ form.reingreso_perdidos.label }}</label>{{ form.reingreso_perdidos }}</div>
       <div class="col-12"><label class="d-flex gap-2 small">{{ form.notificar_venta_supervisores }} {{ form.notificar_venta_supervisores.label }}</label></div>
+      {% if 'postventa' in funciones_cliente %}
+      <div class="col-12"><label class="d-flex gap-2 small">{{ form.crear_cuenta_al_ganar }} {{ form.crear_cuenta_al_ganar.label }}</label><div class="form-text">{{ form.crear_cuenta_al_ganar.help_text }}</div></div>
+      {% endif %}
       <div class="col-12"><label class="d-flex gap-2 small">{{ form.exigir_resultado }} {{ form.exigir_resultado.label }}</label>
         <div class="form-text">{{ form.exigir_resultado.help_text }} Las opciones se configuran abajo, en <a href="#resultados">Resultados de gestión</a>.</div></div>
     </div>

@@ -623,6 +623,16 @@ def mover_etapa(op: Oportunidad, etapa: Etapa, usuario=None, tipificacion: Tipif
             f'{op.embudo} · {tipificacion} · {op.agente.display_name if op.agente else "sin agente"}',
             op.get_absolute_url(),
         )
+    # Postventa: al ganar la venta, el contacto pasa a ser una Cuenta (si el módulo está habilitado
+    # y el embudo tiene activado "crear cuenta al ganar"; apagado por defecto).
+    if op.estado == Oportunidad.ESTADO_GANADA and op.embudo.crear_cuenta_al_ganar:
+        from core.tenancy import tiene_funcion
+        if tiene_funcion('postventa'):
+            try:
+                from apps.cuentas.services import crear_cuenta_desde_oportunidad
+                crear_cuenta_desde_oportunidad(op)
+            except Exception:  # pragma: no cover - la venta no debe fallar por la postventa
+                logger.warning('No se pudo crear la cuenta de postventa para op %s', op.pk, exc_info=True)
     _disparar_entrada_etapa(op, historial)
     from .puntaje import recalcular
     transaction.on_commit(lambda: recalcular(op))

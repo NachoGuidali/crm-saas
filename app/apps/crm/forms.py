@@ -223,7 +223,8 @@ class EmbudoForm(BootstrapMixin, forms.ModelForm):
                   'asignar_entre', 'sin_conectados', 'sla_minutos', 'sla_accion', 'sla_max_reasignaciones',
                   'respetar_horario', 'horario_desde', 'horario_hasta', 'fuera_de_horario', 'crear_tarea_al_asignar',
                   'linea_whatsapp', 'max_intentos_sin_respuesta', 'dias_inactividad_recordatorio',
-                  'dias_estancado_alerta', 'notificar_venta_supervisores', 'reingreso_perdidos', 'exigir_resultado',
+                  'dias_estancado_alerta', 'notificar_venta_supervisores', 'crear_cuenta_al_ganar',
+                  'reingreso_perdidos', 'exigir_resultado',
                   'vence_dias', 'vence_accion', 'vence_hasta_etapa', 'socios_a', 'socios_usuario', 'etiqueta_venta', 'clientes_de_otros']
         widgets = {
             'descripcion': forms.Textarea(attrs={'rows': 2}),

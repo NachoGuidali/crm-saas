@@ -122,6 +122,11 @@ class Embudo(models.Model):
     dias_estancado_alerta = models.PositiveSmallIntegerField(
         default=7, verbose_name='Días en la misma etapa para avisar a supervisión', help_text='0 = desactivado')
     notificar_venta_supervisores = models.BooleanField(default=True, verbose_name='Avisar a supervisión cada venta')
+    crear_cuenta_al_ganar = models.BooleanField(
+        default=False, verbose_name='Al ganar una venta, crear una cuenta de postventa',
+        help_text='Solo si el módulo Clientes / Postventa está habilitado. El contacto pasa a ser una cuenta '
+                  '(sin duplicar). Dejalo apagado si solo querés que quede como venta cerrada.',
+    )
     reingreso_perdidos = models.CharField(
         max_length=10, choices=REINGRESO_CHOICES, default=REINGRESO_NUEVA,
         verbose_name='Si reingresa un prospecto que se perdió antes',
