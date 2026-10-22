@@ -6,7 +6,8 @@ from datetime import date
 from django.db import transaction
 from django.utils import timezone
 
-from .models import AvisoRecurrente, Cuenta, EstadoProyecto, Proyecto, ESTADOS_PROYECTO_DEFAULT
+from .models import (AvisoRecurrente, Cuenta, EstadoProyecto, Proyecto, RecordatorioPersonal,
+                     ESTADOS_PROYECTO_DEFAULT)
 
 logger = logging.getLogger('apps.cuentas')
 
@@ -118,4 +119,88 @@ def disparar_aviso(aviso, hoy=None):
     aviso.ultimo_detalle = detalle[:200]
     aviso.proximo_envio = proxima_fecha(hoy, aviso.cada_meses, aviso.dia_mes)
     aviso.save(update_fields=['ultimo_envio_at', 'ultimo_detalle', 'proximo_envio'])
+    return detalle
+
+
+# ── Recordatorios personales (el CRM te avisa a vos antes de una fecha) ─────────
+
+def _texto_recordatorio(rec):
+    """Cuerpo del recordatorio, común a email, WhatsApp y campanita."""
+    partes = [rec.titulo]
+    if rec.nota:
+        partes.append(rec.nota)
+    partes.append(f'📅 {rec.fecha:%d/%m/%Y}')
+    if rec.proyecto_id:
+        partes.append(f'Proyecto: {rec.proyecto.nombre}')
+    elif rec.cuenta_id:
+        partes.append(f'Cliente: {rec.cuenta.nombre}')
+    return '\n'.join(partes)
+
+
+def _recordatorio_por_email(rec):
+    if not (rec.usuario and rec.usuario.email):
+        return 'email omitido: no tenés un email cargado en tu usuario'
+    from django.core.mail import EmailMessage
+    from apps.automatizaciones.services import conexion_email
+    con, remitente = conexion_email()
+    EmailMessage(subject=f'⏰ Recordatorio: {rec.titulo}', body=_texto_recordatorio(rec),
+                 from_email=remitente, to=[rec.usuario.email], connection=con).send(fail_silently=False)
+    return f'email a {rec.usuario.email}'
+
+
+def _recordatorio_por_whatsapp(rec):
+    from apps.whatsapp import services as wa
+    from apps.whatsapp.services import ErrorEnvio
+    tel = (rec.usuario.telefono or '').strip() if rec.usuario else ''
+    if not tel:
+        return 'WhatsApp omitido: no tenés un teléfono cargado en tu usuario'
+    if wa.wa_dia_restante() == 0:
+        return 'WhatsApp omitido: se alcanzó el límite diario del plan'
+    linea = wa.linea_para(user=rec.usuario, preferida=rec.linea)
+    if linea is None:
+        return 'WhatsApp omitido: no hay ninguna línea activa'
+    conv, _ = wa.obtener_conversacion(linea, tel)
+    demora = wa.reservar_turno(linea)
+    try:
+        wa.enviar_mensaje(conv, texto=_texto_recordatorio(rec), automatico=True, demora_segundos=demora)
+    except ErrorEnvio as e:
+        return f'WhatsApp omitido: {e}'
+    return f'WhatsApp por {linea}'
+
+
+def enviar_recordatorio(rec):
+    """Manda el recordatorio por el/los canal(es) elegidos. Devuelve el detalle de lo que pasó."""
+    detalles = []
+    if rec.canal in (RecordatorioPersonal.CANAL_EMAIL, RecordatorioPersonal.CANAL_AMBOS):
+        try:
+            detalles.append(_recordatorio_por_email(rec))
+        except Exception as e:  # pragma: no cover - defensivo: un canal no frena el otro
+            logger.warning('Email del recordatorio %s falló', rec.pk, exc_info=True)
+            detalles.append(f'email falló: {e}')
+    if rec.canal in (RecordatorioPersonal.CANAL_WHATSAPP, RecordatorioPersonal.CANAL_AMBOS):
+        detalles.append(_recordatorio_por_whatsapp(rec))
+    return ' · '.join(detalles)
+
+
+def disparar_recordatorio(rec, hoy=None):
+    """Dispara el recordatorio: manda por sus canales, deja la campanita interna y lo marca enviado."""
+    detalle = 'Error inesperado'
+    try:
+        detalle = enviar_recordatorio(rec)
+    except Exception:  # pragma: no cover - nunca frenar el barrido por uno
+        logger.warning('Falló el recordatorio %s', rec.pk, exc_info=True)
+    try:
+        from apps.users.services import notificar
+        url = ''
+        if rec.proyecto_id:
+            url = rec.proyecto.get_absolute_url()
+        elif rec.cuenta_id:
+            url = rec.cuenta.get_absolute_url()
+        notificar(rec.usuario, 'tarea', f'Recordatorio: {rec.titulo}', rec.nota[:150], url)
+    except Exception:  # pragma: no cover
+        pass
+    rec.estado = RecordatorioPersonal.ESTADO_ENVIADO
+    rec.enviado_at = timezone.now()
+    rec.detalle = (detalle or '')[:200]
+    rec.save(update_fields=['estado', 'enviado_at', 'detalle'])
     return detalle

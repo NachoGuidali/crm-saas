@@ -63,6 +63,9 @@
       <a href="{% url 'cuentas:tablero' %}" class="nav-item {% if seccion == 'cuentas' and url_name == 'tablero' %}active{% endif %}">
         <span class="nav-icon"><i class="bi bi-kanban"></i></span> Proyectos
       </a>
+      <a href="{% url 'cuentas:recordatorios' %}" class="nav-item {% if url_name == 'recordatorios' %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-alarm"></i></span> Recordatorios
+      </a>
       {% endif %}
 
       {% if 'supervision' in perms_crm or 'reportes' in perms_crm or 'importar' in perms_crm or 'pautas' in perms_crm or 'difusiones' in perms_crm %}

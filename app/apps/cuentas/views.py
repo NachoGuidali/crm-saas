@@ -9,8 +9,10 @@ from django.views import View
 
 from core.permisos import PermisoRequeridoMixin
 from core.tenancy import tiene_funcion
-from .forms import AvisoRecurrenteForm, CuentaForm, EstadoProyectoForm, ProyectoForm, TareaPostventaForm
-from .models import AvisoRecurrente, Cuenta, EstadoProyecto, Proyecto, TareaPostventa
+from .forms import (AvisoRecurrenteForm, CuentaForm, EstadoProyectoForm, ProyectoForm, RecordatorioForm,
+                    TareaPostventaForm)
+from .models import (AvisoRecurrente, Cuenta, EstadoProyecto, Proyecto, RecordatorioPersonal,
+                     TareaPostventa)
 from . import services
 
 
@@ -264,3 +266,65 @@ class AvisoAccionView(PostventaMixin, View):
             aviso.activo = not aviso.activo
             aviso.save(update_fields=['activo'])
         return redirect('cuentas:detalle', pk=cuenta_id)
+
+
+# ── Recordatorios personales (el CRM te avisa a vos) ───────────────────────────
+
+class RecordatorioListView(PostventaMixin, View):
+    """Mis recordatorios: el CRM me avisa a mí antes de una fecha (email / WhatsApp)."""
+    def get(self, request):
+        recs = RecordatorioPersonal.objects.filter(usuario=request.user).select_related(
+            'linea', 'cuenta', 'proyecto')
+        return render(request, 'cuentas/recordatorios.html', {
+            'form': RecordatorioForm(),
+            'pendientes': recs.filter(estado=RecordatorioPersonal.ESTADO_PENDIENTE),
+            'historial': recs.exclude(estado=RecordatorioPersonal.ESTADO_PENDIENTE)[:30],
+        })
+
+    def post(self, request):
+        form = RecordatorioForm(request.POST)
+        proyecto = None
+        if request.POST.get('proyecto'):
+            proyecto = get_object_or_404(Proyecto.objects.select_related('cuenta'),
+                                         pk=request.POST['proyecto'])
+        if not form.is_valid():
+            if proyecto is not None:
+                messages.error(request, 'No se pudo crear el recordatorio: revisá la fecha.')
+                return redirect('cuentas:proyecto_editar', pk=proyecto.pk)
+            recs = RecordatorioPersonal.objects.filter(usuario=request.user).select_related(
+                'linea', 'cuenta', 'proyecto')
+            return render(request, 'cuentas/recordatorios.html', {
+                'form': form,
+                'pendientes': recs.filter(estado=RecordatorioPersonal.ESTADO_PENDIENTE),
+                'historial': recs.exclude(estado=RecordatorioPersonal.ESTADO_PENDIENTE)[:30],
+            })
+        rec = form.save(commit=False)
+        rec.usuario = request.user
+        if proyecto is not None:
+            rec.proyecto = proyecto
+            rec.cuenta = proyecto.cuenta
+        rec.save()
+        messages.success(request, f'Listo: te vamos a avisar el {rec.enviar_el:%d/%m/%Y}.')
+        if proyecto is not None:
+            return redirect('cuentas:proyecto_editar', pk=proyecto.pk)
+        return redirect('cuentas:recordatorios')
+
+
+class RecordatorioAccionView(PostventaMixin, View):
+    """Cancelar, reactivar o borrar uno de mis recordatorios."""
+    def post(self, request, pk):
+        rec = get_object_or_404(RecordatorioPersonal, pk=pk, usuario=request.user)
+        accion = request.POST.get('accion')
+        if accion == 'borrar':
+            rec.delete()
+            messages.success(request, 'Recordatorio eliminado.')
+        elif accion == 'cancelar':
+            rec.estado = RecordatorioPersonal.ESTADO_CANCELADO
+            rec.save(update_fields=['estado'])
+        elif accion == 'reactivar':
+            rec.estado = RecordatorioPersonal.ESTADO_PENDIENTE
+            rec.save(update_fields=['estado'])
+        destino = request.POST.get('next')
+        if destino == 'proyecto' and rec.proyecto_id:
+            return redirect('cuentas:proyecto_editar', pk=rec.proyecto_id)
+        return redirect('cuentas:recordatorios')

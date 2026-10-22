@@ -5,7 +5,7 @@
   <div class="toolbar"><a href="{{ cuenta.get_absolute_url }}" class="btn btn-outline-secondary btn-sm">{{ cuenta.nombre }}</a></div>
 </div>
 <div class="row g-3"><div class="col-lg-7">
-<form method="post" class="card"><div class="card-body">{% csrf_token %}
+<form method="post" class="card" action=""><div class="card-body">{% csrf_token %}
   {% if not proyecto %}<input type="hidden" name="cuenta" value="{{ cuenta.pk }}">{% endif %}
   {% if form.non_field_errors %}<div class="alert alert-danger py-2">{{ form.non_field_errors|join:" " }}</div>{% endif %}
   <div class="row g-2">
@@ -22,5 +22,30 @@
     <a href="{{ cuenta.get_absolute_url }}" class="btn btn-link">Cancelar</a>
   </div>
 </div></form>
-</div></div>
+</div>
+
+{% if proyecto and proyecto.fecha_entrega %}
+<div class="col-lg-5">
+  <div class="card"><div class="card-header"><i class="bi bi-alarm"></i> Recordarme la entrega</div>
+  <div class="card-body">
+    <p class="small muted">Te avisamos a vos antes de la entrega del {{ proyecto.fecha_entrega|date:"d/m/Y" }}.</p>
+    <form method="post" action="{% url 'cuentas:recordatorios' %}" class="row g-2">{% csrf_token %}
+      <input type="hidden" name="proyecto" value="{{ proyecto.pk }}">
+      <input type="hidden" name="titulo" value="Entrega: {{ proyecto.nombre }}">
+      <input type="hidden" name="fecha" value="{{ proyecto.fecha_entrega|date:'Y-m-d' }}">
+      <div class="col-6"><label class="form-label small">Días antes</label>
+        <input type="number" name="dias_antes" value="3" min="0" max="60" class="form-control"></div>
+      <div class="col-6"><label class="form-label small">Cómo</label>
+        <select name="canal" class="form-select">
+          <option value="email">Email</option>
+          <option value="whatsapp">WhatsApp</option>
+          <option value="ambos">Email y WhatsApp</option>
+        </select></div>
+      <div class="col-12"><button class="btn btn-outline-primary w-100"><i class="bi bi-bell"></i> Avisarme antes de la entrega</button></div>
+    </form>
+    <div class="form-text mt-2">Lo vas a ver y gestionar en <a href="{% url 'cuentas:recordatorios' %}">Recordatorios</a>.</div>
+  </div></div>
+</div>
+{% endif %}
+</div>
 {% endblock %}

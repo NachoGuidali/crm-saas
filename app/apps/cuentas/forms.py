@@ -1,7 +1,8 @@
 from django import forms
 
 from apps.users.models import User
-from .models import AvisoRecurrente, Cuenta, EstadoProyecto, Proyecto, TareaPostventa
+from .models import (AvisoRecurrente, Cuenta, EstadoProyecto, Proyecto, RecordatorioPersonal,
+                     TareaPostventa)
 from . import services
 
 
@@ -113,3 +114,22 @@ class AvisoRecurrenteForm(forms.ModelForm):
         if commit:
             aviso.save()
         return aviso
+
+
+class RecordatorioForm(forms.ModelForm):
+    class Meta:
+        model = RecordatorioPersonal
+        fields = ['titulo', 'fecha', 'dias_antes', 'canal', 'linea', 'nota']
+        widgets = {
+            'fecha': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
+            'nota': forms.Textarea(attrs={'rows': 2}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from apps.whatsapp.models import LineaWhatsApp
+        self.fields['fecha'].input_formats = ['%Y-%m-%d']
+        self.fields['linea'].queryset = LineaWhatsApp.objects.filter(activa=True)
+        self.fields['linea'].required = False
+        self.fields['nota'].required = False
+        _bootstrap(self)

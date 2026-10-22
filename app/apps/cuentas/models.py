@@ -177,3 +177,60 @@ class AvisoRecurrente(models.Model):
 
     def __str__(self):
         return f'{self.cuenta} · cada {self.cada_meses} mes(es)'
+
+
+class RecordatorioPersonal(models.Model):
+    """
+    Recordatorio que el CRM te manda **a vos** (al usuario), unos días antes de una fecha.
+    Ej.: "entrego el 1/11" → avisame 3 días antes por email y/o WhatsApp.
+    Lo dispara una tarea diaria (ver tasks.enviar_recordatorios).
+    """
+    CANAL_EMAIL = 'email'
+    CANAL_WHATSAPP = 'whatsapp'
+    CANAL_AMBOS = 'ambos'
+    CANAL_CHOICES = [
+        (CANAL_EMAIL, 'Email'),
+        (CANAL_WHATSAPP, 'WhatsApp'),
+        (CANAL_AMBOS, 'Email y WhatsApp'),
+    ]
+    ESTADO_PENDIENTE = 'pendiente'
+    ESTADO_ENVIADO = 'enviado'
+    ESTADO_CANCELADO = 'cancelado'
+    ESTADO_CHOICES = [(ESTADO_PENDIENTE, 'Pendiente'), (ESTADO_ENVIADO, 'Enviado'),
+                      (ESTADO_CANCELADO, 'Cancelado')]
+
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE, related_name='recordatorios',
+                                verbose_name='Avisar a')
+    titulo = models.CharField('¿Qué te recuerdo?', max_length=200)
+    nota = models.TextField('Detalle (opcional)', blank=True)
+    fecha = models.DateField('Fecha del evento')
+    dias_antes = models.PositiveSmallIntegerField('Avisar con cuántos días de anticipación', default=0,
+                                                  help_text='0 = el mismo día. Ej.: 3 = tres días antes.')
+    canal = models.CharField('Cómo avisarte', max_length=10, choices=CANAL_CHOICES, default=CANAL_EMAIL)
+    linea = models.ForeignKey('whatsapp.LineaWhatsApp', null=True, blank=True, on_delete=models.SET_NULL,
+                              related_name='+', verbose_name='Línea de WhatsApp',
+                              help_text='Solo para WhatsApp. Vacío = se elige una línea activa.')
+    # Vínculos opcionales (ej.: recordatorio de la entrega de un proyecto).
+    cuenta = models.ForeignKey(Cuenta, null=True, blank=True, on_delete=models.CASCADE,
+                               related_name='recordatorios')
+    proyecto = models.ForeignKey(Proyecto, null=True, blank=True, on_delete=models.CASCADE,
+                                 related_name='recordatorios')
+    # Día en que realmente se dispara (fecha - dias_antes). Lo calcula save().
+    enviar_el = models.DateField(db_index=True, editable=False)
+    estado = models.CharField(max_length=12, choices=ESTADO_CHOICES, default=ESTADO_PENDIENTE)
+    enviado_at = models.DateTimeField(null=True, blank=True)
+    detalle = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['enviar_el', 'fecha']
+        verbose_name = 'Recordatorio personal'
+        verbose_name_plural = 'Recordatorios personales'
+
+    def __str__(self):
+        return self.titulo
+
+    def save(self, *args, **kwargs):
+        from datetime import timedelta
+        self.enviar_el = self.fecha - timedelta(days=max(0, self.dias_antes or 0))
+        super().save(*args, **kwargs)

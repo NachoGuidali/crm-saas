@@ -239,6 +239,7 @@ CELERY_BEAT_SCHEDULE = {
     'whatsapp-estado-lineas': {'task': 'whatsapp.actualizar_estado_lineas', 'schedule': 300},
     'whatsapp-sync-plantillas': {'task': 'whatsapp.sincronizar_plantillas', 'schedule': crontab(minute=0)},
     'avisos-recurrentes': {'task': 'cuentas.enviar_avisos_recurrentes', 'schedule': crontab(hour=10, minute=0)},
+    'recordatorios-personales': {'task': 'cuentas.enviar_recordatorios', 'schedule': crontab(hour=8, minute=0)},
     'purgar-logs': {'task': 'core.purgar_logs', 'schedule': crontab(hour=3, minute=30)},
     # Solo en el schema público (plataforma): avisos de vencimiento y suspensión por falta de pago.
     'clientes-cobros': {'task': 'clientes.revisar_cobros', 'schedule': crontab(hour=9, minute=0),

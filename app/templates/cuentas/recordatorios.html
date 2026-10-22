@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Recordatorios{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-alarm"></i> Mis recordatorios</h1></div>
+
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="card"><div class="card-header"><i class="bi bi-plus-lg"></i> Nuevo recordatorio</div>
+    <div class="card-body">
+      <p class="small muted">El CRM te avisa a vos (email y/o WhatsApp) unos días antes de una fecha. Ej.: entregás el 1/11 y querés que te avise 3 días antes.</p>
+      <form method="post" class="row g-2">{% csrf_token %}
+        {% if form.non_field_errors %}<div class="col-12"><div class="alert alert-danger py-2">{{ form.non_field_errors|join:" " }}</div></div>{% endif %}
+        <div class="col-12"><label class="form-label small">{{ form.titulo.label }}</label>{{ form.titulo }}{{ form.titulo.errors }}</div>
+        <div class="col-7"><label class="form-label small">{{ form.fecha.label }}</label>{{ form.fecha }}{{ form.fecha.errors }}</div>
+        <div class="col-5"><label class="form-label small">Días antes</label>{{ form.dias_antes }}{{ form.dias_antes.errors }}</div>
+        <div class="col-12"><label class="form-label small">{{ form.canal.label }}</label>{{ form.canal }}</div>
+        <div class="col-12"><label class="form-label small">{{ form.linea.label }}</label>{{ form.linea }}<div class="form-text">{{ form.linea.help_text }}</div></div>
+        <div class="col-12"><label class="form-label small">{{ form.nota.label }}</label>{{ form.nota }}</div>
+        <div class="col-12"><button class="btn btn-primary"><i class="bi bi-bell"></i> Crear recordatorio</button></div>
+      </form>
+    </div></div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card mb-3"><div class="card-header"><i class="bi bi-hourglass-split"></i> Pendientes</div><div class="card-body">
+      {% for r in pendientes %}
+        <div class="d-flex justify-content-between align-items-start py-2 {% if not forloop.last %}border-bottom{% endif %}">
+          <div>
+            <span class="fw-semibold">{{ r.titulo }}</span>
+            <span class="chip ms-1"><i class="bi bi-{% if r.canal == 'email' %}envelope{% elif r.canal == 'whatsapp' %}whatsapp{% else %}send{% endif %}"></i> {{ r.get_canal_display }}</span>
+            <div class="small muted">
+              Evento {{ r.fecha|date:"d/m/Y" }} · te aviso el <strong>{{ r.enviar_el|date:"d/m/Y" }}</strong>
+              {% if r.dias_antes %}({{ r.dias_antes }} día{{ r.dias_antes|pluralize }} antes){% else %}(mismo día){% endif %}
+              {% if r.proyecto %} · <a href="{% url 'cuentas:proyecto_editar' r.proyecto.pk %}">{{ r.proyecto.nombre }}</a>{% elif r.cuenta %} · <a href="{{ r.cuenta.get_absolute_url }}">{{ r.cuenta.nombre }}</a>{% endif %}
+            </div>
+            {% if r.nota %}<div class="small muted">{{ r.nota|truncatechars:90 }}</div>{% endif %}
+          </div>
+          <form method="post" action="{% url 'cuentas:recordatorio_accion' r.pk %}" class="d-flex gap-1">{% csrf_token %}
+            <button name="accion" value="cancelar" class="btn btn-sm btn-outline-secondary" title="Cancelar"><i class="bi bi-pause"></i></button>
+            <button name="accion" value="borrar" class="btn btn-sm btn-outline-danger" title="Eliminar" onclick="return confirm('¿Eliminar este recordatorio?')"><i class="bi bi-trash"></i></button>
+          </form>
+        </div>
+      {% empty %}<div class="muted small">No tenés recordatorios pendientes.</div>{% endfor %}
+    </div></div>
+
+    {% if historial %}
+    <div class="card"><div class="card-header"><i class="bi bi-clock-history"></i> Historial</div><div class="card-body">
+      {% for r in historial %}
+        <div class="d-flex justify-content-between align-items-start py-1 {% if not forloop.last %}border-bottom{% endif %}">
+          <div class="small">
+            {% if r.estado == 'cancelado' %}<s class="muted">{{ r.titulo }}</s> <span class="chip">Cancelado</span>
+            {% else %}{{ r.titulo }} <span class="chip">Enviado</span>{% endif %}
+            <div class="muted">
+              {% if r.enviado_at %}{{ r.enviado_at|date:"d/m/Y H:i" }}{% else %}{{ r.fecha|date:"d/m/Y" }}{% endif %}
+              {% if r.detalle %} · {{ r.detalle }}{% endif %}
+            </div>
+          </div>
+          <form method="post" action="{% url 'cuentas:recordatorio_accion' r.pk %}" class="d-flex gap-1">{% csrf_token %}
+            {% if r.estado == 'cancelado' %}<button name="accion" value="reactivar" class="btn btn-sm btn-outline-secondary" title="Reactivar"><i class="bi bi-arrow-counterclockwise"></i></button>{% endif %}
+            <button name="accion" value="borrar" class="btn btn-sm btn-outline-danger" title="Eliminar" onclick="return confirm('¿Eliminar?')"><i class="bi bi-trash"></i></button>
+          </form>
+        </div>
+      {% endfor %}
+    </div></div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

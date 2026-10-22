@@ -22,3 +22,22 @@ def enviar_avisos_recurrentes():
         services.disparar_aviso(aviso, hoy)
         n += 1
     return n
+
+
+@shared_task(name='cuentas.enviar_recordatorios')
+def enviar_recordatorios():
+    """Manda los recordatorios personales que corresponden a hoy (fecha - días de anticipación)."""
+    from core.tenancy import tiene_funcion
+    if not tiene_funcion('postventa'):
+        return 0
+    from .models import RecordatorioPersonal
+    from . import services
+    hoy = timezone.localdate()
+    pendientes = (RecordatorioPersonal.objects
+                  .filter(estado=RecordatorioPersonal.ESTADO_PENDIENTE, enviar_el__lte=hoy)
+                  .select_related('usuario', 'linea', 'cuenta', 'proyecto')[:500])
+    n = 0
+    for rec in pendientes:
+        services.disparar_recordatorio(rec, hoy)
+        n += 1
+    return n

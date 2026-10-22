@@ -10,9 +10,12 @@ from apps.users.models import User
 
 from datetime import date
 
-from .models import AvisoRecurrente, Cuenta, EstadoProyecto, Proyecto, TareaPostventa
+from django.core import mail
+
+from .models import (AvisoRecurrente, Cuenta, EstadoProyecto, Proyecto, RecordatorioPersonal,
+                     TareaPostventa)
 from . import services
-from .tasks import enviar_avisos_recurrentes
+from .tasks import enviar_avisos_recurrentes, enviar_recordatorios
 
 
 def _habilitar_postventa(habilitada=True):
@@ -197,3 +200,74 @@ class AccesoYVistasTests(BasePostventa):
         t.refresh_from_db()
         self.assertEqual(t.estado, TareaPostventa.ESTADO_COMPLETADA)
         self.assertIsNotNone(t.completada_at)
+
+
+class RecordatoriosTests(BasePostventa):
+    def setUp(self):
+        super().setUp()
+        self.yo = User.objects.create_user('yo', password='x', email='yo@test.com', rol=User.ROL_ADMIN)
+
+    def test_calcula_enviar_el_restando_los_dias(self):
+        r = RecordatorioPersonal.objects.create(usuario=self.yo, titulo='Entrega', fecha=date(2026, 11, 1),
+                                                dias_antes=3)
+        self.assertEqual(r.enviar_el, date(2026, 10, 29))
+
+    def test_la_tarea_dispara_los_de_hoy_por_email_y_marca_enviado(self):
+        hoy = timezone.localdate()
+        r = RecordatorioPersonal.objects.create(usuario=self.yo, titulo='Entregar la web', fecha=hoy,
+                                                dias_antes=0, canal=RecordatorioPersonal.CANAL_EMAIL)
+        futuro = RecordatorioPersonal.objects.create(usuario=self.yo, titulo='Después', fecha=date(2099, 1, 1),
+                                                     dias_antes=0, canal=RecordatorioPersonal.CANAL_EMAIL)
+        mail.outbox = []
+        self.assertEqual(enviar_recordatorios(), 1)
+        r.refresh_from_db()
+        self.assertEqual(r.estado, RecordatorioPersonal.ESTADO_ENVIADO)
+        self.assertIsNotNone(r.enviado_at)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('yo@test.com', mail.outbox[0].to)
+        futuro.refresh_from_db()
+        self.assertEqual(futuro.estado, RecordatorioPersonal.ESTADO_PENDIENTE)
+
+    def test_la_tarea_no_hace_nada_sin_funcion(self):
+        _habilitar_postventa(False)
+        RecordatorioPersonal.objects.create(usuario=self.yo, titulo='x', fecha=timezone.localdate())
+        self.assertEqual(enviar_recordatorios(), 0)
+
+    def test_crear_por_la_vista(self):
+        self.client.force_login(self.yo)
+        r = self.client.post(reverse('cuentas:recordatorios'),
+                             {'titulo': 'Pagar hosting', 'fecha': '2026-12-01', 'dias_antes': '2',
+                              'canal': 'ambos', 'nota': ''}, follow=True)
+        self.assertEqual(r.status_code, 200)  # renderiza la lista de recordatorios sin error
+        rec = RecordatorioPersonal.objects.get(titulo='Pagar hosting')
+        self.assertEqual(rec.usuario, self.yo)
+        self.assertEqual(rec.enviar_el, date(2026, 11, 29))
+
+    def test_crear_desde_un_proyecto(self):
+        self.client.force_login(self.yo)
+        cuenta = Cuenta.objects.create(nombre='Acme SA')
+        p = Proyecto.objects.create(cuenta=cuenta, nombre='Web', fecha_entrega=date(2026, 11, 10))
+        r = self.client.post(reverse('cuentas:recordatorios'),
+                             {'proyecto': p.pk, 'titulo': 'Entrega: Web', 'fecha': '2026-11-10',
+                              'dias_antes': '3', 'canal': 'email'}, follow=True)
+        self.assertEqual(r.status_code, 200)  # renderiza la ficha del proyecto (con el atajo) sin error
+        rec = RecordatorioPersonal.objects.get(proyecto=p)
+        self.assertEqual(rec.cuenta, cuenta)
+        self.assertEqual(rec.enviar_el, date(2026, 11, 7))
+
+    def test_cancelar_y_reactivar(self):
+        self.client.force_login(self.yo)
+        rec = RecordatorioPersonal.objects.create(usuario=self.yo, titulo='x', fecha=date(2099, 1, 1))
+        url = reverse('cuentas:recordatorio_accion', args=[rec.pk])
+        self.client.post(url, {'accion': 'cancelar'})
+        rec.refresh_from_db()
+        self.assertEqual(rec.estado, RecordatorioPersonal.ESTADO_CANCELADO)
+        self.client.post(url, {'accion': 'reactivar'})
+        rec.refresh_from_db()
+        self.assertEqual(rec.estado, RecordatorioPersonal.ESTADO_PENDIENTE)
+
+    def test_sin_funcion_la_vista_404(self):
+        _habilitar_postventa(False)
+        self.client.force_login(self.yo)
+        r = self.client.get(reverse('cuentas:recordatorios'))
+        self.assertEqual(r.status_code, 404)
