@@ -312,6 +312,16 @@ class PanelTests(BaseMultiCliente):
         self.assertEqual(resp.status_code, 302)
         self.assertEqual(resp['Location'], 'https://otro.testserver/usuarios/login/')
 
+    def test_home_publica_se_ve_con_boton_ingresar(self):
+        resp = self.pedir(Client(), 'get', '/', PLATAFORMA)
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, '/ingresar/')
+
+    def test_home_muestra_whatsapp_si_hay_numero(self):
+        with self.settings(SAAS_WHATSAPP_VENTAS='5491112345678'):
+            resp = self.pedir(Client(), 'get', '/', PLATAFORMA)
+        self.assertContains(resp, 'wa.me/5491112345678')
+
 
 class SubdominioTests(TestCase):
     def test_validaciones(self):

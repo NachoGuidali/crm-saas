@@ -1,0 +1,204 @@
+{% load static %}<!DOCTYPE html>
+<html lang="es" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ CRM_NOMBRE }} — CRM con WhatsApp, telefonía y automatizaciones</title>
+  <meta name="description" content="{{ SAAS_DESCRIPCION }}">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://{{ SAAS_DOMINIO }}/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="{{ CRM_NOMBRE }} — CRM para ventas y postventa">
+  <meta property="og:description" content="{{ SAAS_DESCRIPCION }}">
+  <meta property="og:url" content="https://{{ SAAS_DOMINIO }}/">
+  <meta name="theme-color" content="#0D1117">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    :root{
+      --bg:#0D1117; --bg2:#161C26; --bg3:#1E2736; --border:rgba(255,255,255,.08);
+      --border2:rgba(255,255,255,.14); --text:#E8ECF4; --text2:#8B95A8;
+      --blue:#3B7EF6; --violet:#7C5CFC; --green:#22C97A; --amber:#F59E0B; --cyan:#06B6D4;
+      --font-head:'Space Grotesk',sans-serif; --font-body:'DM Sans',sans-serif;
+    }
+    *{box-sizing:border-box}
+    body{background:var(--bg);color:var(--text);font-family:var(--font-body);margin:0;line-height:1.55;
+         -webkit-font-smoothing:antialiased;overflow-x:hidden}
+    h1,h2,h3,.h-font{font-family:var(--font-head);letter-spacing:-.02em}
+    a{color:inherit;text-decoration:none}
+    .wrap{max-width:1080px;margin:0 auto;padding:0 16px}
+    /* decorative glow */
+    .glow{position:absolute;inset:0;overflow:hidden;z-index:0;pointer-events:none}
+    .glow::before{content:"";position:absolute;top:-220px;left:50%;transform:translateX(-50%);
+      width:900px;height:620px;border-radius:50%;
+      background:radial-gradient(closest-side,rgba(59,126,246,.22),transparent 70%);filter:blur(10px)}
+    /* nav */
+    header.nav{position:sticky;top:0;z-index:20;background:rgba(13,17,23,.82);
+      backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+    .nav-inner{display:flex;align-items:center;justify-content:space-between;height:60px}
+    .brand{display:flex;align-items:center;gap:10px;font-family:var(--font-head);font-weight:600;font-size:1.05rem}
+    .logo-mark{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;color:#fff;font-weight:700;
+      background:linear-gradient(135deg,var(--blue),var(--violet));font-family:var(--font-head);font-size:.95rem}
+    .nav-links{display:flex;align-items:center;gap:26px}
+    .nav-links a.navlink{color:var(--text2);font-weight:500;font-size:.94rem}
+    .nav-links a.navlink:hover{color:var(--text)}
+    .btn-ingresar{background:var(--blue);color:#fff;border:0;border-radius:9px;padding:9px 20px;font-weight:600;
+      font-size:.94rem;transition:filter .15s}
+    .btn-ingresar:hover{filter:brightness(1.1);color:#fff}
+    .btn-wa{background:var(--green);color:#06231a;border:0;border-radius:9px;padding:12px 24px;font-weight:700;
+      display:inline-flex;align-items:center;gap:9px;transition:filter .15s}
+    .btn-wa:hover{filter:brightness(1.07);color:#06231a}
+    .btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border2);border-radius:9px;
+      padding:12px 24px;font-weight:600;display:inline-flex;align-items:center;gap:9px;transition:background .15s}
+    .btn-ghost:hover{background:var(--bg2);color:var(--text)}
+    /* hero */
+    .hero{position:relative;text-align:center;padding:84px 0 64px}
+    .hero .wrap{position:relative;z-index:1}
+    .pill{display:inline-flex;align-items:center;gap:7px;background:var(--bg2);border:1px solid var(--border);
+      border-radius:999px;padding:6px 14px;font-size:.82rem;color:var(--text2);margin-bottom:22px}
+    .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--green)}
+    .hero h1{font-size:clamp(2.1rem,5vw,3.5rem);font-weight:700;line-height:1.08;margin:0 auto 18px;max-width:14ch}
+    .hero .grad{background:linear-gradient(120deg,var(--blue),var(--violet) 60%,var(--cyan));
+      -webkit-background-clip:text;background-clip:text;color:transparent}
+    .hero p.lead{font-size:clamp(1.02rem,2vw,1.22rem);color:var(--text2);max-width:46ch;margin:0 auto 32px}
+    .cta-row{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+    .hero .mini{margin-top:18px;color:var(--text2);font-size:.86rem}
+    /* sections */
+    section{position:relative;padding:60px 0}
+    .sec-head{text-align:center;max-width:52ch;margin:0 auto 44px}
+    .sec-head h2{font-size:clamp(1.6rem,3.5vw,2.3rem);font-weight:700;margin:0 0 12px}
+    .sec-head p{color:var(--text2);margin:0}
+    .eyebrow{color:var(--blue);font-weight:600;font-size:.82rem;text-transform:uppercase;letter-spacing:.08em;
+      margin-bottom:10px;display:block}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+    .card-f{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:26px 24px;
+      transition:border-color .15s,transform .15s}
+    .card-f:hover{border-color:var(--border2);transform:translateY(-2px)}
+    .card-f .ico{width:46px;height:46px;border-radius:11px;display:grid;place-items:center;font-size:1.3rem;
+      margin-bottom:16px}
+    .card-f h3{font-size:1.08rem;font-weight:600;margin:0 0 8px}
+    .card-f p{color:var(--text2);font-size:.93rem;margin:0}
+    .i-blue{background:rgba(59,126,246,.14);color:var(--blue)}
+    .i-green{background:rgba(34,201,122,.14);color:var(--green)}
+    .i-violet{background:rgba(124,92,252,.14);color:var(--violet)}
+    .i-amber{background:rgba(245,158,11,.14);color:var(--amber)}
+    .i-cyan{background:rgba(6,182,212,.14);color:var(--cyan)}
+    /* steps */
+    .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;counter-reset:s}
+    .step{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:26px 24px}
+    .step .num{counter-increment:s;font-family:var(--font-head);font-weight:700;color:var(--blue);font-size:1.5rem}
+    .step .num::before{content:counter(s)}
+    .step h3{font-size:1.05rem;margin:10px 0 6px;font-weight:600}
+    .step p{color:var(--text2);font-size:.92rem;margin:0}
+    /* cta band */
+    .band{background:linear-gradient(135deg,rgba(59,126,246,.14),rgba(124,92,252,.14));
+      border:1px solid var(--border2);border-radius:20px;padding:48px 32px;text-align:center}
+    .band h2{font-size:clamp(1.5rem,3.5vw,2.1rem);margin:0 0 14px;font-weight:700}
+    .band p{color:var(--text2);margin:0 0 28px;max-width:44ch;margin-inline:auto}
+    /* footer */
+    footer{border-top:1px solid var(--border);padding:34px 0;color:var(--text2);font-size:.9rem}
+    .foot-inner{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px}
+    @media(max-width:860px){
+      .grid,.steps{grid-template-columns:1fr}
+      .nav-links a.navlink{display:none}
+      .hero{padding:60px 0 48px}
+    }
+  </style>
+</head>
+<body>
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="/"><span class="logo-mark">{{ CRM_NOMBRE|slice:":1" }}</span> {{ CRM_NOMBRE }}</a>
+    <nav class="nav-links">
+      <a class="navlink" href="#funciones">Funciones</a>
+      <a class="navlink" href="#como">Cómo funciona</a>
+      <a class="btn-ingresar" href="{% url 'ingresar' %}">Ingresar</a>
+    </nav>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="glow"></div>
+  <div class="wrap">
+    <span class="pill"><span class="dot"></span> CRM multi-empresa · WhatsApp · Telefonía</span>
+    <h1>Vendé y atendé a tus clientes <span class="grad">desde un solo lugar</span></h1>
+    <p class="lead">{{ SAAS_DESCRIPCION }}</p>
+    <div class="cta-row">
+      {% if wa_url %}<a class="btn-wa" href="{{ wa_url }}" target="_blank" rel="noopener"><i class="bi bi-whatsapp"></i> Pedir una demo</a>{% endif %}
+      <a class="btn-ghost" href="{% url 'ingresar' %}"><i class="bi bi-box-arrow-in-right"></i> Ingresar a mi cuenta</a>
+    </div>
+    <div class="mini">Cada empresa con su propio espacio y sus datos aislados.</div>
+  </div>
+</div>
+
+<section id="funciones">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Todo integrado</span>
+      <h2>Una herramienta, todo el proceso</h2>
+      <p>Desde que entra un prospecto hasta la postventa, sin saltar entre apps sueltas.</p>
+    </div>
+    <div class="grid">
+      <div class="card-f"><div class="ico i-blue"><i class="bi bi-kanban"></i></div>
+        <h3>Embudos de venta</h3>
+        <p>Tableros kanban por etapa, asignación automática de prospectos, tareas y tipificaciones. Nada se pierde.</p></div>
+      <div class="card-f"><div class="ico i-green"><i class="bi bi-whatsapp"></i></div>
+        <h3>WhatsApp integrado</h3>
+        <p>Chateá desde el CRM con varias líneas (oficial o QR), plantillas, difusiones y respuestas automáticas.</p></div>
+      <div class="card-f"><div class="ico i-cyan"><i class="bi bi-telephone"></i></div>
+        <h3>Telefonía y discador</h3>
+        <p>Llamadas con registro automático, internos y discador para campañas salientes.</p></div>
+      <div class="card-f"><div class="ico i-violet"><i class="bi bi-lightning-charge"></i></div>
+        <h3>Automatizaciones</h3>
+        <p>Acciones por etapa: mandar WhatsApp o email, crear tareas, reasignar, avisar al equipo. Se arma sin código.</p></div>
+      <div class="card-f"><div class="ico i-amber"><i class="bi bi-people"></i></div>
+        <h3>Clientes y postventa</h3>
+        <p>Cuentas, proyectos, tareas, avisos mensuales y recordatorios. El cliente sigue vivo después de la venta.</p></div>
+      <div class="card-f"><div class="ico i-blue"><i class="bi bi-graph-up-arrow"></i></div>
+        <h3>Reportes en vivo</h3>
+        <p>Pulso del equipo, conversión por etapa y productividad por vendedor, actualizado al instante.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="como">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Simple de arrancar</span>
+      <h2>Cómo funciona</h2>
+      <p>Te damos tu espacio y empezás a cargar a tu equipo el mismo día.</p>
+    </div>
+    <div class="steps">
+      <div class="step"><div class="num"></div><h3>Tu propio espacio</h3>
+        <p>Cada empresa entra por su dirección, con sus usuarios y sus datos separados del resto.</p></div>
+      <div class="step"><div class="num"></div><h3>Conectás tus canales</h3>
+        <p>Sumás tus líneas de WhatsApp, telefonía y armás tus embudos y automatizaciones.</p></div>
+      <div class="step"><div class="num"></div><h3>Vende tu equipo</h3>
+        <p>Los vendedores trabajan desde un solo lugar y vos mirás todo en los reportes.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="band">
+      <h2>¿Lo querés para tu empresa?</h2>
+      <p>Te mostramos el CRM funcionando con tu caso y te dejamos tu espacio listo para probar.</p>
+      <div class="cta-row">
+        {% if wa_url %}<a class="btn-wa" href="{{ wa_url }}" target="_blank" rel="noopener"><i class="bi bi-whatsapp"></i> Escribinos por WhatsApp</a>{% endif %}
+        <a class="btn-ghost" href="{% url 'ingresar' %}"><i class="bi bi-box-arrow-in-right"></i> Ya tengo cuenta</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot-inner">
+    <div class="brand" style="font-size:.98rem"><span class="logo-mark" style="width:28px;height:28px;font-size:.8rem">{{ CRM_NOMBRE|slice:":1" }}</span> {{ CRM_NOMBRE }}</div>
+    <div>© {% now "Y" %} {{ CRM_SUBTITULO|default:"SupReg Solutions" }} · Todos los derechos reservados</div>
+    <div><a href="{% url 'ingresar' %}" class="navlink" style="color:var(--text2)">Ingresar</a></div>
+  </div>
+</footer>
+</body>
+</html>

@@ -348,6 +348,22 @@ class AuditoriaPanelView(PanelMixin, View):
             'pagina': pagina, 'accion': accion, 'q': q, 'acciones': RegistroAuditoria.ACCION_CHOICES})
 
 
+class HomeView(View):
+    """Home pública de supregcrm.com: presentación del producto para indexar y publicitar."""
+
+    def get(self, request):
+        numero = (settings.SAAS_WHATSAPP_VENTAS or '').strip()
+        wa_url = ''
+        if numero:
+            from urllib.parse import quote
+            msg = quote(f'Hola, quiero más info sobre {settings.CRM_NOMBRE}.')
+            wa_url = f'https://wa.me/{numero}?text={msg}'
+        return render(request, 'clientes/home.html', {
+            'wa_url': wa_url,
+            'SAAS_DESCRIPCION': settings.SAAS_DESCRIPCION,
+        })
+
+
 class IngresarView(View):
     """Login central: el usuario indica su empresa y lo mandamos al login de su subdominio."""
 

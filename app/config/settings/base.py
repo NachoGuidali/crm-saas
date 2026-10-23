@@ -36,6 +36,11 @@ SAAS_SUSPENDER_VENCIDOS = env_bool('SAAS_SUSPENDER_VENCIDOS', True)
 SAAS_EMAIL_AVISOS = env_bool('SAAS_EMAIL_AVISOS', True)   # email al cliente antes de vencer y al suspender
 SAAS_DATOS_PAGO = env('SAAS_DATOS_PAGO', '')              # ej: "Alias: mi.alias.mp · CBU 000... · Titular X"
 SAAS_EMAIL_AVISOS_COPIA = env('SAAS_EMAIL_AVISOS_COPIA', '')  # copia de los avisos (tu email)
+# Home pública (supregcrm.com): WhatsApp de ventas para el botón "Pedir demo". Solo dígitos, con país y 9.
+# Ej. Argentina: 5491112345678. Vacío = el botón no se muestra.
+SAAS_WHATSAPP_VENTAS = env('SAAS_WHATSAPP_VENTAS', '')
+SAAS_DESCRIPCION = env('SAAS_DESCRIPCION',
+                       'CRM con WhatsApp, telefonía y automatizaciones para equipos de ventas y postventa.')
 MP_ACCESS_TOKEN = env('MP_ACCESS_TOKEN', '')
 MP_WEBHOOK_SECRET = env('MP_WEBHOOK_SECRET', '')
 

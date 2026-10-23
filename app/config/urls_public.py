@@ -3,12 +3,11 @@ URLs del dominio principal (schema público): la pantalla para ingresar y el pan
 El CRM de cada cliente se sirve en su subdominio con config/urls.py.
 """
 from django.urls import include, path
-from django.views.generic import RedirectView
 
 from apps.clientes import views as clientes_views
 
 urlpatterns = [
-    path('', RedirectView.as_view(pattern_name='ingresar', permanent=False)),
+    path('', clientes_views.HomeView.as_view(), name='home'),
     path('ingresar/', clientes_views.IngresarView.as_view(), name='ingresar'),
     path('panel/', include('apps.clientes.urls')),
     path('mercadopago/webhook/', clientes_views.MercadoPagoWebhookView.as_view(), name='mercadopago_webhook'),
