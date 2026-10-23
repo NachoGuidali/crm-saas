@@ -8,6 +8,8 @@ from apps.clientes import views as clientes_views
 
 urlpatterns = [
     path('', clientes_views.HomeView.as_view(), name='home'),
+    path('robots.txt', clientes_views.robots_txt, name='robots'),
+    path('sitemap.xml', clientes_views.sitemap_xml, name='sitemap'),
     path('ingresar/', clientes_views.IngresarView.as_view(), name='ingresar'),
     path('panel/', include('apps.clientes.urls')),
     path('mercadopago/webhook/', clientes_views.MercadoPagoWebhookView.as_view(), name='mercadopago_webhook'),

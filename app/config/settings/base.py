@@ -20,7 +20,7 @@ ALLOWED_HOSTS = env('ALLOWED_HOSTS', 'localhost 127.0.0.1').split()
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in env('CSRF_TRUSTED_ORIGINS', '').split(',') if o.strip()]
 
 # Nombre visible del sistema (logo, títulos, emails)
-CRM_NOMBRE = env('CRM_NOMBRE', 'CRM Ventas')
+CRM_NOMBRE = env('CRM_NOMBRE', 'SupReg CRM')
 CRM_SUBTITULO = env('CRM_SUBTITULO', 'SupReg Solutions')
 
 # ── Multi-cliente (SaaS) ───────────────────────────────────────────────────

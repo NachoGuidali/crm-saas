@@ -348,6 +348,30 @@ class AuditoriaPanelView(PanelMixin, View):
             'pagina': pagina, 'accion': accion, 'q': q, 'acciones': RegistroAuditoria.ACCION_CHOICES})
 
 
+def robots_txt(request):
+    """robots.txt del dominio principal: indexable, salvo el panel/pagos. Apunta al sitemap."""
+    host = request.get_host()
+    cuerpo = ('User-agent: *\n'
+              'Allow: /\n'
+              'Disallow: /panel/\n'
+              'Disallow: /mercadopago/\n'
+              '\n'
+              f'Sitemap: https://{host}/sitemap.xml\n')
+    return HttpResponse(cuerpo, content_type='text/plain')
+
+
+def sitemap_xml(request):
+    """Sitemap del dominio principal (hoy, la home)."""
+    host = request.get_host()
+    hoy = timezone.localdate().isoformat()
+    xml = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+           '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+           f'  <url><loc>https://{host}/</loc><lastmod>{hoy}</lastmod>'
+           '<changefreq>weekly</changefreq><priority>1.0</priority></url>\n'
+           '</urlset>\n')
+    return HttpResponse(xml, content_type='application/xml')
+
+
 class HomeView(View):
     """Home pública de supregcrm.com: presentación del producto para indexar y publicitar."""
 

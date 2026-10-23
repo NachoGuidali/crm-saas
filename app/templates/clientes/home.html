@@ -3,113 +3,131 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ CRM_NOMBRE }} — CRM con WhatsApp, telefonía y automatizaciones</title>
-  <meta name="description" content="{{ SAAS_DESCRIPCION }}">
+  <title>{{ CRM_NOMBRE }} — CRM con WhatsApp, telefonía y automatizaciones | SupReg Solutions</title>
+  <meta name="description" content="{{ SAAS_DESCRIPCION }} {{ CRM_NOMBRE }} es el CRM de SupReg Solutions.">
   <meta name="robots" content="index,follow">
+  <meta name="author" content="SupReg Solutions">
   <link rel="canonical" href="https://{{ SAAS_DOMINIO }}/">
+  <link rel="icon" type="image/png" href="{% static 'img/supreg-mark.png' %}">
+  <link rel="apple-touch-icon" href="{% static 'img/supreg-mark.png' %}">
   <meta property="og:type" content="website">
+  <meta property="og:site_name" content="{{ CRM_NOMBRE }} · SupReg Solutions">
   <meta property="og:title" content="{{ CRM_NOMBRE }} — CRM para ventas y postventa">
   <meta property="og:description" content="{{ SAAS_DESCRIPCION }}">
   <meta property="og:url" content="https://{{ SAAS_DOMINIO }}/">
-  <meta name="theme-color" content="#0D1117">
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <meta property="og:image" content="https://{{ SAAS_DOMINIO }}{% static 'img/supreg-logo.png' %}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ CRM_NOMBRE }} — CRM de SupReg Solutions">
+  <meta name="twitter:description" content="{{ SAAS_DESCRIPCION }}">
+  <meta name="twitter:image" content="https://{{ SAAS_DOMINIO }}{% static 'img/supreg-logo.png' %}">
+  <meta name="theme-color" content="#07070B">
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"SoftwareApplication","name":"{{ CRM_NOMBRE }}",
+   "applicationCategory":"BusinessApplication","operatingSystem":"Web",
+   "description":"{{ SAAS_DESCRIPCION }}","url":"https://{{ SAAS_DOMINIO }}/",
+   "publisher":{"@type":"Organization","name":"SupReg Solutions","url":"https://supregsolutions.com/"}}
+  </script>
   <style>
     :root{
-      --bg:#0D1117; --bg2:#161C26; --bg3:#1E2736; --border:rgba(255,255,255,.08);
-      --border2:rgba(255,255,255,.14); --text:#E8ECF4; --text2:#8B95A8;
-      --blue:#3B7EF6; --violet:#7C5CFC; --green:#22C97A; --amber:#F59E0B; --cyan:#06B6D4;
-      --font-head:'Space Grotesk',sans-serif; --font-body:'DM Sans',sans-serif;
+      --bg:#07070B; --surface:#11131C; --surface2:#171A26; --ink:#F8FAFC; --text:#E5E7EB;
+      --muted:#A7AEC2; --line:#262A3A; --line2:#2A2F45; --tint:#1E1B4B;
+      --accent:#818CF8; --accent-text:#A5B4FC; --violet:#A78BFA; --cyan:#67E8F9;
+      --grad:linear-gradient(120deg,#6B21A8 0%,#3730A3 100%);
+      --grad-logo:linear-gradient(110deg,#7C3AED 0%,#4F46E5 45%,#22D3EE 100%);
+      --font-display:'Bricolage Grotesque','Trebuchet MS',Arial,sans-serif;
+      --font-body:'Public Sans',Arial,sans-serif; --radius:18px;
     }
     *{box-sizing:border-box}
     body{background:var(--bg);color:var(--text);font-family:var(--font-body);margin:0;line-height:1.55;
          -webkit-font-smoothing:antialiased;overflow-x:hidden}
-    h1,h2,h3,.h-font{font-family:var(--font-head);letter-spacing:-.02em}
+    h1,h2,h3{font-family:var(--font-display);letter-spacing:-.01em;color:var(--ink)}
     a{color:inherit;text-decoration:none}
     .wrap{max-width:1080px;margin:0 auto;padding:0 16px}
-    /* decorative glow */
     .glow{position:absolute;inset:0;overflow:hidden;z-index:0;pointer-events:none}
-    .glow::before{content:"";position:absolute;top:-220px;left:50%;transform:translateX(-50%);
-      width:900px;height:620px;border-radius:50%;
-      background:radial-gradient(closest-side,rgba(59,126,246,.22),transparent 70%);filter:blur(10px)}
+    .glow::before{content:"";position:absolute;top:-240px;left:50%;transform:translateX(-50%);
+      width:960px;height:660px;border-radius:50%;
+      background:radial-gradient(closest-side,rgba(124,58,237,.28),transparent 70%)}
+    .glow::after{content:"";position:absolute;top:-120px;right:8%;width:420px;height:420px;border-radius:50%;
+      background:radial-gradient(closest-side,rgba(34,211,238,.16),transparent 70%)}
     /* nav */
-    header.nav{position:sticky;top:0;z-index:20;background:rgba(13,17,23,.82);
-      backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
-    .nav-inner{display:flex;align-items:center;justify-content:space-between;height:60px}
-    .brand{display:flex;align-items:center;gap:10px;font-family:var(--font-head);font-weight:600;font-size:1.05rem}
-    .logo-mark{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;color:#fff;font-weight:700;
-      background:linear-gradient(135deg,var(--blue),var(--violet));font-family:var(--font-head);font-size:.95rem}
+    header.nav{position:sticky;top:0;z-index:20;background:rgba(7,7,11,.82);
+      backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+    .nav-inner{display:flex;align-items:center;justify-content:space-between;height:64px;gap:16px}
+    .brand{display:flex;align-items:center;gap:11px}
+    .brand img{height:30px;width:auto;display:block}
+    .brand .tag{font-family:var(--font-display);font-weight:700;font-size:.72rem;letter-spacing:.14em;
+      color:var(--bg);background:var(--cyan);border-radius:6px;padding:3px 8px;text-transform:uppercase}
     .nav-links{display:flex;align-items:center;gap:26px}
-    .nav-links a.navlink{color:var(--text2);font-weight:500;font-size:.94rem}
-    .nav-links a.navlink:hover{color:var(--text)}
-    .btn-ingresar{background:var(--blue);color:#fff;border:0;border-radius:9px;padding:9px 20px;font-weight:600;
+    .nav-links a.navlink{color:var(--muted);font-weight:500;font-size:.94rem}
+    .nav-links a.navlink:hover{color:var(--ink)}
+    .btn-ingresar{background:var(--grad);color:#fff;border:0;border-radius:11px;padding:10px 22px;font-weight:600;
       font-size:.94rem;transition:filter .15s}
-    .btn-ingresar:hover{filter:brightness(1.1);color:#fff}
-    .btn-wa{background:var(--green);color:#06231a;border:0;border-radius:9px;padding:12px 24px;font-weight:700;
+    .btn-ingresar:hover{filter:brightness(1.12);color:#fff}
+    .btn-wa{background:var(--cyan);color:#052b31;border:0;border-radius:11px;padding:13px 26px;font-weight:700;
       display:inline-flex;align-items:center;gap:9px;transition:filter .15s}
-    .btn-wa:hover{filter:brightness(1.07);color:#06231a}
-    .btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border2);border-radius:9px;
-      padding:12px 24px;font-weight:600;display:inline-flex;align-items:center;gap:9px;transition:background .15s}
-    .btn-ghost:hover{background:var(--bg2);color:var(--text)}
+    .btn-wa:hover{filter:brightness(1.06);color:#052b31}
+    .btn-ghost{background:transparent;color:var(--ink);border:1px solid var(--line2);border-radius:11px;
+      padding:13px 26px;font-weight:600;display:inline-flex;align-items:center;gap:9px;transition:background .15s}
+    .btn-ghost:hover{background:var(--surface2)}
     /* hero */
-    .hero{position:relative;text-align:center;padding:84px 0 64px}
+    .hero{position:relative;text-align:center;padding:88px 0 64px}
     .hero .wrap{position:relative;z-index:1}
-    .pill{display:inline-flex;align-items:center;gap:7px;background:var(--bg2);border:1px solid var(--border);
-      border-radius:999px;padding:6px 14px;font-size:.82rem;color:var(--text2);margin-bottom:22px}
-    .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--green)}
-    .hero h1{font-size:clamp(2.1rem,5vw,3.5rem);font-weight:700;line-height:1.08;margin:0 auto 18px;max-width:14ch}
-    .hero .grad{background:linear-gradient(120deg,var(--blue),var(--violet) 60%,var(--cyan));
-      -webkit-background-clip:text;background-clip:text;color:transparent}
-    .hero p.lead{font-size:clamp(1.02rem,2vw,1.22rem);color:var(--text2);max-width:46ch;margin:0 auto 32px}
+    .pill{display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);
+      border-radius:999px;padding:7px 15px;font-size:.82rem;color:var(--accent-text);margin-bottom:24px}
+    .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--cyan)}
+    .hero h1{font-size:clamp(2.1rem,5vw,3.6rem);font-weight:800;line-height:1.07;margin:0 auto 18px;max-width:15ch}
+    .grad{background:var(--grad-logo);-webkit-background-clip:text;background-clip:text;color:transparent}
+    .hero p.lead{font-size:clamp(1.02rem,2vw,1.22rem);color:var(--muted);max-width:48ch;margin:0 auto 32px}
     .cta-row{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
-    .hero .mini{margin-top:18px;color:var(--text2);font-size:.86rem}
+    .hero .mini{margin-top:18px;color:var(--muted);font-size:.86rem}
     /* sections */
-    section{position:relative;padding:60px 0}
-    .sec-head{text-align:center;max-width:52ch;margin:0 auto 44px}
-    .sec-head h2{font-size:clamp(1.6rem,3.5vw,2.3rem);font-weight:700;margin:0 0 12px}
-    .sec-head p{color:var(--text2);margin:0}
-    .eyebrow{color:var(--blue);font-weight:600;font-size:.82rem;text-transform:uppercase;letter-spacing:.08em;
-      margin-bottom:10px;display:block}
+    section{position:relative;padding:62px 0}
+    .sec-head{text-align:center;max-width:54ch;margin:0 auto 46px}
+    .sec-head h2{font-size:clamp(1.6rem,3.5vw,2.4rem);font-weight:700;margin:0 0 12px}
+    .sec-head p{color:var(--muted);margin:0}
+    .eyebrow{color:var(--accent-text);font-weight:600;font-size:.82rem;text-transform:uppercase;
+      letter-spacing:.1em;margin-bottom:10px;display:block}
     .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-    .card-f{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:26px 24px;
+    .card-f{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:26px 24px;
       transition:border-color .15s,transform .15s}
-    .card-f:hover{border-color:var(--border2);transform:translateY(-2px)}
-    .card-f .ico{width:46px;height:46px;border-radius:11px;display:grid;place-items:center;font-size:1.3rem;
-      margin-bottom:16px}
-    .card-f h3{font-size:1.08rem;font-weight:600;margin:0 0 8px}
-    .card-f p{color:var(--text2);font-size:.93rem;margin:0}
-    .i-blue{background:rgba(59,126,246,.14);color:var(--blue)}
-    .i-green{background:rgba(34,201,122,.14);color:var(--green)}
-    .i-violet{background:rgba(124,92,252,.14);color:var(--violet)}
-    .i-amber{background:rgba(245,158,11,.14);color:var(--amber)}
-    .i-cyan{background:rgba(6,182,212,.14);color:var(--cyan)}
+    .card-f:hover{border-color:var(--line2);transform:translateY(-2px)}
+    .card-f .ico{width:46px;height:46px;border-radius:12px;display:grid;place-items:center;font-size:1.3rem;
+      margin-bottom:16px;background:var(--tint);color:var(--accent-text)}
+    .card-f .ico.cyan{background:rgba(34,211,238,.12);color:var(--cyan)}
+    .card-f .ico.violet{background:rgba(167,139,250,.14);color:var(--violet)}
+    .card-f h3{font-size:1.1rem;font-weight:700;margin:0 0 8px}
+    .card-f p{color:var(--muted);font-size:.93rem;margin:0}
     /* steps */
     .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;counter-reset:s}
-    .step{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:26px 24px}
-    .step .num{counter-increment:s;font-family:var(--font-head);font-weight:700;color:var(--blue);font-size:1.5rem}
-    .step .num::before{content:counter(s)}
-    .step h3{font-size:1.05rem;margin:10px 0 6px;font-weight:600}
-    .step p{color:var(--text2);font-size:.92rem;margin:0}
+    .step{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:26px 24px}
+    .step .num{counter-increment:s;font-family:var(--font-display);font-weight:800;font-size:1.6rem}
+    .step .num::before{content:counter(s);background:var(--grad-logo);-webkit-background-clip:text;
+      background-clip:text;color:transparent}
+    .step h3{font-size:1.06rem;margin:10px 0 6px;font-weight:700}
+    .step p{color:var(--muted);font-size:.92rem;margin:0}
     /* cta band */
-    .band{background:linear-gradient(135deg,rgba(59,126,246,.14),rgba(124,92,252,.14));
-      border:1px solid var(--border2);border-radius:20px;padding:48px 32px;text-align:center}
-    .band h2{font-size:clamp(1.5rem,3.5vw,2.1rem);margin:0 0 14px;font-weight:700}
-    .band p{color:var(--text2);margin:0 0 28px;max-width:44ch;margin-inline:auto}
+    .band{background:linear-gradient(135deg,rgba(124,58,237,.18),rgba(34,211,238,.12));
+      border:1px solid var(--line2);border-radius:24px;padding:50px 32px;text-align:center}
+    .band h2{font-size:clamp(1.5rem,3.5vw,2.2rem);margin:0 0 14px;font-weight:800}
+    .band p{color:var(--muted);margin:0 0 28px;max-width:46ch;margin-inline:auto}
     /* footer */
-    footer{border-top:1px solid var(--border);padding:34px 0;color:var(--text2);font-size:.9rem}
-    .foot-inner{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px}
+    footer{border-top:1px solid var(--line);padding:36px 0;color:var(--muted);font-size:.9rem}
+    .foot-inner{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+    .foot-inner img{height:26px;width:auto;opacity:.9}
+    .foot-inner a{color:var(--accent-text)}
     @media(max-width:860px){
       .grid,.steps{grid-template-columns:1fr}
       .nav-links a.navlink{display:none}
-      .hero{padding:60px 0 48px}
+      .hero{padding:62px 0 48px}
     }
   </style>
 </head>
 <body>
 <header class="nav">
   <div class="wrap nav-inner">
-    <a class="brand" href="/"><span class="logo-mark">{{ CRM_NOMBRE|slice:":1" }}</span> {{ CRM_NOMBRE }}</a>
+    <a class="brand" href="/"><img src="{% static 'img/supreg-logo.png' %}" alt="SupReg Solutions"><span class="tag">CRM</span></a>
     <nav class="nav-links">
       <a class="navlink" href="#funciones">Funciones</a>
       <a class="navlink" href="#como">Cómo funciona</a>
@@ -121,7 +139,7 @@
 <div class="hero">
   <div class="glow"></div>
   <div class="wrap">
-    <span class="pill"><span class="dot"></span> CRM multi-empresa · WhatsApp · Telefonía</span>
+    <span class="pill"><span class="dot"></span> El CRM de SupReg Solutions</span>
     <h1>Vendé y atendé a tus clientes <span class="grad">desde un solo lugar</span></h1>
     <p class="lead">{{ SAAS_DESCRIPCION }}</p>
     <div class="cta-row">
@@ -140,22 +158,22 @@
       <p>Desde que entra un prospecto hasta la postventa, sin saltar entre apps sueltas.</p>
     </div>
     <div class="grid">
-      <div class="card-f"><div class="ico i-blue"><i class="bi bi-kanban"></i></div>
+      <div class="card-f"><div class="ico"><i class="bi bi-kanban"></i></div>
         <h3>Embudos de venta</h3>
         <p>Tableros kanban por etapa, asignación automática de prospectos, tareas y tipificaciones. Nada se pierde.</p></div>
-      <div class="card-f"><div class="ico i-green"><i class="bi bi-whatsapp"></i></div>
+      <div class="card-f"><div class="ico cyan"><i class="bi bi-whatsapp"></i></div>
         <h3>WhatsApp integrado</h3>
         <p>Chateá desde el CRM con varias líneas (oficial o QR), plantillas, difusiones y respuestas automáticas.</p></div>
-      <div class="card-f"><div class="ico i-cyan"><i class="bi bi-telephone"></i></div>
+      <div class="card-f"><div class="ico cyan"><i class="bi bi-telephone"></i></div>
         <h3>Telefonía y discador</h3>
         <p>Llamadas con registro automático, internos y discador para campañas salientes.</p></div>
-      <div class="card-f"><div class="ico i-violet"><i class="bi bi-lightning-charge"></i></div>
+      <div class="card-f"><div class="ico violet"><i class="bi bi-lightning-charge"></i></div>
         <h3>Automatizaciones</h3>
         <p>Acciones por etapa: mandar WhatsApp o email, crear tareas, reasignar, avisar al equipo. Se arma sin código.</p></div>
-      <div class="card-f"><div class="ico i-amber"><i class="bi bi-people"></i></div>
+      <div class="card-f"><div class="ico violet"><i class="bi bi-people"></i></div>
         <h3>Clientes y postventa</h3>
         <p>Cuentas, proyectos, tareas, avisos mensuales y recordatorios. El cliente sigue vivo después de la venta.</p></div>
-      <div class="card-f"><div class="ico i-blue"><i class="bi bi-graph-up-arrow"></i></div>
+      <div class="card-f"><div class="ico"><i class="bi bi-graph-up-arrow"></i></div>
         <h3>Reportes en vivo</h3>
         <p>Pulso del equipo, conversión por etapa y productividad por vendedor, actualizado al instante.</p></div>
     </div>
@@ -184,7 +202,7 @@
   <div class="wrap">
     <div class="band">
       <h2>¿Lo querés para tu empresa?</h2>
-      <p>Te mostramos el CRM funcionando con tu caso y te dejamos tu espacio listo para probar.</p>
+      <p>Te mostramos {{ CRM_NOMBRE }} funcionando con tu caso y te dejamos tu espacio listo para probar.</p>
       <div class="cta-row">
         {% if wa_url %}<a class="btn-wa" href="{{ wa_url }}" target="_blank" rel="noopener"><i class="bi bi-whatsapp"></i> Escribinos por WhatsApp</a>{% endif %}
         <a class="btn-ghost" href="{% url 'ingresar' %}"><i class="bi bi-box-arrow-in-right"></i> Ya tengo cuenta</a>
@@ -195,9 +213,9 @@
 
 <footer>
   <div class="wrap foot-inner">
-    <div class="brand" style="font-size:.98rem"><span class="logo-mark" style="width:28px;height:28px;font-size:.8rem">{{ CRM_NOMBRE|slice:":1" }}</span> {{ CRM_NOMBRE }}</div>
-    <div>© {% now "Y" %} {{ CRM_SUBTITULO|default:"SupReg Solutions" }} · Todos los derechos reservados</div>
-    <div><a href="{% url 'ingresar' %}" class="navlink" style="color:var(--text2)">Ingresar</a></div>
+    <img src="{% static 'img/supreg-logo.png' %}" alt="SupReg Solutions">
+    <div>© {% now "Y" %} SupReg Solutions · {{ CRM_NOMBRE }} · <a href="https://supregsolutions.com/" target="_blank" rel="noopener">supregsolutions.com</a></div>
+    <div><a href="{% url 'ingresar' %}">Ingresar</a></div>
   </div>
 </footer>
 </body>

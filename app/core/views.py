@@ -1,4 +1,10 @@
+from django.http import HttpResponse
 from django.shortcuts import render
+
+
+def robots_privado(request):
+    """robots.txt de los subdominios de clientes: el CRM es privado, no se indexa."""
+    return HttpResponse('User-agent: *\nDisallow: /\n', content_type='text/plain')
 
 
 def error_403(request, exception=None):

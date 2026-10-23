@@ -312,15 +312,35 @@ class PanelTests(BaseMultiCliente):
         self.assertEqual(resp.status_code, 302)
         self.assertEqual(resp['Location'], 'https://otro.testserver/usuarios/login/')
 
-    def test_home_publica_se_ve_con_boton_ingresar(self):
+    def test_home_publica_se_ve_con_boton_ingresar_y_marca(self):
         resp = self.pedir(Client(), 'get', '/', PLATAFORMA)
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, '/ingresar/')
+        self.assertContains(resp, 'SupReg Solutions')
+        self.assertContains(resp, 'supreg-logo')  # el logo de la marca
 
     def test_home_muestra_whatsapp_si_hay_numero(self):
         with self.settings(SAAS_WHATSAPP_VENTAS='5491112345678'):
             resp = self.pedir(Client(), 'get', '/', PLATAFORMA)
         self.assertContains(resp, 'wa.me/5491112345678')
+
+    def test_robots_publico_apunta_al_sitemap(self):
+        resp = self.pedir(Client(), 'get', '/robots.txt', PLATAFORMA)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp['Content-Type'], 'text/plain')
+        self.assertIn(b'Sitemap:', resp.content)
+        self.assertIn(b'sitemap.xml', resp.content)
+
+    def test_sitemap_publico_lista_la_home(self):
+        resp = self.pedir(Client(), 'get', '/sitemap.xml', PLATAFORMA)
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn(b'<urlset', resp.content)
+        self.assertIn(b'<loc>https://', resp.content)
+
+    def test_robots_de_subdominio_bloquea_indexacion(self):
+        resp = self.pedir(Client(), 'get', '/robots.txt', OTRO)
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn(b'Disallow: /', resp.content)
 
 
 class SubdominioTests(TestCase):
