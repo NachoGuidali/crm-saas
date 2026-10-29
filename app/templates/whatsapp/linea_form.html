@@ -34,10 +34,26 @@
   <div class="section-title mt-3">Quiénes usan esta línea</div>
   <div class="checks-grid">{% for c in form.agentes %}<label>{{ c.tag }} {{ c.choice_label }}</label>{% endfor %}</div>
   <div class="form-text">Sin marcar = todos los usuarios.</div>
+  <div class="section-title mt-3"><i class="bi bi-robot"></i> Bot automático (n8n)</div>
+  <div class="row g-2">
+    <div class="col-12"><label class="d-flex gap-2">{{ form.bot_n8n_activo }} {{ form.bot_n8n_activo.label }}</label><div class="form-text">{{ form.bot_n8n_activo.help_text }}</div></div>
+    <div class="col-12"><label class="form-label">{{ form.bot_n8n_url.label }}</label>{{ form.bot_n8n_url }}<div class="form-text">{{ form.bot_n8n_url.help_text }}</div>{{ form.bot_n8n_url.errors }}</div>
+    <div class="col-12"><label class="form-label">{{ form.bot_n8n_liberar_url.label }}</label>{{ form.bot_n8n_liberar_url }}<div class="form-text">{{ form.bot_n8n_liberar_url.help_text }}</div></div>
+  </div>
   <button class="btn btn-primary mt-3">Guardar</button>
 </div></form>
 </div>
 <div class="col-lg-5">
+  {% if linea and linea.bot_n8n_activo %}
+  <div class="card mb-3"><div class="card-header"><i class="bi bi-robot"></i> Conectar el bot (n8n)</div><div class="card-body small">
+    <p class="muted mb-1">Datos para armar el flujo en n8n. El CRM reenvía cada mensaje entrante a tu webhook y n8n responde con estos endpoints (header <code>X-API-Key</code>):</p>
+    <p class="muted mb-0 mt-2">Responder al cliente:</p><code class="copiable d-block">{{ request.scheme }}://{{ request.get_host }}/api/v1/whatsapp/enviar/</code>
+    <p class="muted mb-0 mt-2">Prender / apagar el bot:</p><code class="copiable d-block">{{ request.scheme }}://{{ request.get_host }}/api/v1/whatsapp/bot/</code>
+    <p class="muted mb-0 mt-2">Derivar a un agente (handoff):</p><code class="copiable d-block">{{ request.scheme }}://{{ request.get_host }}/api/v1/whatsapp/handoff/</code>
+    <p class="muted mb-0 mt-2">Guardar / completar el lead:</p><code class="copiable d-block">{{ request.scheme }}://{{ request.get_host }}/api/v1/leads/</code>
+    <p class="muted mb-0 mt-2">La <code>X-API-Key</code> la generás en <a href="{% url 'integraciones:lista' %}">Integraciones</a> y la cargás una vez como credencial en n8n.</p>
+  </div></div>
+  {% endif %}
   {% if linea %}
   <div class="card mb-3"><div class="card-header">Webhook</div><div class="card-body small">
     <p class="muted mb-1">URL que recibe los mensajes de esta línea{% if linea.proveedor == 'meta' %} (pegala en Meta → WhatsApp → Configuración, con el verify token){% elif linea.proveedor == 'twilio' %} (Twilio → número → "A message comes in"){% endif %}:</p>

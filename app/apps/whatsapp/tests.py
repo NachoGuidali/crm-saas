@@ -277,3 +277,68 @@ class MediaSalienteFirmadaTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         # firma de otra ruta no sirve
         self.assertEqual(Client().get(f'/media/{ruta}?sig={firmar("whatsapp/salientes/otra.txt")}').status_code, 404)
+
+
+class BotN8nTests(WhatsAppBase):
+    """Bot de n8n por línea: reenvío del entrante, toggle por conversación y liberar al reactivar."""
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.linea.bot_n8n_activo = True
+        cls.linea.bot_n8n_url = 'https://n8n.test/webhook/bot'
+        cls.linea.bot_n8n_liberar_url = 'https://n8n.test/webhook/liberar'
+        cls.linea.save()
+
+    def _entrante(self, **kw):
+        url = self.linea.webhook_url.replace(settings.SITE_URL, '')
+        return self.client.post(url, json.dumps(payload_evolution(**kw)), content_type='application/json')
+
+    def _llamadas_bot(self, post):
+        return [c for c in post.call_args_list if c.args and c.args[0] == 'https://n8n.test/webhook/bot']
+
+    def test_entrante_se_reenvia_a_n8n_y_la_conv_arranca_con_bot(self):
+        with mock.patch('requests.post') as post, self.captureOnCommitCallbacks(execute=True):
+            self._entrante()
+        conv = Conversacion.objects.get()
+        self.assertTrue(conv.bot_activo)
+        llamadas = self._llamadas_bot(post)
+        self.assertEqual(len(llamadas), 1)
+        payload = llamadas[0].kwargs['json']
+        self.assertEqual(payload['conversation_id'], conv.pk)
+        self.assertIn('5491155551234', payload['phone'])
+        self.assertEqual(payload['message'], 'Hola, quiero info')
+        self.assertIn('/api/v1/whatsapp/enviar/', payload['crm_reply_url'])
+        self.assertIn('/api/v1/whatsapp/handoff/', payload['crm_handoff_url'])
+
+    def test_conversacion_pausada_no_reenvia(self):
+        with mock.patch('requests.post'), self.captureOnCommitCallbacks(execute=True):
+            self._entrante(wa_id='1')
+        Conversacion.objects.update(bot_activo=False)  # un agente tomó la conversación
+        with mock.patch('requests.post') as post, self.captureOnCommitCallbacks(execute=True):
+            self._entrante(wa_id='2', texto='otra')
+        self.assertEqual(self._llamadas_bot(post), [])
+
+    def test_linea_sin_bot_no_reenvia(self):
+        self.linea.bot_n8n_activo = False
+        self.linea.save()
+        with mock.patch('requests.post') as post, self.captureOnCommitCallbacks(execute=True):
+            self._entrante()
+        self.assertFalse(Conversacion.objects.get().bot_activo)
+        self.assertEqual(self._llamadas_bot(post), [])
+
+    def test_toggle_bot_desde_el_inbox(self):
+        with mock.patch('requests.post'), self.captureOnCommitCallbacks(execute=True):
+            self._entrante()
+        conv = Conversacion.objects.get()
+        cl = Client()
+        cl.force_login(self.agente)
+        r = cl.post(f'/whatsapp/conversacion/{conv.pk}/bot_off/', content_type='application/json')
+        self.assertEqual(r.status_code, 200, r.content)
+        conv.refresh_from_db()
+        self.assertFalse(conv.bot_activo)
+        with mock.patch('apps.whatsapp.tasks.liberar_bot_n8n.delay') as lib:
+            r = cl.post(f'/whatsapp/conversacion/{conv.pk}/bot_on/', content_type='application/json')
+        self.assertEqual(r.status_code, 200, r.content)
+        conv.refresh_from_db()
+        self.assertTrue(conv.bot_activo)
+        lib.assert_called_once_with(conv.pk)

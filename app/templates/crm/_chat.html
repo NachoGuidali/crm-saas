@@ -8,7 +8,11 @@
     </select>
     {% elif linea_actual %}<span class="chip"><i class="bi bi-phone"></i> {{ linea_actual.nombre }}{% if linea_actual.telefono %} ({{ linea_actual.telefono }}){% endif %}</span>{% endif %}
     {% if linea_actual.es_oficial %}<span class="chip" title="Línea oficial: fuera de las 24 h solo plantillas aprobadas">oficial</span>{% endif %}
-    {% if conv %}<a class="small ms-auto" href="{% url 'whatsapp:inbox' %}?conv={{ conv.pk }}">Abrir en el inbox <i class="bi bi-box-arrow-up-right"></i></a>{% endif %}
+    {% if conv and conv.linea.bot_n8n_activo %}
+      {% if conv.bot_activo %}<button class="btn btn-sm btn-outline-info ms-auto" data-accion="{% url 'whatsapp:conv_accion' conv.pk 'bot_off' %}" data-recargar="1" title="El bot está atendiendo este chat. Pausalo para responder vos."><i class="bi bi-robot"></i> Bot activo · pausar</button>
+      {% else %}<button class="btn btn-sm btn-outline-secondary ms-auto" data-accion="{% url 'whatsapp:conv_accion' conv.pk 'bot_on' %}" data-recargar="1" title="Reactivar el bot (retoma la charla de cero)"><i class="bi bi-robot"></i> Reactivar bot</button>{% endif %}
+    {% endif %}
+    {% if conv %}<a class="small {% if not conv.linea.bot_n8n_activo %}ms-auto{% endif %}" href="{% url 'whatsapp:inbox' %}?conv={{ conv.pk }}">Abrir en el inbox <i class="bi bi-box-arrow-up-right"></i></a>{% endif %}
   </div>
   <div class="chat-msgs" id="chatMsgs">
     {% if conv %}{% include "whatsapp/_mensajes.html" %}{% else %}

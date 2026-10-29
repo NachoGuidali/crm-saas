@@ -64,6 +64,19 @@ class LineaWhatsApp(models.Model):
         help_text='Anti-bloqueo para envíos masivos/automáticos. Sugerido: por QR 6–15 s, Meta/Twilio 1 s.',
     )
 
+    # ── Bot n8n (asistente automático de esta línea) ──
+    # Cada número puede enganchar su propio flujo de n8n. Al llegar un entrante, el CRM lo reenvía a bot_n8n_url
+    # (si el bot está atendiendo esa conversación) y n8n responde por la API (/api/v1/whatsapp/enviar/).
+    bot_n8n_activo = models.BooleanField(
+        default=False, verbose_name='Bot n8n en esta línea',
+        help_text='Si está activo, las conversaciones nuevas de este número arrancan con el bot atendiendo.')
+    bot_n8n_url = models.CharField(
+        max_length=500, blank=True, verbose_name='Webhook de n8n (entrante)',
+        help_text='URL del flujo de n8n que atiende este número. A esta URL se le reenvía cada mensaje entrante.')
+    bot_n8n_liberar_url = models.CharField(
+        max_length=500, blank=True, verbose_name='Webhook de n8n para reiniciar',
+        help_text='Opcional: se avisa a esta URL cuando un agente reactiva el bot, para que retome la charla de cero.')
+
     # Conexión por QR
     evolution_instancia = models.SlugField(max_length=100, blank=True, verbose_name='Nombre de instancia')
     evolution_api_url = models.CharField(max_length=300, blank=True, help_text='Vacío = valor global del .env')
@@ -161,6 +174,9 @@ class Conversacion(models.Model):
     ultimo_entrante_at = models.DateTimeField(null=True, blank=True)
     ultimo_mensaje_texto = models.CharField(max_length=200, blank=True)
     archivada = models.BooleanField(default=False)
+    bot_activo = models.BooleanField(
+        default=False, db_index=True,
+        help_text='El bot n8n está atendiendo esta conversación. Se apaga cuando un agente la toma o al hacer handoff.')
     created_at = models.DateTimeField(auto_now_add=True)
 
     objects = ConversacionQuerySet.as_manager()

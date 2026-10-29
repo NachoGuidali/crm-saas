@@ -57,7 +57,9 @@ def obtener_conversacion(linea, telefono, nombre_perfil=''):
         return conv, False
     try:
         with transaction.atomic():
-            return Conversacion.objects.create(linea=linea, telefono=telefono, nombre_perfil=nombre_perfil[:200]), True
+            # Si la línea tiene bot n8n, la conversación nueva arranca con el bot atendiendo.
+            return Conversacion.objects.create(linea=linea, telefono=telefono, nombre_perfil=nombre_perfil[:200],
+                                               bot_activo=linea.bot_n8n_activo), True
     except IntegrityError:
         return Conversacion.objects.get(linea=linea, telefono=telefono), False
 
@@ -170,6 +172,16 @@ def procesar_mensaje_entrante(linea, msg):
                   f'/whatsapp/?conv={conv.pk}')
     invalidar_no_leidos([agente_id] + _ids_supervisores())
     marcar_cambio_inbox()
+
+    # Bot n8n: si esta línea tiene bot y está atendiendo esta conversación, reenviar el entrante al flujo de n8n.
+    if linea.bot_n8n_activo and linea.bot_n8n_url and \
+            Conversacion.objects.filter(pk=conv.pk, bot_activo=True).exists():
+        from .tasks import reenviar_a_n8n
+        datos_bot = {
+            'telefono': msg.telefono, 'contenido': msg.contenido or '', 'tipo': msg.tipo,
+            'wa_id': msg.wa_id or '', 'nombre': (contacto.nombre if contacto else '') or msg.nombre_perfil or '',
+        }
+        transaction.on_commit(lambda: reenviar_a_n8n.delay(conv.pk, datos_bot))
     return mensaje
 
 

@@ -137,3 +137,45 @@ class LandingDemoTests(TestCase):
     @override_settings(DEMO_LANDING=False)
     def test_apagada_no_existe(self):
         self.assertEqual(self.client.get('/demo/formulario/').status_code, 404)
+
+
+class ApiBotTests(TestCase):
+    """Endpoints de control del bot n8n: /api/v1/whatsapp/bot/ y /handoff/."""
+    @classmethod
+    def setUpTestData(cls):
+        from apps.whatsapp.models import Conversacion, LineaWhatsApp
+        call_command('setup_inicial', '--sin-admin', verbosity=0)
+        cls.key, cls.clave = ApiKey.generar(nombre='n8n', embudo=Embudo.objects.get())
+        cls.linea = LineaWhatsApp.objects.create(nombre='Ventas', proveedor='evolution', evolution_instancia='v',
+                                                 bot_n8n_activo=True, bot_n8n_url='https://n8n.test/bot')
+        cls.conv = Conversacion.objects.create(linea=cls.linea, telefono='+5491155550000', bot_activo=True)
+
+    def post(self, path, data, clave=None):
+        return self.client.post(path, json.dumps(data), content_type='application/json',
+                                 HTTP_X_API_KEY=clave or self.clave)
+
+    def test_apagar_y_prender_bot(self):
+        r = self.post('/api/v1/whatsapp/bot/', {'conversation_id': self.conv.pk, 'activo': False})
+        self.assertEqual(r.status_code, 200, r.content)
+        self.conv.refresh_from_db()
+        self.assertFalse(self.conv.bot_activo)
+        r = self.post('/api/v1/whatsapp/bot/', {'conversation_id': self.conv.pk, 'activo': True})
+        self.conv.refresh_from_db()
+        self.assertTrue(self.conv.bot_activo)
+
+    def test_handoff_por_telefono_apaga_bot_y_deja_pendiente(self):
+        from apps.whatsapp.models import Conversacion
+        from apps.users.models import User
+        self.conv.agente = User.objects.create_user('ana9', password='x')
+        self.conv.estado = Conversacion.ESTADO_ABIERTA
+        self.conv.save()
+        r = self.post('/api/v1/whatsapp/handoff/', {'telefono': '011 15 5555 0000'})
+        self.assertEqual(r.status_code, 200, r.content)
+        self.conv.refresh_from_db()
+        self.assertFalse(self.conv.bot_activo)
+        self.assertEqual(self.conv.estado, Conversacion.ESTADO_PENDIENTE)
+
+    def test_conversacion_inexistente_y_sin_clave(self):
+        self.assertEqual(self.post('/api/v1/whatsapp/bot/', {'conversation_id': 999999, 'activo': True}).status_code, 404)
+        self.assertEqual(self.post('/api/v1/whatsapp/bot/', {'conversation_id': self.conv.pk, 'activo': True},
+                                   clave='mala').status_code, 401)

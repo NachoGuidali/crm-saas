@@ -204,6 +204,53 @@ class EnviarWhatsAppView(ApiBase):
         return self._resp(request, {'ok': True, 'mensaje_id': msg.pk, 'linea': str(linea)}, 202)
 
 
+def _conversacion_de(data):
+    """Resuelve la conversación por `conversation_id` o por teléfono (la más reciente)."""
+    from apps.whatsapp.models import Conversacion
+    cid = data.get('conversation_id') or data.get('conversacion_id')
+    if cid and str(cid).isdigit():
+        return Conversacion.objects.select_related('agente', 'linea').filter(pk=int(cid)).first()
+    tel = data.get('telefono') or data.get('phone')
+    if tel:
+        from core.phone import normalizar_telefono
+        tel = normalizar_telefono(tel)
+        return (Conversacion.objects.select_related('agente', 'linea').filter(telefono=tel)
+                .order_by('-ultimo_mensaje_at').first())
+    return None
+
+
+class BotToggleView(ApiBase):
+    """Prende/apaga el bot n8n para una conversación. Body: {conversation_id|telefono, activo: true/false}."""
+    def post(self, request):
+        from apps.whatsapp.models import Conversacion
+        from apps.whatsapp import services as wa
+        conv = _conversacion_de(self.data)
+        if conv is None:
+            return self._resp(request, {'ok': False, 'error': 'Conversación no encontrada'}, 404)
+        activo = str(self.data.get('activo', '')).strip().lower() in ('1', 'true', 'si', 'sí', 'yes')
+        Conversacion.objects.filter(pk=conv.pk).update(bot_activo=activo)
+        wa.marcar_cambio_inbox()
+        return self._resp(request, {'ok': True, 'conversation_id': conv.pk, 'bot_activo': activo})
+
+
+class HandoffView(ApiBase):
+    """El bot deriva a un agente: apaga el bot, deja la conversación pendiente y notifica. Body: {conversation_id|telefono}."""
+    def post(self, request):
+        from apps.whatsapp.models import Conversacion
+        from apps.whatsapp import services as wa
+        conv = _conversacion_de(self.data)
+        if conv is None:
+            return self._resp(request, {'ok': False, 'error': 'Conversación no encontrada'}, 404)
+        Conversacion.objects.filter(pk=conv.pk).update(bot_activo=False, estado=Conversacion.ESTADO_PENDIENTE)
+        if conv.agente_id:
+            from apps.users.services import notificar
+            notificar(conv.agente, 'whatsapp', f'El bot te derivó el chat con {conv.nombre_mostrar}', '',
+                      f'/whatsapp/?conv={conv.pk}')
+        wa.invalidar_no_leidos([conv.agente_id])
+        wa.marcar_cambio_inbox()
+        return self._resp(request, {'ok': True, 'conversation_id': conv.pk, 'estado': 'pendiente'})
+
+
 # ── Gestión de claves (UI) ──────────────────────────────────────────────────
 
 class ApiKeysView(PermisoRequeridoMixin, View):

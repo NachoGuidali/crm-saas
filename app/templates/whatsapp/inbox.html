@@ -26,7 +26,7 @@
     <div class="cab">
       <a href="?bandeja={{ bandeja }}" class="btn btn-sm btn-link d-md-none p-0"><i class="bi bi-arrow-left"></i></a>
       <div class="flex-grow-1" style="min-width:0">
-        <div class="fw-semibold">{% if op %}<a href="{% url 'crm:oportunidad_detalle' op.pk %}">{{ conv.nombre_mostrar }}</a>{% elif conv.contacto %}<a href="{% url 'crm:contacto_detalle' conv.contacto_id %}?ficha=contacto">{{ conv.nombre_mostrar }}</a>{% else %}{{ conv.nombre_mostrar }}{% endif %}</div>
+        <div class="fw-semibold">{% if op %}<a href="{% url 'crm:oportunidad_detalle' op.pk %}">{{ conv.nombre_mostrar }}</a>{% elif conv.contacto %}<a href="{% url 'crm:contacto_detalle' conv.contacto_id %}?ficha=contacto">{{ conv.nombre_mostrar }}</a>{% else %}{{ conv.nombre_mostrar }}{% endif %}{% if conv.linea.bot_n8n_activo and conv.bot_activo %} <span class="badge bg-info-subtle text-info-emphasis" title="El bot automático está atendiendo este chat"><i class="bi bi-robot"></i> Bot</span>{% endif %}</div>
         <div class="small muted">{{ conv.telefono|telefono }} · {{ conv.linea.nombre }} ({{ conv.linea.get_proveedor_display|truncatechars:16 }}){% if conv.linea.es_oficial and conv.ventana_restante %} · ventana 24 h: quedan {{ conv.ventana_restante|duracion_td }}{% endif %}</div>
       </div>
       {% if conv.contacto %}<button class="btn btn-sm btn-outline-primary" data-llamar data-contacto="{{ conv.contacto_id }}"><i class="bi bi-telephone"></i></button>{% endif %}
@@ -34,6 +34,7 @@
         <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
         <ul class="dropdown-menu dropdown-menu-end">
           {% if not conv.agente %}<li><a class="dropdown-item" href="#" data-accion="{% url 'whatsapp:conv_accion' conv.pk 'tomar' %}" data-recargar="1"><i class="bi bi-hand-index me-2"></i>Tomar el chat</a></li>{% endif %}
+          {% if conv.linea.bot_n8n_activo %}{% if conv.bot_activo %}<li><a class="dropdown-item" href="#" data-accion="{% url 'whatsapp:conv_accion' conv.pk 'bot_off' %}" data-recargar="1"><i class="bi bi-pause-circle me-2"></i>Pausar bot (lo tomo yo)</a></li>{% else %}<li><a class="dropdown-item" href="#" data-accion="{% url 'whatsapp:conv_accion' conv.pk 'bot_on' %}" data-recargar="1"><i class="bi bi-robot me-2"></i>Reactivar bot (retoma de cero)</a></li>{% endif %}{% endif %}
           {% if conv.estado != 'cerrada' %}<li><a class="dropdown-item" href="#" data-accion="{% url 'whatsapp:conv_accion' conv.pk 'cerrar' %}" data-recargar="1"><i class="bi bi-check2-circle me-2"></i>Marcar resuelto</a></li>{% else %}<li><a class="dropdown-item" href="#" data-accion="{% url 'whatsapp:conv_accion' conv.pk 'reabrir' %}" data-recargar="1">Reabrir</a></li>{% endif %}
           <li><a class="dropdown-item" href="#" data-accion="{% url 'whatsapp:conv_accion' conv.pk 'no_leido' %}"><i class="bi bi-envelope me-2"></i>Marcar no leído</a></li>
           {% if conv.archivada %}<li><a class="dropdown-item" href="#" data-accion="{% url 'whatsapp:conv_accion' conv.pk 'desarchivar' %}" data-recargar="1">Desarchivar</a></li>{% else %}<li><a class="dropdown-item" href="#" data-accion="{% url 'whatsapp:conv_accion' conv.pk 'archivar' %}" data-recargar="1"><i class="bi bi-archive me-2"></i>Archivar</a></li>{% endif %}

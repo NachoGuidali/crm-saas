@@ -86,3 +86,59 @@ def sincronizar_plantillas():
         except Exception as e:
             logger.warning('No se pudieron sincronizar plantillas de %s: %s', linea, e)
     return total
+
+
+@shared_task(name='whatsapp.reenviar_a_n8n')
+def reenviar_a_n8n(conv_pk, datos):
+    """Reenvía un mensaje entrante al flujo de n8n de la línea (bot). n8n responde por /api/v1/whatsapp/enviar/."""
+    import requests
+    from core import tenancy
+    from .models import Conversacion
+    conv = Conversacion.objects.select_related('linea', 'contacto', 'agente').filter(pk=conv_pk).first()
+    if conv is None or not conv.bot_activo:
+        return
+    url = (conv.linea.bot_n8n_url or '').strip()
+    if not url:
+        return
+    base = tenancy.url_sitio()
+    payload = {
+        'event': 'message_received',
+        'phone': datos.get('telefono', ''),
+        'contact_name': datos.get('nombre', ''),
+        'message': datos.get('contenido', ''),
+        'message_type': datos.get('tipo', 'text'),
+        'message_id': datos.get('wa_id', ''),
+        'conversation_id': conv.pk,
+        'linea_id': conv.linea_id,
+        'timestamp': timezone.now().isoformat(),
+        # Datos para que n8n le responda / opere sobre el CRM (la API key va como credencial en n8n):
+        'crm_reply_url': f'{base}/api/v1/whatsapp/enviar/',
+        'crm_bot_url': f'{base}/api/v1/whatsapp/bot/',
+        'crm_handoff_url': f'{base}/api/v1/whatsapp/handoff/',
+        'crm_lead_url': f'{base}/api/v1/leads/',
+        'crm_contacto_url': f'{base}/api/v1/leads/',
+    }
+    try:
+        requests.post(url, json=payload, timeout=10).raise_for_status()
+        logger.info('Entrante reenviado a n8n (conv %s)', conv_pk)
+    except Exception as e:
+        logger.warning('Error reenviando a n8n conv %s: %s', conv_pk, e)
+
+
+@shared_task(name='whatsapp.liberar_bot_n8n')
+def liberar_bot_n8n(conv_pk):
+    """Avisa a n8n que un agente reactivó el bot, para que retome la conversación de cero."""
+    import requests
+    from .models import Conversacion
+    conv = Conversacion.objects.select_related('linea').filter(pk=conv_pk).first()
+    if conv is None:
+        return
+    url = (conv.linea.bot_n8n_liberar_url or '').strip()
+    if not url:
+        return
+    try:
+        requests.post(url, json={'phone': conv.telefono.lstrip('+'), 'conversation_id': conv.pk},
+                      timeout=10).raise_for_status()
+        logger.info('Avisado liberar-bot a n8n (conv %s)', conv_pk)
+    except Exception as e:
+        logger.warning('Error avisando liberar-bot a n8n conv %s: %s', conv_pk, e)
