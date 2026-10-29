@@ -206,6 +206,7 @@
     const tpl = $('condTpl').innerHTML.replace(/__prefix__/g, i);
     const wrap = document.createElement('div'); wrap.innerHTML = tpl.trim();
     $('condCampos').appendChild(wrap.firstElementChild);
+    adaptarFila($('condCampos').lastElementChild);
     total.value = i + 1;
   });
   $('condCampos').addEventListener('click', e => {
@@ -216,6 +217,46 @@
     if (idf && idf.value) { if (del) del.checked = true; row.style.display = 'none'; }  // existente: marcar borrar
     else { row.remove(); }  // fila nueva: sacar del DOM
   });
+
+  // Operadores según el tipo de campo: número/fecha suman mayor/menor; texto suma "contiene".
+  const META = {{ condiciones_meta|safe }};
+  function tipoDeFila(row) {
+    const sc = row.querySelector('select[name$="-campo"]');
+    const o = sc && sc.selectedOptions[0];
+    return o ? (o.dataset.tipo || '') : '';
+  }
+  function adaptarValor(row) {
+    const selOp = row.querySelector('select[name$="-operador"]');
+    const inpVal = row.querySelector('[name$="-valor"]');
+    if (!inpVal || !selOp) return;
+    const tipo = tipoDeFila(row);
+    const sinValor = META.sin_valor.includes(selOp.value);
+    inpVal.disabled = sinValor;
+    inpVal.style.visibility = sinValor ? 'hidden' : '';
+    if (inpVal.tagName === 'INPUT') inpVal.type = sinValor ? 'text' : (META.tipo_valor[tipo] || 'text');
+  }
+  function adaptarFila(row) {
+    const selOp = row.querySelector('select[name$="-operador"]');
+    if (!selOp) return;
+    const tipo = tipoDeFila(row);
+    const permitidos = META.por_tipo[tipo] || Object.keys(META.labels);
+    const actual = selOp.value;
+    selOp.innerHTML = '';
+    permitidos.forEach(op => {
+      const o = document.createElement('option');
+      o.value = op;
+      o.textContent = (tipo === 'fecha' && META.relabel_fecha[op]) ? META.relabel_fecha[op] : META.labels[op];
+      selOp.appendChild(o);
+    });
+    selOp.value = permitidos.includes(actual) ? actual : permitidos[0];
+    adaptarValor(row);
+  }
+  $('boxCondCampos').addEventListener('change', e => {
+    const row = e.target.closest('.cond-row'); if (!row) return;
+    if (e.target.name && e.target.name.endsWith('-campo')) adaptarFila(row);
+    else if (e.target.name && e.target.name.endsWith('-operador')) adaptarValor(row);
+  });
+  document.querySelectorAll('#condCampos .cond-row').forEach(adaptarFila);
 
   upd(); filtrarEtapas(); updEmbudo(); updDisp(); prev(); resumen();
 })();

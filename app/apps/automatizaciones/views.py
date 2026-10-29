@@ -131,17 +131,32 @@ class AccionForm(forms.ModelForm):
         return super().save(commit)
 
 
+class SelectCampo(forms.Select):
+    """Select de campos que etiqueta cada opción con data-tipo, para que el front adapte los operadores."""
+    tipos = {}
+
+    def create_option(self, name, value, *a, **k):
+        opt = super().create_option(name, value, *a, **k)
+        tipo = self.tipos.get(str(value))
+        if tipo:
+            opt['attrs']['data-tipo'] = tipo
+        return opt
+
+
 class CondicionCampoForm(forms.ModelForm):
     class Meta:
         model = CondicionCampo
         fields = ['campo', 'operador', 'valor']
+        widgets = {'campo': SelectCampo}
 
     def __init__(self, *a, **k):
         super().__init__(*a, **k)
         from apps.crm.models import CampoPersonalizado
-        self.fields['campo'].queryset = CampoPersonalizado.objects.filter(activo=True).exclude(
+        qs = CampoPersonalizado.objects.filter(activo=True).exclude(
             tipo=CampoPersonalizado.TIPO_ARCHIVO).order_by('nombre')
+        self.fields['campo'].queryset = qs
         self.fields['campo'].empty_label = '— elegí un campo —'
+        self.fields['campo'].widget.tipos = {str(c.pk): c.tipo for c in qs}
         for f in self.fields.values():
             f.widget.attrs['class'] = 'form-select' if isinstance(f.widget, forms.Select) else 'form-control'
         self.fields['valor'].widget.attrs['placeholder'] = 'valor (ej. Sí)'
@@ -216,6 +231,7 @@ class AccionEditarView(PermisoRequeridoMixin, View):
             'accion': accion, 'embudo': embudo, 'form': form, 'condforms': formset,
             'plantillas_texto': json.dumps({str(p.pk): p.cuerpo for p in Plantilla.objects.filter(activa=True)}).replace('</', '<\\/'),
             'plantillas_email_texto': json.dumps({str(p.pk): f'{p.asunto}\n\n{p.cuerpo}' for p in PlantillaEmail.objects.filter(activa=True)}).replace('</', '<\\/'),
+            'condiciones_meta': json.dumps(CondicionCampo.metadata_js()).replace('</', '<\\/'),
         })
 
 

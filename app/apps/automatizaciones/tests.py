@@ -364,6 +364,34 @@ class CondicionCampoCumpleTests(TestCase):
         self.assertTrue(c.cumple(self._C({'es_socio': 'Plan Oro'})))
         self.assertFalse(c.cumple(self._C({'es_socio': 'Plan Plata'})))
 
+    def _cond_num(self, operador, valor):
+        from apps.crm.models import CampoPersonalizado
+        campo = CampoPersonalizado(slug='edad', nombre='Edad', tipo=CampoPersonalizado.TIPO_NUMERO)
+        return CondicionCampo(campo=campo, operador=operador, valor=valor)
+
+    def test_comparacion_numerica(self):
+        self.assertTrue(self._cond_num(CondicionCampo.OP_MAYOR, '18').cumple(self._C({'edad': 25})))
+        self.assertFalse(self._cond_num(CondicionCampo.OP_MAYOR, '18').cumple(self._C({'edad': 18})))
+        self.assertTrue(self._cond_num(CondicionCampo.OP_MAYOR_IGUAL, '18').cumple(self._C({'edad': '18'})))
+        self.assertTrue(self._cond_num(CondicionCampo.OP_MENOR, '18').cumple(self._C({'edad': '17'})))
+        self.assertTrue(self._cond_num(CondicionCampo.OP_MENOR_IGUAL, '18').cumple(self._C({'edad': '18,0'})))
+        self.assertFalse(self._cond_num(CondicionCampo.OP_MENOR, '18').cumple(self._C({'edad': ''})))  # vacío no compara
+
+    def test_comparacion_fecha(self):
+        from apps.crm.models import CampoPersonalizado
+        campo = CampoPersonalizado(slug='vence', nombre='Vence', tipo=CampoPersonalizado.TIPO_FECHA)
+        c = CondicionCampo(campo=campo, operador=CondicionCampo.OP_MENOR, valor='2026-01-01')
+        self.assertTrue(c.cumple(self._C({'vence': '2025-12-31'})))
+        self.assertFalse(c.cumple(self._C({'vence': '2026-06-01'})))
+
+    def test_operadores_por_tipo(self):
+        from apps.crm.models import CampoPersonalizado as Cp
+        self.assertIn(CondicionCampo.OP_MAYOR, CondicionCampo.operadores_para(Cp.TIPO_NUMERO))
+        self.assertIn(CondicionCampo.OP_MAYOR, CondicionCampo.operadores_para(Cp.TIPO_FECHA))
+        self.assertNotIn(CondicionCampo.OP_MAYOR, CondicionCampo.operadores_para(Cp.TIPO_SINO))
+        self.assertIn(CondicionCampo.OP_CONTIENE, CondicionCampo.operadores_para(Cp.TIPO_TEXTO))
+        self.assertNotIn(CondicionCampo.OP_CONTIENE, CondicionCampo.operadores_para(Cp.TIPO_NUMERO))
+
 
 class AutomatizacionPorCampoTests(TestCase):
     """Disparador "cuando cambia un campo": el agente/bot solo marca el campo y la tarjeta se mueve sola."""
@@ -406,6 +434,20 @@ class AutomatizacionPorCampoTests(TestCase):
         contacto.save(update_fields=['datos_extra'])
         with self.captureOnCommitCallbacks(execute=True):
             crm.avisar_campos_cambiados(contacto, extra_antes, self.ana)
+
+    def test_form_adapta_operadores_segun_tipo(self):
+        from django.test import Client
+        from apps.crm.models import CampoPersonalizado
+        CampoPersonalizado.objects.create(nombre='Edad', tipo=CampoPersonalizado.TIPO_NUMERO)
+        admin = User.objects.create_user('jefe_campo', password='x', rol=User.ROL_ADMIN)
+        cl = Client()
+        cl.force_login(admin)
+        r = cl.get(f'/automatizaciones/nueva/?etapa={self.inicial.pk}')
+        self.assertEqual(r.status_code, 200)
+        html = r.content.decode()
+        self.assertIn('data-tipo="numero"', html)          # la opción del campo lleva su tipo
+        self.assertIn('es mayor que', html)                # etiqueta del operador numérico, para el front
+        self.assertIn('"por_tipo"', html)                  # metadata de operadores por tipo
 
     def test_marcar_socio_mueve_al_embudo_socios(self):
         socios = self._embudo('Socios')

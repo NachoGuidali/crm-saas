@@ -242,17 +242,52 @@ class CondicionCampo(models.Model):
     """
     OP_IGUAL = '='
     OP_DISTINTO = '!='
+    OP_MAYOR = '>'
+    OP_MAYOR_IGUAL = '>='
+    OP_MENOR = '<'
+    OP_MENOR_IGUAL = '<='
     OP_CONTIENE = 'contiene'
     OP_LLENO = 'lleno'
     OP_VACIO = 'vacio'
     OPERADORES = [
         (OP_IGUAL, 'es igual a'),
         (OP_DISTINTO, 'es distinto de'),
+        (OP_MAYOR, 'es mayor que'),
+        (OP_MAYOR_IGUAL, 'es mayor o igual que'),
+        (OP_MENOR, 'es menor que'),
+        (OP_MENOR_IGUAL, 'es menor o igual que'),
         (OP_CONTIENE, 'contiene'),
         (OP_LLENO, 'tiene algún valor'),
         (OP_VACIO, 'está vacío'),
     ]
     SIN_VALOR = (OP_LLENO, OP_VACIO)
+    COMPARACION = (OP_MAYOR, OP_MAYOR_IGUAL, OP_MENOR, OP_MENOR_IGUAL)
+
+    @classmethod
+    def operadores_para(cls, tipo):
+        """Operadores que tienen sentido para un tipo de campo (número/fecha suman mayor/menor; texto suma 'contiene')."""
+        from apps.crm.models import CampoPersonalizado as C
+        ops = [cls.OP_IGUAL, cls.OP_DISTINTO]
+        if tipo in (C.TIPO_NUMERO, C.TIPO_FECHA):
+            ops += list(cls.COMPARACION)
+        if tipo in (C.TIPO_TEXTO, C.TIPO_TEXTO_LARGO, C.TIPO_EMAIL, C.TIPO_TELEFONO, C.TIPO_URL, C.TIPO_LISTA):
+            ops.append(cls.OP_CONTIENE)
+        ops += [cls.OP_LLENO, cls.OP_VACIO]
+        return ops
+
+    @classmethod
+    def metadata_js(cls):
+        """Para el front: qué operadores van por tipo, etiquetas, y cómo mostrar el campo de valor."""
+        from apps.crm.models import CampoPersonalizado as C
+        tipos = [t for t, _ in C.TIPO_CHOICES if t != C.TIPO_ARCHIVO]
+        return {
+            'labels': dict(cls.OPERADORES),
+            'por_tipo': {t: cls.operadores_para(t) for t in tipos},
+            'sin_valor': list(cls.SIN_VALOR),
+            'relabel_fecha': {cls.OP_MAYOR: 'es posterior a', cls.OP_MAYOR_IGUAL: 'es a partir de',
+                              cls.OP_MENOR: 'es anterior a', cls.OP_MENOR_IGUAL: 'es hasta'},
+            'tipo_valor': {C.TIPO_NUMERO: 'number', C.TIPO_FECHA: 'date'},
+        }
 
     accion = models.ForeignKey(AccionEtapa, on_delete=models.CASCADE, related_name='condiciones_campo')
     campo = models.ForeignKey('crm.CampoPersonalizado', on_delete=models.CASCADE, related_name='+')
@@ -271,6 +306,22 @@ class CondicionCampo(models.Model):
         return {'sí': 'true', 'si': 'true', 'yes': 'true', '1': 'true',
                 'no': 'false', '0': 'false'}.get(s, s)
 
+    def _comparable(self, v):
+        """Convierte a algo comparable según el tipo del campo: fecha → date, el resto → número."""
+        from datetime import date
+        from apps.crm.models import CampoPersonalizado as C
+        if v in (None, ''):
+            return None
+        if self.campo.tipo == C.TIPO_FECHA:
+            try:
+                return date.fromisoformat(str(v)[:10])
+            except ValueError:
+                return None
+        try:
+            return float(str(v).replace(',', '.'))
+        except (TypeError, ValueError):
+            return None
+
     def cumple(self, contacto):
         actual = (contacto.datos_extra or {}).get(self.campo.slug)
         vacio = actual in (None, '', [], {})
@@ -278,6 +329,17 @@ class CondicionCampo(models.Model):
             return vacio
         if self.operador == self.OP_LLENO:
             return not vacio
+        if self.operador in self.COMPARACION:
+            a, b = self._comparable(actual), self._comparable(self.valor)
+            if a is None or b is None:
+                return False
+            if self.operador == self.OP_MAYOR:
+                return a > b
+            if self.operador == self.OP_MAYOR_IGUAL:
+                return a >= b
+            if self.operador == self.OP_MENOR:
+                return a < b
+            return a <= b  # OP_MENOR_IGUAL
         a, b = self._norm(actual), self._norm(self.valor)
         if self.operador == self.OP_IGUAL:
             return a == b
