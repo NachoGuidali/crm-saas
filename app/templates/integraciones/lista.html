@@ -43,10 +43,10 @@ Content-Type: application/json
   <div class="form-text mt-2">Para recibir respuestas, en Twilio configurá el webhook de mensajes del número (POST):<br><code class="copiable">{{ base_url }}/integraciones/sms/webhook/{{ sms.webhook_token }}/</code></div>
 </div></div></div>
 <div class="col-12"><div class="card"><div class="card-header">Últimas solicitudes</div><div class="table-responsive"><table class="table table-sm mb-0">
-  <thead><tr><th>Fecha</th><th>Clave</th><th>Endpoint</th><th>Estado</th><th>IP</th><th>Respuesta</th></tr></thead>
+  <thead><tr><th>Fecha</th><th>Clave</th><th>Endpoint</th><th>Estado</th><th>IP</th><th>Enviado</th><th>Respuesta</th></tr></thead>
   <tbody>{% for l in logs %}<tr><td class="small">{{ l.created_at|date:"d/m H:i:s" }}</td><td class="small">{{ l.api_key.nombre|default:"global" }}</td><td class="small">{{ l.metodo }} {{ l.endpoint }}</td>
-    <td><span class="chip {% if l.status < 300 %}ok{% else %}danger{% endif %}">{{ l.status }}</span></td><td class="small">{{ l.ip }}</td><td class="small muted">{{ l.response|truncatechars:90 }}</td></tr>
-  {% empty %}<tr><td colspan="6" class="muted text-center py-3">Sin solicitudes.</td></tr>{% endfor %}</tbody>
+    <td><span class="chip {% if l.status < 300 %}ok{% else %}danger{% endif %}">{{ l.status }}</span></td><td class="small">{{ l.ip }}</td><td class="small muted" style="max-width:260px;word-break:break-all">{{ l.request|truncatechars:160 }}</td><td class="small muted" style="max-width:220px;word-break:break-all">{{ l.response|truncatechars:120 }}</td></tr>
+  {% empty %}<tr><td colspan="7" class="muted text-center py-3">Sin solicitudes.</td></tr>{% endfor %}</tbody>
 </table></div></div></div>
 </div>
 {% endblock %}

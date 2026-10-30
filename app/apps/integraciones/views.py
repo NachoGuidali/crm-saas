@@ -187,21 +187,43 @@ class EnviarWhatsAppView(ApiBase):
         from apps.crm.services import buscar_contacto, oportunidad_activa_de
         from apps.whatsapp.models import LineaWhatsApp, Plantilla
         from apps.whatsapp.services import ErrorEnvio, conversacion_para_contacto, enviar_mensaje, linea_para
-        c = buscar_contacto(self.data.get('telefono', ''))
-        if c is None:
-            return self._resp(request, {'error': 'Contacto no encontrado'}, 404)
-        linea = LineaWhatsApp.objects.filter(pk=self.data.get('linea'), activa=True).first() if self.data.get('linea') else None
-        op = oportunidad_activa_de(c)
-        linea = linea or linea_para(c, op)
-        if linea is None:
-            return self._resp(request, {'error': 'No hay líneas de WhatsApp activas'}, 400)
-        conv = conversacion_para_contacto(c, linea, agente=op.agente if op else None)
-        plantilla = Plantilla.objects.filter(nombre=self.data['plantilla']).first() if self.data.get('plantilla') else None
-        try:
-            msg = enviar_mensaje(conv, texto=self.data.get('mensaje', ''), plantilla=plantilla, automatico=True)
-        except ErrorEnvio as e:
-            return self._resp(request, {'error': str(e)}, 409)
-        return self._resp(request, {'ok': True, 'mensaje_id': msg.pk, 'linea': str(linea)}, 202)
+        # Alias tolerantes: el bot recibe el payload con claves en inglés (phone/message) y suele reenviarlas tal cual.
+        mensaje = self.data.get('mensaje') or self.data.get('message') or ''
+        nombre_plantilla = self.data.get('plantilla') or self.data.get('template')
+        plantilla = Plantilla.objects.filter(nombre=nombre_plantilla).first() if nombre_plantilla else None
+
+        def responder(conv):
+            try:
+                msg = enviar_mensaje(conv, texto=mensaje, plantilla=plantilla, automatico=True)
+            except ErrorEnvio as e:
+                return self._resp(request, {'error': str(e)}, 409)
+            return self._resp(request, {'ok': True, 'mensaje_id': msg.pk, 'linea': str(conv.linea)}, 202)
+
+        # 1) Respuesta directa a una conversación por conversation_id (camino natural del bot).
+        if self.data.get('conversation_id') or self.data.get('conversacion_id'):
+            conv = _conversacion_de(self.data)
+            if conv is None:
+                return self._resp(request, {'error': 'Conversación no encontrada'}, 404)
+            return responder(conv)
+
+        # 2) Por teléfono: si existe el Contacto, camino clásico (respeta la línea pedida si es válida).
+        c = buscar_contacto(self.data.get('telefono') or self.data.get('phone') or '')
+        if c is not None:
+            linea_id = str(self.data.get('linea') or '')
+            linea = LineaWhatsApp.objects.filter(pk=linea_id, activa=True).first() if linea_id.isdigit() else None
+            op = oportunidad_activa_de(c)
+            linea = linea or linea_para(c, op)
+            if linea is None:
+                return self._resp(request, {'error': 'No hay líneas de WhatsApp activas'}, 400)
+            return responder(conversacion_para_contacto(c, linea, agente=op.agente if op else None))
+
+        # 3) Sin Contacto pero con una conversación existente para ese número (el bot responde a un entrante
+        #    que todavía no se convirtió en prospecto): respondemos en esa conversación, por su propia línea.
+        conv = _conversacion_de(self.data)
+        if conv is not None:
+            return responder(conv)
+
+        return self._resp(request, {'error': 'Contacto no encontrado'}, 404)
 
 
 def _conversacion_de(data):
@@ -212,10 +234,11 @@ def _conversacion_de(data):
         return Conversacion.objects.select_related('agente', 'linea').filter(pk=int(cid)).first()
     tel = data.get('telefono') or data.get('phone')
     if tel:
-        from core.phone import normalizar_telefono
-        tel = normalizar_telefono(tel)
-        return (Conversacion.objects.select_related('agente', 'linea').filter(telefono=tel)
-                .order_by('-ultimo_mensaje_at').first())
+        from core.phone import variantes_telefono
+        vs = variantes_telefono(tel)  # tolera +549X / +54X y números guardados sin normalizar
+        if vs:
+            return (Conversacion.objects.select_related('agente', 'linea').filter(telefono__in=vs)
+                    .order_by('-ultimo_mensaje_at').first())
     return None
 
 

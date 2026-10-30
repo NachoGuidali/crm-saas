@@ -179,3 +179,40 @@ class ApiBotTests(TestCase):
         self.assertEqual(self.post('/api/v1/whatsapp/bot/', {'conversation_id': 999999, 'activo': True}).status_code, 404)
         self.assertEqual(self.post('/api/v1/whatsapp/bot/', {'conversation_id': self.conv.pk, 'activo': True},
                                    clave='mala').status_code, 401)
+
+
+class ApiEnviarTests(TestCase):
+    """POST /api/v1/whatsapp/enviar/ — respuesta del bot por conversation_id (sin depender de Contacto)."""
+    @classmethod
+    def setUpTestData(cls):
+        from apps.whatsapp.models import Conversacion, LineaWhatsApp
+        call_command('setup_inicial', '--sin-admin', verbosity=0)
+        cls.key, cls.clave = ApiKey.generar(nombre='n8n', embudo=Embudo.objects.get())
+        cls.linea = LineaWhatsApp.objects.create(nombre='Bot', proveedor='demo', bot_n8n_activo=True)
+        # Conversación de un número que todavía NO tiene Contacto en el CRM.
+        cls.conv = Conversacion.objects.create(linea=cls.linea, telefono='+5491166660000', bot_activo=True)
+
+    def post(self, data):
+        return self.client.post('/api/v1/whatsapp/enviar/', json.dumps(data), content_type='application/json',
+                                 HTTP_X_API_KEY=self.clave)
+
+    def test_responde_por_conversation_id_sin_contacto(self):
+        from apps.whatsapp.models import Mensaje
+        self.assertFalse(Contacto.objects.filter(telefono='+5491166660000').exists())
+        r = self.post({'conversation_id': self.conv.pk, 'message': 'Hola, soy el bot'})
+        self.assertEqual(r.status_code, 202, r.content)
+        self.assertTrue(Mensaje.objects.filter(conversacion=self.conv, direccion=Mensaje.DIR_SALIENTE,
+                                               contenido='Hola, soy el bot', automatico=True).exists())
+
+    def test_responde_por_telefono_sin_mas_y_sin_contacto(self):
+        # Como manda n8n: teléfono en dígitos (sin +) y sin Contacto creado todavía → responde en la conversación.
+        from apps.whatsapp.models import Mensaje
+        r = self.post({'telefono': '5491166660000', 'mensaje': 'Respuesta del bot', 'linea': 'COMPLETAR_LINEA'})
+        self.assertEqual(r.status_code, 202, r.content)
+        self.assertTrue(Mensaje.objects.filter(conversacion=self.conv, contenido='Respuesta del bot').exists())
+
+    def test_conversation_id_inexistente(self):
+        self.assertEqual(self.post({'conversation_id': 999999, 'message': 'x'}).status_code, 404)
+
+    def test_telefono_sin_contacto_ni_conversacion(self):
+        self.assertEqual(self.post({'telefono': '5491199999999', 'mensaje': 'x'}).status_code, 404)
