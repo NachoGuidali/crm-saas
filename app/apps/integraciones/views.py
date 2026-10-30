@@ -9,6 +9,7 @@ Autenticación: header `X-API-Key: <clave>`.
 """
 import json
 import logging
+import re
 
 from django.contrib import messages
 from django.core.cache import cache
@@ -104,16 +105,24 @@ class LeadCrearView(ApiBase):
         from apps.crm.importacion import _valor_personalizado
         from apps.crm.models import CampoPersonalizado
         personalizados = {c.slug: c for c in CampoPersonalizado.activos() if not c.es_archivo}
-        extra = {}
+        # Alias tolerante: una integración puede mandar la clave con guion medio/bajo, espacios o
+        # distinta capitalización; la resolvemos al slug real del campo.
+        def _norm_clave(s):
+            return re.sub(r'[\s_-]+', '-', str(s).strip().lower())
+        alias = {_norm_clave(slug): campo for slug, campo in personalizados.items()}
+        extra, advertencias = {}, []
         for k, v in d.items():
             if k in CAMPOS_LEAD | {'embudo', 'etapa', 'agente', 'fuente', 'origen', 'valor', 'nota', *claves_pauta} \
                     or v in (None, ''):
                 continue
-            if k in personalizados:
+            campo = personalizados.get(k) or alias.get(_norm_clave(k))
+            if campo is not None:
                 try:
-                    extra[k] = _valor_personalizado(personalizados[k], v)
+                    extra[campo.slug] = _valor_personalizado(campo, v)
                 except ValueError as e:
-                    return self._resp(request, {'error': str(e), 'campo': k}, 400)
+                    # Un valor malo en un campo opcional (ej. opción de lista inexistente) no frena todo el lead:
+                    # se ignora ese campo y se avisa en la respuesta, así el resto igual se guarda.
+                    advertencias.append(str(e))
             else:
                 extra[k] = str(v)[:500]
         if extra:
@@ -159,13 +168,16 @@ class LeadCrearView(ApiBase):
             from apps.automatizaciones.services import campos_cambiaron
             campos_cambiaron(res.contacto, set(extra))
         op = res.oportunidad
-        return self._resp(request, {
+        resp = {
             'ok': True, 'contacto_id': res.contacto.pk, 'contacto_nuevo': res.contacto_nuevo,
             'oportunidad_id': op.pk if op else None, 'oportunidad_nueva': res.oportunidad_nueva,
             'motivo': res.motivo or None, 'etapa': str(op.etapa) if op else None, 'movida': movida,
             'pauta': str(op.pauta) if op and op.pauta_id else None,
             'agente': op.agente.display_name if op and op.agente else None,
-        }, 201 if res.oportunidad_nueva else 200)
+        }
+        if advertencias:
+            resp['advertencias'] = advertencias
+        return self._resp(request, resp, 201 if res.oportunidad_nueva else 200)
 
 
 class LeadBuscarView(ApiBase):

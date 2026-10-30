@@ -54,6 +54,30 @@ class ApiLeadsTests(TestCase):
         r = self.client.get('/api/v1/leads/buscar/', {'telefono': '011 15 5555 0000'}, HTTP_X_API_KEY=self.clave)
         self.assertEqual(r.json()['contacto']['nombre'], 'Ana')
 
+    def test_campos_personalizados_dinamicos_por_slug(self):
+        # Cualquier campo personalizado activo se acepta por su slug; crear uno nuevo no necesita tocar el CRM.
+        from apps.crm.models import CampoPersonalizado as CP
+        CP.objects.create(nombre='Edad', tipo=CP.TIPO_NUMERO)
+        CP.objects.create(nombre='Situación laboral', tipo=CP.TIPO_LISTA,
+                          opciones=['Relación de dependencia', 'Monotributista / Autónomo'])
+        r = self.post({'nombre': 'Juan', 'telefono': '1166660000', 'edad': 34,
+                       'situacion_laboral': 'Monotributista / Autónomo', 'localidad': 'Quilmes'})
+        self.assertEqual(r.status_code, 201, r.content)
+        c = Contacto.objects.get(telefono='+5491166660000')
+        self.assertEqual(c.datos_extra['edad'], 34)
+        self.assertEqual(c.datos_extra['situacion_laboral'], 'Monotributista / Autónomo')
+        self.assertEqual(c.localidad, 'Quilmes')  # localidad es campo core del contacto, no personalizado
+
+    def test_slug_tolerante_y_valor_de_lista_invalido_no_frena_el_lead(self):
+        from apps.crm.models import CampoPersonalizado as CP
+        CP.objects.create(nombre='Situación laboral', tipo=CP.TIPO_LISTA, opciones=['Relación de dependencia'])
+        # Clave con guion medio / mayúsculas igual matchea el slug; valor fuera de las opciones se ignora con aviso.
+        r = self.post({'nombre': 'Pia', 'telefono': '1177770000', 'Situacion-Laboral': 'Monotributo'})
+        self.assertEqual(r.status_code, 201, r.content)   # el lead igual se crea
+        self.assertIn('advertencias', r.json())
+        c = Contacto.objects.get(telefono='+5491177770000')
+        self.assertNotIn('situacion_laboral', c.datos_extra or {})
+
 
 class EmailYSMSDesdeLaFichaTests(TestCase):
     @classmethod
