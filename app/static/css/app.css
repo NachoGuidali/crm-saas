@@ -126,6 +126,7 @@
 
 /* Inbox de 3 columnas */
 .inbox { display: grid; grid-template-columns: 330px 1fr 290px; height: calc(100vh - var(--topbar-h) - 40px);
+         height: calc(100dvh - var(--topbar-h) - 40px);
          border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; background: var(--bg2); }
 .inbox-lista { border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
 .inbox-lista .filtros { padding: 10px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 7px; }
@@ -143,8 +144,15 @@
 .inbox-chat .cab { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
 .inbox-lado { border-left: 1px solid var(--border); overflow-y: auto; padding: 14px; }
 @media (max-width: 1199.98px) { .inbox { grid-template-columns: 290px 1fr; } .inbox-lado { display: none; } }
-@media (max-width: 767.98px) { .inbox { grid-template-columns: 1fr; height: auto; } .inbox.con-chat .inbox-lista { display: none; }
-  .inbox:not(.con-chat) .inbox-chat { display: none; } .inbox-chat { height: calc(100vh - 110px); } }
+@media (max-width: 767.98px) {
+  /* El inbox llena el área visible (el shell ya usa 100dvh); sin número mágico que deje el input fuera de pantalla */
+  .inbox { grid-template-columns: 1fr; height: 100%; }
+  .inbox.con-chat .inbox-lista { display: none; }
+  .inbox:not(.con-chat) .inbox-chat { display: none; }
+  .inbox-chat { height: 100%; min-height: 0; }
+  /* Fila de filtros (línea + "no leídos" + "archivados"): que envuelva en vez de cortarse a la derecha */
+  .inbox-lista .filtros .d-flex { flex-wrap: wrap; }
+}
 
 /* ── Widget de llamada (persistente en todas las pantallas) ─────────── */
 #callWidget { position: fixed; right: 18px; bottom: 18px; z-index: 1080; min-width: 290px; background: var(--bg2);

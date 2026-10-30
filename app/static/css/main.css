@@ -67,6 +67,7 @@ html, body {
 .app-layout {
   display: flex;
   height: 100vh;
+  height: 100dvh; /* iOS/Android: alto visible real, descontando barras dinámicas del navegador */
   overflow: hidden;
 }
 
