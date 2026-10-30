@@ -346,7 +346,8 @@ class ConversacionAccionView(LoginRequiredMixin, View):
 class LineaForm(forms.ModelForm):
     class Meta:
         model = LineaWhatsApp
-        fields = ['nombre', 'proveedor', 'telefono', 'activa', 'orden', 'embudo', 'agentes', 'min_segundos_entre_envios',
+        fields = ['nombre', 'proveedor', 'telefono', 'activa', 'orden', 'embudo', 'agentes',
+                  'min_segundos_entre_envios', 'max_segundos_entre_envios',
                   'bot_n8n_activo', 'bot_n8n_url', 'bot_n8n_liberar_url',
                   'evolution_instancia', 'evolution_api_url', 'evolution_api_key',
                   'meta_phone_number_id', 'meta_waba_id', 'meta_access_token', 'meta_app_secret', 'meta_verify_token',

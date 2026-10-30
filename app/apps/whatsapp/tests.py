@@ -113,6 +113,16 @@ class WebhookMetaTwilioTests(WhatsAppBase):
 
 
 class EnvioTests(WhatsAppBase):
+    def test_pausa_aleatoria_entre_min_y_max(self):
+        from apps.whatsapp.services import _gap_aleatorio, demora_para
+        fija = LineaWhatsApp.objects.create(nombre='Fija', proveedor='demo', min_segundos_entre_envios=5)
+        self.assertEqual(_gap_aleatorio(fija), 5)  # sin máximo → pausa fija
+        rnd = LineaWhatsApp.objects.create(nombre='Rnd', proveedor='demo',
+                                           min_segundos_entre_envios=3, max_segundos_entre_envios=8)
+        for _ in range(40):
+            self.assertTrue(3 <= _gap_aleatorio(rnd) <= 8)
+        self.assertTrue(3 <= demora_para(rnd) <= 8)  # línea ociosa: domina la pausa humanizada
+
     def test_ventana_24h_en_linea_oficial(self):
         linea = LineaWhatsApp.objects.create(nombre='Oficial', proveedor='meta', meta_phone_number_id='1',
                                              meta_access_token='t', meta_verify_token='v')

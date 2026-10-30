@@ -309,7 +309,7 @@ def enviar_automatico(oportunidad, plantilla=None, texto='', linea=None, accion=
             return None, f'Omitido: la plantilla "{plantilla}" no está aprobada para {linea}.'
     if plantilla is None:
         texto = reemplazar_variables_texto(texto, contacto, oportunidad)
-    demora = reservar_turno(linea)
+    demora = demora_para(linea)
     try:
         msg = enviar_mensaje(conv, texto=texto, plantilla=plantilla, automatico=True, demora_segundos=demora)
     except ErrorEnvio as e:
@@ -342,13 +342,36 @@ def _redis():
         return None
 
 
+def _gap_aleatorio(linea) -> int:
+    """Pausa entre envíos: mínima, o aleatoria entre mínimo y máximo si se configuró un máximo mayor."""
+    lo = max(int(linea.min_segundos_entre_envios or 0), 0)
+    hi = max(int(linea.max_segundos_entre_envios or 0), 0)
+    if hi > lo:
+        import random
+        return random.randint(lo, hi)
+    return lo
+
+
+def demora_para(linea, humanizar=True) -> float:
+    """
+    Segundos a esperar antes de enviar por esta línea. Combina el espaciado anti-ráfaga
+    (reservar_turno, atómico entre workers) con una pausa aleatoria mínima tipo 'tipeando'
+    para que el bot/automático no responda al instante y no genere un patrón detectable.
+    """
+    espera = reservar_turno(linea)
+    if humanizar:
+        espera = max(espera, _gap_aleatorio(linea))
+    return espera
+
+
 def reservar_turno(linea) -> float:
     """
     Reserva el próximo hueco de envío de la línea y devuelve cuántos segundos hay que esperar.
     Es atómico en Redis: varios workers encolando a la vez no rompen el espaciado, y ningún
-    worker queda dormido esperando (el envío se programa con countdown).
+    worker queda dormido esperando (el envío se programa con countdown). El gap es aleatorio
+    (mínimo–máximo) para romper la periodicidad en ráfagas.
     """
-    gap = max(int(linea.min_segundos_entre_envios or 0), 0)
+    gap = _gap_aleatorio(linea)
     if gap == 0:
         return 0
     ahora = time.time()

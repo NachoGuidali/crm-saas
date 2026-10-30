@@ -63,6 +63,11 @@ class LineaWhatsApp(models.Model):
         default=6, verbose_name='Segundos mínimos entre envíos automáticos',
         help_text='Anti-bloqueo para envíos masivos/automáticos. Sugerido: por QR 6–15 s, Meta/Twilio 1 s.',
     )
+    max_segundos_entre_envios = models.PositiveSmallIntegerField(
+        default=0, verbose_name='Segundos máximos entre envíos automáticos',
+        help_text='Si es mayor que el mínimo, la pausa entre envíos (y antes de que responda el bot) es '
+                  'aleatoria entre mínimo y máximo, para parecer más humano. 0 = pausa fija igual al mínimo.',
+    )
 
     # ── Bot n8n (asistente automático de esta línea) ──
     # Cada número puede enganchar su propio flujo de n8n. Al llegar un entrante, el CRM lo reenvía a bot_n8n_url

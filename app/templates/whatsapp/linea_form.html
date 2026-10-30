@@ -12,7 +12,8 @@
     <div class="col-md-6"><label class="form-label">Número (informativo)</label>{{ form.telefono }}</div>
     <div class="col-12"><label class="form-label">Proveedor</label>{{ form.proveedor }}</div>
     <div class="col-md-8"><label class="form-label">{{ form.embudo.label }}</label>{{ form.embudo }}<div class="form-text">{{ form.embudo.help_text }}</div></div>
-    <div class="col-md-4"><label class="form-label">Seg. entre envíos auto.</label>{{ form.min_segundos_entre_envios }}</div>
+    <div class="col-md-2"><label class="form-label">Seg. mín. entre envíos</label>{{ form.min_segundos_entre_envios }}</div>
+    <div class="col-md-2"><label class="form-label">Seg. máx. (aleatorio)</label>{{ form.max_segundos_entre_envios }}<div class="form-text">0 = pausa fija</div></div>
     <div class="col-6"><label class="d-flex gap-2">{{ form.activa }} Activa</label></div>
     <div class="col-6"><label class="form-label">Orden</label>{{ form.orden }}</div>
   </div>

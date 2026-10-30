@@ -186,18 +186,22 @@ class EnviarWhatsAppView(ApiBase):
     def post(self, request):
         from apps.crm.services import buscar_contacto, oportunidad_activa_de
         from apps.whatsapp.models import LineaWhatsApp, Plantilla
-        from apps.whatsapp.services import ErrorEnvio, conversacion_para_contacto, enviar_mensaje, linea_para
+        from apps.whatsapp.services import (ErrorEnvio, conversacion_para_contacto, demora_para, enviar_mensaje,
+                                            linea_para)
         # Alias tolerantes: el bot recibe el payload con claves en inglés (phone/message) y suele reenviarlas tal cual.
         mensaje = self.data.get('mensaje') or self.data.get('message') or ''
         nombre_plantilla = self.data.get('plantilla') or self.data.get('template')
         plantilla = Plantilla.objects.filter(nombre=nombre_plantilla).first() if nombre_plantilla else None
 
         def responder(conv):
+            # Pausa anti-bloqueo / humanizada antes de que salga la respuesta del bot.
+            demora = demora_para(conv.linea)
             try:
-                msg = enviar_mensaje(conv, texto=mensaje, plantilla=plantilla, automatico=True)
+                msg = enviar_mensaje(conv, texto=mensaje, plantilla=plantilla, automatico=True, demora_segundos=demora)
             except ErrorEnvio as e:
                 return self._resp(request, {'error': str(e)}, 409)
-            return self._resp(request, {'ok': True, 'mensaje_id': msg.pk, 'linea': str(conv.linea)}, 202)
+            return self._resp(request, {'ok': True, 'mensaje_id': msg.pk, 'linea': str(conv.linea),
+                                       'demora_segundos': int(demora)}, 202)
 
         # 1) Respuesta directa a una conversación por conversation_id (camino natural del bot).
         if self.data.get('conversation_id') or self.data.get('conversacion_id'):
