@@ -200,6 +200,14 @@ class EnviarWhatsAppView(ApiBase):
                 msg = enviar_mensaje(conv, texto=mensaje, plantilla=plantilla, automatico=True, demora_segundos=demora)
             except ErrorEnvio as e:
                 return self._resp(request, {'error': str(e)}, 409)
+            # Que el bot responda es "primera gestión": saca la tarjeta de la etapa inicial ("Nuevo").
+            if conv.contacto_id:
+                from apps.crm.services import avanzar_desde_inicial, marcar_primer_contacto, oportunidad_activa_de, tocar
+                op = oportunidad_activa_de(conv.contacto)
+                if op:
+                    tocar(op)
+                    marcar_primer_contacto(op)
+                    avanzar_desde_inicial(op)
             return self._resp(request, {'ok': True, 'mensaje_id': msg.pk, 'linea': str(conv.linea),
                                        'demora_segundos': int(demora)}, 202)
 
@@ -261,21 +269,43 @@ class BotToggleView(ApiBase):
 
 
 class HandoffView(ApiBase):
-    """El bot deriva a un agente: apaga el bot, deja la conversación pendiente y notifica. Body: {conversation_id|telefono}."""
+    """El bot deriva a una persona: apaga el bot, deja la conversación pendiente, la asigna si puede y avisa.
+    Body: {conversation_id|telefono}."""
     def post(self, request):
         from apps.whatsapp.models import Conversacion
         from apps.whatsapp import services as wa
+        from apps.users.services import notificar, supervisores_de
         conv = _conversacion_de(self.data)
         if conv is None:
             return self._resp(request, {'ok': False, 'error': 'Conversación no encontrada'}, 404)
-        Conversacion.objects.filter(pk=conv.pk).update(bot_activo=False, estado=Conversacion.ESTADO_PENDIENTE)
-        if conv.agente_id:
-            from apps.users.services import notificar
-            notificar(conv.agente, 'whatsapp', f'El bot te derivó el chat con {conv.nombre_mostrar}', '',
-                      f'/whatsapp/?conv={conv.pk}')
-        wa.invalidar_no_leidos([conv.agente_id])
+
+        # Agente a cargo: el de la conversación o, si no tiene, el de la oportunidad activa del contacto.
+        agente, op = conv.agente, None
+        if conv.contacto_id:
+            from apps.crm.services import oportunidad_activa_de
+            op = oportunidad_activa_de(conv.contacto)
+            if agente is None and op is not None:
+                agente = op.agente
+
+        campos = {'bot_activo': False, 'estado': Conversacion.ESTADO_PENDIENTE}
+        if agente is not None and conv.agente_id is None:
+            campos['agente'] = agente  # dejamos el chat a cargo de quien ya tiene el lead
+        Conversacion.objects.filter(pk=conv.pk).update(**campos)
+
+        nombre, url = conv.nombre_mostrar, f'/whatsapp/?conv={conv.pk}'
+        if agente is not None:
+            notificar(agente, 'whatsapp', f'El bot te derivó el chat con {nombre}',
+                      'El cliente necesita que lo atienda una persona.', url)
+        else:
+            # Nadie asignado: avisar a los supervisores del embudo para que lo tomen.
+            for s in supervisores_de(op.embudo if op is not None else None):
+                notificar(s, 'whatsapp', f'El bot derivó un chat sin asignar: {nombre}',
+                          'Hay que asignarlo a un agente para que lo atienda.', url)
+
+        wa.invalidar_no_leidos([agente.pk if agente else None])
         wa.marcar_cambio_inbox()
-        return self._resp(request, {'ok': True, 'conversation_id': conv.pk, 'estado': 'pendiente'})
+        return self._resp(request, {'ok': True, 'conversation_id': conv.pk, 'estado': 'pendiente',
+                                   'asignado_a': agente.pk if agente else None})
 
 
 # ── Gestión de claves (UI) ──────────────────────────────────────────────────

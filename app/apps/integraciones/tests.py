@@ -180,6 +180,33 @@ class ApiBotTests(TestCase):
         self.assertEqual(self.post('/api/v1/whatsapp/bot/', {'conversation_id': self.conv.pk, 'activo': True},
                                    clave='mala').status_code, 401)
 
+    def test_handoff_toma_el_agente_de_la_oportunidad_y_lo_asigna(self):
+        from apps.crm.services import ingresar_prospecto
+        from apps.whatsapp.models import Conversacion
+        from apps.users.models import NotificacionInterna, User
+        ag = User.objects.create_user('ag_ho', password='x')
+        emb = Embudo.objects.get()
+        emb.agentes.set([ag])
+        op = ingresar_prospecto({'telefono': '5491188880000', 'nombre': 'Caro'}, emb, 'manual').oportunidad
+        Oportunidad.objects.filter(pk=op.pk).update(agente=ag)  # garantizamos agente, sin depender del modo de asignación
+        conv = Conversacion.objects.create(linea=self.linea, telefono=op.contacto.telefono,
+                                           contacto=op.contacto, bot_activo=True)  # la conv todavía no tiene agente
+        r = self.post('/api/v1/whatsapp/handoff/', {'conversation_id': conv.pk})
+        self.assertEqual(r.status_code, 200, r.content)
+        conv.refresh_from_db()
+        self.assertEqual(conv.agente_id, ag.pk)
+        self.assertFalse(conv.bot_activo)
+        self.assertTrue(NotificacionInterna.objects.filter(destinatario=ag, tipo='whatsapp').exists())
+
+    def test_handoff_sin_asignar_avisa_a_supervisores(self):
+        from apps.whatsapp.models import Conversacion
+        from apps.users.models import NotificacionInterna, User
+        sup = User.objects.create_user('sup_ho', password='x', rol=User.ROL_SUPERVISOR)
+        conv = Conversacion.objects.create(linea=self.linea, telefono='+5491199990000', bot_activo=True)  # sin contacto
+        r = self.post('/api/v1/whatsapp/handoff/', {'conversation_id': conv.pk})
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertTrue(NotificacionInterna.objects.filter(destinatario=sup, tipo='whatsapp').exists())
+
 
 class ApiEnviarTests(TestCase):
     """POST /api/v1/whatsapp/enviar/ — respuesta del bot por conversation_id (sin depender de Contacto)."""
@@ -216,3 +243,17 @@ class ApiEnviarTests(TestCase):
 
     def test_telefono_sin_contacto_ni_conversacion(self):
         self.assertEqual(self.post({'telefono': '5491199999999', 'mensaje': 'x'}).status_code, 404)
+
+    def test_respuesta_del_bot_saca_la_tarjeta_de_la_etapa_inicial(self):
+        from apps.crm.services import ingresar_prospecto
+        from apps.whatsapp.models import Conversacion
+        emb = Embudo.objects.get()
+        op = ingresar_prospecto({'telefono': '5491177770000', 'nombre': 'Tere'}, emb, 'manual').oportunidad
+        inicial = emb.etapa_inicial
+        self.assertEqual(op.etapa_id, inicial.pk)
+        conv = Conversacion.objects.create(linea=self.linea, telefono=op.contacto.telefono,
+                                           contacto=op.contacto, bot_activo=True)
+        r = self.post({'conversation_id': conv.pk, 'message': 'Hola, soy el bot'})
+        self.assertEqual(r.status_code, 202, r.content)
+        op.refresh_from_db()
+        self.assertNotEqual(op.etapa_id, inicial.pk)  # avanzó desde "Nuevo"
