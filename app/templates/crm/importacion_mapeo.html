@@ -15,9 +15,14 @@
 <div class="card mb-3"><div class="card-body row g-3">
   <div class="col-md-4"><label class="form-label">Etapa de ingreso</label><select name="etapa" class="form-select"><option value="">Etapa inicial del embudo</option>{% for e in etapas %}<option value="{{ e.pk }}">{{ e.nombre }}</option>{% endfor %}</select></div>
   <div class="col-md-4"><label class="form-label">Asignación</label>
+    {% if puede_reasignar %}
     <select name="agente_fijo" class="form-select" id="agenteFijo"><option value="">Automática según el embudo</option>{% for a in agentes %}<option value="{{ a.pk }}">Todo a {{ a.display_name }}</option>{% endfor %}</select>
     <input type="hidden" name="asignar" value="1" id="asignar">
-    <label class="small mt-1 d-flex gap-1"><input type="checkbox" class="form-check-input" id="sinAsignar"> Dejar sin asignar</label></div>
+    <label class="small mt-1 d-flex gap-1"><input type="checkbox" class="form-check-input" id="sinAsignar"> Dejar sin asignar</label>
+    {% else %}
+    <div class="form-control-plaintext"><i class="bi bi-person-check"></i> Todo a vos ({{ request.user.display_name }})</div>
+    <div class="form-text">Se asignan a tu nombre. Los leads que ya esté atendiendo otro agente quedan como estaban.</div>
+    {% endif %}</div>
   <div class="col-md-4"><label class="form-label">Pauta de toda la base <span class="muted">(opcional)</span></label>
     <select name="pauta" class="form-select"><option value="">Ninguna / por columna</option>{% for p in pautas %}<option value="{{ p.pk }}">{{ p }}</option>{% endfor %}</select>
     <div class="form-text">Si el archivo trae una columna "Pauta / origen de campaña", se usa la de cada fila.</div></div>
@@ -28,5 +33,5 @@
 <button class="btn btn-primary"><i class="bi bi-cloud-upload"></i> Importar</button>
 <a href="{% url 'crm:importaciones' %}" class="btn btn-outline-secondary">Cancelar</a>
 </form>
-<script>document.getElementById('sinAsignar').addEventListener('change', e => { document.getElementById('asignar').value = e.target.checked ? '0' : '1'; document.getElementById('agenteFijo').disabled = e.target.checked; });</script>
+<script>(function(){var s=document.getElementById('sinAsignar');if(s)s.addEventListener('change', e => { document.getElementById('asignar').value = e.target.checked ? '0' : '1'; document.getElementById('agenteFijo').disabled = e.target.checked; });})();</script>
 {% endblock %}

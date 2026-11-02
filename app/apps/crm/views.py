@@ -965,6 +965,7 @@ class ImportacionMapeoView(PermisoRequeridoMixin, View):
             'lote': lote, 'columnas': columnas, 'filas': filas, 'campos': campos_importacion(),
             'etapas': [e for e in etapas_de(lote.embudo) if not e.es_cierre], 'agentes': lote.embudo.agentes.filter(is_active=True),
             'pautas': Pauta.objects.filter(activa=True),
+            'puede_reasignar': request.user.tiene_permiso('reasignar'),
         })
 
     def post(self, request, pk):
@@ -982,8 +983,13 @@ class ImportacionMapeoView(PermisoRequeridoMixin, View):
         lote.mapeo = mapeo
         etapa_id = request.POST.get('etapa')
         lote.etapa = Etapa.objects.filter(pk=etapa_id, embudo=lote.embudo).first() if etapa_id else None
-        lote.asignar_automaticamente = request.POST.get('asignar') == '1'
-        lote.agente_fijo_id = request.POST.get('agente_fijo') or None
+        if request.user.tiene_permiso('reasignar'):
+            lote.asignar_automaticamente = request.POST.get('asignar') == '1'
+            lote.agente_fijo_id = request.POST.get('agente_fijo') or None
+        else:
+            # Un agente sin permiso de reasignar solo puede importar leads para sí mismo.
+            lote.asignar_automaticamente = False
+            lote.agente_fijo = request.user
         lote.disparar_automatizaciones = request.POST.get('automatizaciones') == '1'
         from apps.pautas.models import Pauta
         lote.pauta = Pauta.objects.filter(pk=request.POST.get('pauta') or 0).first()

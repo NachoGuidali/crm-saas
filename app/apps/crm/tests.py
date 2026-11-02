@@ -201,6 +201,42 @@ class ImportacionTests(BaseCRM):
         self.assertEqual(str(c.fecha_atencion), '2026-08-15')
 
 
+class ImportacionAsignacionTests(BaseCRM):
+    """Quién puede repartir la base al importar: sin 'reasignar' solo se la asigna a sí mismo."""
+
+    def _lote(self):
+        return ImportacionLote.objects.create(
+            archivo=SimpleUploadedFile('base.xlsx', b'x'), nombre_archivo='base.xlsx',
+            embudo=self.embudo, mapeo={'Teléfono': 'telefono'})
+
+    def test_agente_sin_reasignar_solo_se_asigna_a_si_mismo(self):
+        from unittest import mock
+        from apps.users.models import RolPersonalizado
+        rol = RolPersonalizado.objects.create(nombre='Vendedor import', permisos=['importar'])
+        User.objects.filter(pk=self.a1.pk).update(rol_custom=rol)
+        self.client.force_login(User.objects.get(pk=self.a1.pk))
+        lote = self._lote()
+        with mock.patch('apps.crm.tasks.procesar_importacion.delay') as proc:
+            r = self.client.post(f'/importaciones/{lote.pk}/columnas/',
+                                 {'col__Teléfono': 'telefono', 'asignar': '1', 'agente_fijo': self.a2.pk})
+        self.assertEqual(r.status_code, 302)
+        lote.refresh_from_db()
+        self.assertEqual(lote.agente_fijo_id, self.a1.pk)      # se ignora el a2 que intentó poner
+        self.assertFalse(lote.asignar_automaticamente)         # no puede repartir al equipo
+        proc.assert_called_once_with(lote.pk)
+
+    def test_supervisor_puede_elegir_otro_agente(self):
+        from unittest import mock
+        self.client.force_login(User.objects.get(pk=self.sup.pk))
+        lote = self._lote()
+        with mock.patch('apps.crm.tasks.procesar_importacion.delay'):
+            r = self.client.post(f'/importaciones/{lote.pk}/columnas/',
+                                 {'col__Teléfono': 'telefono', 'asignar': '0', 'agente_fijo': self.a2.pk})
+        self.assertEqual(r.status_code, 302)
+        lote.refresh_from_db()
+        self.assertEqual(lote.agente_fijo_id, self.a2.pk)
+
+
 class CargaMasivaTests(BaseCRM):
     def test_mil_ingresos_sin_duplicar(self):
         """1000 datos (con repetidos en distintos formatos) → sin duplicados y reparto parejo."""
@@ -262,7 +298,9 @@ class CamposPersonalizadosTests(BaseCRM):
         _, clave = ApiKey.generar(nombre='x')
         r = self.client.post('/api/v1/leads/', json.dumps({'telefono': '1155552222', 'plan_de_interes': 'Plan X'}),
                              content_type='application/json', HTTP_X_API_KEY=clave)
-        self.assertEqual(r.status_code, 400)
+        self.assertEqual(r.status_code, 201)            # valor de lista inválido: avisa pero NO frena el lead
+        self.assertIn('advertencias', r.json())
+        self.assertNotIn('plan_de_interes', Contacto.objects.get(telefono='+5491155552222').datos_extra)
         r = self.client.post('/api/v1/leads/', json.dumps({'telefono': '1155552222', 'plan_de_interes': 'Flex 1',
                                                             'utm': 'fb'}), content_type='application/json', HTTP_X_API_KEY=clave)
         self.assertEqual(Contacto.objects.get(telefono='+5491155552222').datos_extra, {'plan_de_interes': 'Flex 1', 'utm': 'fb'})
