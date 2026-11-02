@@ -299,7 +299,7 @@ class HandoffView(ApiBase):
             if agente is None and op is not None:
                 agente = op.agente
 
-        campos = {'bot_activo': False, 'estado': Conversacion.ESTADO_PENDIENTE}
+        campos = {'bot_activo': False, 'bot_derivada': True, 'estado': Conversacion.ESTADO_PENDIENTE}
         if agente is not None and conv.agente_id is None:
             campos['agente'] = agente  # dejamos el chat a cargo de quien ya tiene el lead
         Conversacion.objects.filter(pk=conv.pk).update(**campos)

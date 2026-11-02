@@ -352,3 +352,15 @@ class BotN8nTests(WhatsAppBase):
         conv.refresh_from_db()
         self.assertTrue(conv.bot_activo)
         lib.assert_called_once_with(conv.pk)
+
+    def test_tomar_apaga_la_marca_de_bot_derivada(self):
+        conv = Conversacion.objects.create(linea=self.linea, telefono='+5491155551111',
+                                           bot_activo=False, bot_derivada=True,
+                                           estado=Conversacion.ESTADO_PENDIENTE)
+        cl = Client()
+        cl.force_login(self.agente)
+        r = cl.post(f'/whatsapp/conversacion/{conv.pk}/tomar/', content_type='application/json')
+        self.assertEqual(r.status_code, 200, r.content)
+        conv.refresh_from_db()
+        self.assertFalse(conv.bot_derivada)
+        self.assertEqual(conv.agente_id, self.agente.pk)

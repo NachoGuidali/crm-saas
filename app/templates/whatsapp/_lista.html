@@ -6,6 +6,7 @@
     <div class="d-flex justify-content-between gap-2"><span class="pv">{{ c.ultimo_mensaje_texto }}</span>{% if c.no_leidos %}<span class="nl">{{ c.no_leidos }}</span>{% endif %}</div>
     <div class="d-flex gap-1 mt-1" style="font-size:10.5px">
       <span class="chip" style="font-size:10px"><i class="bi bi-phone"></i> {{ c.linea.nombre|truncatechars:16 }}</span>
+      {% if c.bot_derivada %}<span class="chip ok" style="font-size:10px" title="El bot terminó y derivó este chat: hay que tomarlo"><i class="bi bi-robot"></i> Bot terminó · tomar</span>{% elif c.linea.bot_n8n_activo and c.bot_activo %}<span class="chip" style="font-size:10px" title="El bot automático está atendiendo este chat"><i class="bi bi-robot"></i> Bot</span>{% endif %}
       {% if not c.agente %}<span class="chip warn" style="font-size:10px">Sin asignar</span>{% elif user.ve_todo %}<span class="chip" style="font-size:10px">{{ c.agente.first_name|default:c.agente.username }}</span>{% endif %}
       {% if c.estado == 'cerrada' %}<span class="chip" style="font-size:10px">Cerrada</span>{% endif %}
     </div>

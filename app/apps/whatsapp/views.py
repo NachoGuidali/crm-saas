@@ -192,6 +192,7 @@ def _marcar_leida(request, conv):
         cambios = {'no_leidos': 0}
         if conv.estado == Conversacion.ESTADO_PENDIENTE and conv.agente_id == request.user.pk:
             cambios['estado'] = Conversacion.ESTADO_ABIERTA
+            cambios['bot_derivada'] = False
         Conversacion.objects.filter(pk=conv.pk).update(**cambios)
         services.invalidar_no_leidos([request.user.pk, conv.agente_id])
 
@@ -302,7 +303,7 @@ class ConversacionAccionView(LoginRequiredMixin, View):
         data = json_body(request)
         cambios = {}
         if accion == 'tomar':
-            cambios = {'agente': request.user, 'estado': Conversacion.ESTADO_ABIERTA}
+            cambios = {'agente': request.user, 'estado': Conversacion.ESTADO_ABIERTA, 'bot_derivada': False}
         elif accion == 'asignar':
             if not request.user.tiene_permiso('reasignar'):
                 return error('Sin permiso para reasignar.', 403)
@@ -313,7 +314,7 @@ class ConversacionAccionView(LoginRequiredMixin, View):
                 notificar(agente, 'whatsapp', f'Te asignaron el chat con {conv.nombre_mostrar}', '',
                           f'/whatsapp/?conv={conv.pk}')
         elif accion == 'cerrar':
-            cambios = {'estado': Conversacion.ESTADO_CERRADA, 'no_leidos': 0}
+            cambios = {'estado': Conversacion.ESTADO_CERRADA, 'no_leidos': 0, 'bot_derivada': False}
         elif accion == 'reabrir':
             cambios = {'estado': Conversacion.ESTADO_ABIERTA}
         elif accion == 'archivar':
@@ -325,7 +326,7 @@ class ConversacionAccionView(LoginRequiredMixin, View):
         elif accion == 'bot_off':
             cambios = {'bot_activo': False}
         elif accion == 'bot_on':
-            cambios = {'bot_activo': True}
+            cambios = {'bot_activo': True, 'bot_derivada': False}
         else:
             return error('Acción desconocida', 404)
         Conversacion.objects.filter(pk=conv.pk).update(**cambios)

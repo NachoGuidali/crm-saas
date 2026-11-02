@@ -182,6 +182,9 @@ class Conversacion(models.Model):
     bot_activo = models.BooleanField(
         default=False, db_index=True,
         help_text='El bot n8n está atendiendo esta conversación. Se apaga cuando un agente la toma o al hacer handoff.')
+    bot_derivada = models.BooleanField(
+        default=False,
+        help_text='El bot terminó y derivó esta conversación: hay que tomarla. Se apaga cuando un agente la atiende.')
     created_at = models.DateTimeField(auto_now_add=True)
 
     objects = ConversacionQuerySet.as_manager()

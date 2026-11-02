@@ -197,6 +197,7 @@ class ApiBotTests(TestCase):
         self.assertEqual(r.status_code, 200, r.content)
         self.conv.refresh_from_db()
         self.assertFalse(self.conv.bot_activo)
+        self.assertTrue(self.conv.bot_derivada)  # queda marcada "bot terminó · tomar" en el inbox
         self.assertEqual(self.conv.estado, Conversacion.ESTADO_PENDIENTE)
 
     def test_conversacion_inexistente_y_sin_clave(self):
