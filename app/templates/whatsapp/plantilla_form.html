@@ -6,8 +6,13 @@
   <div class="row g-2">
     <div class="col-md-6"><label class="form-label">Nombre</label>{{ form.nombre }}{{ form.nombre.errors }}</div>
     <div class="col-md-6"><label class="form-label">Línea</label>{{ form.linea }}</div>
-    <div class="col-12"><label class="form-label">Texto</label>{{ form.cuerpo }}<div class="form-text">Usá {% templatetag openvariable %}1{% templatetag closevariable %}, {% templatetag openvariable %}2{% templatetag closevariable %}… y elegí abajo con qué dato se completa cada una.</div></div>
+    <div class="col-12"><label class="form-label">Texto</label>{{ form.cuerpo }}<div class="form-text">Escribí {% templatetag openvariable %}1{% templatetag closevariable %}, {% templatetag openvariable %}2{% templatetag closevariable %}… donde quieras un dato y abajo elegís con qué se completa cada uno.</div></div>
     <div class="col-12" id="vars"></div>
+    <div class="col-12"><div class="alert alert-info py-2 small mb-0">
+      <b><i class="bi bi-info-circle"></i> Cómo se usan las variables.</b>
+      Las plantillas usan números: poné {% templatetag openvariable %}1{% templatetag closevariable %} en el texto y elegí el dato en el desplegable que aparece abajo (nombre, agente, etapa…). Repetí con {% templatetag openvariable %}2{% templatetag closevariable %}, {% templatetag openvariable %}3{% templatetag closevariable %} si necesitás más.
+      <br>Acá <b>no</b> funciona el formato con nombre como <code>{primer_nombre}</code>: eso es solo para las <b>respuestas rápidas</b> y los mensajes automáticos. Las plantillas van con números porque así las exige WhatsApp/Meta.
+    </div></div>
     <div class="col-md-4"><label class="form-label">Categoría (Meta)</label>{{ form.categoria }}</div>
     <div class="col-md-4"><label class="form-label">Idioma</label>{{ form.idioma }}</div>
     <div class="col-md-4"><label class="form-label">Nombre técnico en Meta</label>{{ form.meta_nombre }}</div>
