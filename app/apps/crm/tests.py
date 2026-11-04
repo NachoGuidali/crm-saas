@@ -793,3 +793,65 @@ class PuntajeTests(BaseCRM):
         self.client.force_login(admin)
         r = self.client.post('/config/puntaje/', {'accion': 'nueva', 'condicion': 'tiene_email', 'puntos': '5'})
         self.assertEqual(r.status_code, 302)
+
+
+class FiltroPorCampoTests(BaseCRM):
+    """Filtro avanzado cf=campo|operador|valor: campos del contacto (incluida edad) y personalizados."""
+
+    def setUp(self):
+        super().setUp()
+        from datetime import date
+        from .models import CampoPersonalizado as CP
+        CP.objects.create(nombre='Edad declarada', tipo=CP.TIPO_NUMERO)
+        CP.objects.create(nombre='Socio', tipo=CP.TIPO_SINO)
+        CP.objects.create(nombre='Alta', tipo=CP.TIPO_FECHA)
+        hoy = timezone.localdate()
+        filas = [
+            ('Ana', '1155550001', {'edad_declarada': 25, 'socio': True, 'alta': '2026-01-10'}, 'Quilmes', 25),
+            ('Beto', '1155550002', {'edad_declarada': '40', 'socio': False, 'alta': '2026-06-01'}, 'Bernal', 40),
+            ('Caro', '1155550003', {'edad_declarada': 'no sabe'}, '', None),
+        ]
+        self.ops = {}
+        for nombre, tel, extra, loc, edad in filas:
+            c = Contacto.objects.create(nombre=nombre, telefono=tel, datos_extra=extra, localidad=loc,
+                                        fecha_nacimiento=date(hoy.year - edad, 1, 1) if edad and hoy >= date(hoy.year, 1, 1) else None)
+            self.ops[nombre] = Oportunidad.objects.create(contacto=c, embudo=self.embudo, etapa=self.etapas[0])
+
+    def nombres(self, *conds):
+        from django.http import QueryDict
+        q = QueryDict(mutable=True)
+        q.setlist('cf', list(conds))
+        return set(crm.filtrar_oportunidades(Oportunidad.objects.all(), q, None).values_list('contacto__nombre', flat=True))
+
+    def test_numero_personalizado(self):
+        self.assertEqual(self.nombres('cp:edad_declarada|>|30'), {'Beto'})
+        self.assertEqual(self.nombres('cp:edad_declarada|<=|25'), {'Ana'})
+        self.assertEqual(self.nombres('cp:edad_declarada|=|40'), {'Beto'})
+        self.assertEqual(self.nombres('cp:edad_declarada|vacio|'), set())
+        self.assertEqual(self.nombres('cp:edad_declarada|contiene|sabe'), {'Caro'})
+
+    def test_edad_por_nacimiento(self):
+        self.assertEqual(self.nombres('c:edad|>|30'), {'Beto'})
+        self.assertEqual(self.nombres('c:edad|<|30'), {'Ana'})
+        self.assertEqual(self.nombres('c:edad|vacio|'), {'Caro'})
+
+    def test_texto_sino_fecha_y_combinadas(self):
+        self.assertEqual(self.nombres('c:localidad|contiene|quil'), {'Ana'})
+        self.assertEqual(self.nombres('c:localidad|vacio|'), {'Caro'})
+        self.assertEqual(self.nombres('c:localidad|!=|Bernal'), {'Ana', 'Caro'})
+        self.assertEqual(self.nombres('cp:socio|=|true'), {'Ana'})
+        self.assertEqual(self.nombres('cp:socio|!=|true'), {'Beto', 'Caro'})
+        self.assertEqual(self.nombres('cp:alta|>|2026-03-01'), {'Beto'})
+        self.assertEqual(self.nombres('cp:edad_declarada|>=|20', 'c:localidad|=|quilmes'), {'Ana'})
+        self.assertEqual(self.nombres('cp:inexistente|=|x', 'basura'), {'Ana', 'Beto', 'Caro'})
+
+    def test_pantallas(self):
+        admin = User.objects.create_superuser('root', 'r@x.com', 'x', rol=User.ROL_ADMIN)
+        self.client.force_login(admin)
+        r = self.client.get('/oportunidades/', {'cf': 'cp:edad_declarada|>|30'})
+        self.assertContains(r, 'Edad declarada es mayor que 30')
+        self.assertContains(r, self.ops['Beto'].get_absolute_url())
+        self.assertNotContains(r, self.ops['Ana'].get_absolute_url())
+        r = self.client.get('/tablero/', {'cf': 'c:edad|>|30'})
+        self.assertContains(r, f'/oportunidades/{self.ops["Beto"].pk}/')
+        self.assertNotContains(r, f'/oportunidades/{self.ops["Ana"].pk}/')

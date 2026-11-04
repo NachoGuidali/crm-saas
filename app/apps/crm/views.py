@@ -1,4 +1,5 @@
 import csv
+import json
 from datetime import datetime, timedelta
 
 from django.contrib import messages
@@ -133,6 +134,7 @@ class TableroView(LoginRequiredMixin, View):
             'tipificaciones': tipificaciones_de(embudo), 'filtros': request.GET,
             'origenes': Oportunidad.ORIGEN_CHOICES, 'pautas': Pauta.objects.filter(activa=True).order_by('nombre'),
             'lotes': ImportacionLote.objects.filter(embudo=embudo).order_by('-created_at')[:50],
+            **_contexto_filtro_campos(request, embudo),
         })
 
     @staticmethod
@@ -219,7 +221,15 @@ class OportunidadListView(LoginRequiredMixin, View):
             'tipificaciones': tipificaciones,
             'lotes': ImportacionLote.objects.filter(embudo=embudo)[:30] if embudo else [],
             'campanias': CampaniaDiscado.objects.exclude(estado=CampaniaDiscado.ESTADO_FINALIZADA),
+            **_contexto_filtro_campos(request, embudo),
         })
+
+
+def _contexto_filtro_campos(request, embudo):
+    """Armador "Filtrar por campo" (Edad > 30, Localidad contiene…) para tablero y lista."""
+    from . import filtro_campos
+    return {'fc_meta': json.dumps(filtro_campos.meta_js(embudo)).replace('</', '<\\/'),
+            'fc_valores': [crudo for *_, crudo in filtro_campos.parsear(request.GET)]}
 
 
 def _chips_filtros(request, etapas, tipificaciones):
@@ -263,6 +273,12 @@ def _chips_filtros(request, etapas, tipificaciones):
             params.pop(clave, None)
             params.pop('page', None)
             chips.append((f'{texto} {request.GET[clave] if clave != "estancados" else ""}'.strip(), params.urlencode()))
+    from . import filtro_campos
+    for texto, crudo in filtro_campos.chips(request.GET):
+        params = request.GET.copy()
+        params.setlist('cf', [v for v in params.getlist('cf') if v != crudo])
+        params.pop('page', None)
+        chips.append((texto, params.urlencode()))
     return chips
 
 

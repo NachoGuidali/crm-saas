@@ -37,7 +37,7 @@
     <button class="btn btn-primary btn-sm"><i class="bi bi-funnel"></i> Filtrar</button>
     <button type="button" class="btn btn-link btn-sm" data-bs-toggle="collapse" data-bs-target="#masFiltros">Más filtros</button>
   </div>
-  <div class="collapse {% if sel.pauta or sel.origen or sel.tipificacion or sel.lote or sel.etiqueta or filtros.intentos_min or filtros.intentos_max or filtros.ingresos_min or filtros.puntaje_min or filtros.sin_actividad or filtros.sin_calificar or filtros.vencida %}show{% endif %}" id="masFiltros">
+  <div class="collapse {% if sel.pauta or sel.origen or sel.tipificacion or sel.lote or sel.etiqueta or filtros.intentos_min or filtros.intentos_max or filtros.ingresos_min or filtros.puntaje_min or filtros.sin_actividad or filtros.sin_calificar or filtros.vencida or fc_valores %}show{% endif %}" id="masFiltros">
     <div class="toolbar mt-2">
       {% include "crm/_multi.html" with nombre="pauta" titulo="Pauta" opciones=opciones.pauta sel=sel.pauta %}
       {% include "crm/_multi.html" with nombre="origen" titulo="Canal" opciones=opciones.origen sel=sel.origen %}
@@ -62,6 +62,7 @@
       {% else %}<input name="{{ clave }}" value="{{ filtros|get_item:clave|default:'' }}" class="form-control form-control-sm" placeholder="{{ c.nombre }}">{% endif %}
       {% endwith %}{% endfor %}
     </div>
+    <div class="mt-2">{% include "crm/_filtro_campos.html" %}</div>
   </div>
   {% if chips %}<div class="d-flex flex-wrap gap-1 align-items-center mt-2">
     {% for texto, url in chips %}<a href="?{{ url }}" class="chip info text-decoration-none" title="Quitar filtro">{{ texto }} <i class="bi bi-x"></i></a>{% endfor %}

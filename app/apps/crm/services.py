@@ -1202,4 +1202,5 @@ def filtrar_oportunidades(qs, params, user):
                 qs = qs.filter(**{f'contacto__datos_extra__{slug}': valor == 'true'})
             else:
                 qs = qs.filter(**{f'contacto__datos_extra__{slug}__icontains': valor})
-    return qs
+    from .filtro_campos import aplicar as filtrar_por_campos
+    return filtrar_por_campos(qs, params)

@@ -849,7 +849,7 @@ class ImportacionLote(models.Model):
         verbose_name_plural = 'Importaciones'
 
     def __str__(self):
-        return f'{self.nombre_archivo} ({self.created_at:%d/%m/%Y})'
+        return f'{self.fuente or self.nombre_archivo} ({self.created_at:%d/%m/%Y})'
 
     @property
     def porcentaje(self):

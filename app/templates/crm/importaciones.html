@@ -5,6 +5,15 @@
   <a href="{% url 'crm:importacion_plantilla' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-file-earmark-excel"></i> Descargar plantilla Excel</a></div>
 <div class="row g-3">
   <div class="col-lg-5"><div class="card"><div class="card-body">
+    <div class="alert alert-info small py-2 mb-3">
+      <b><i class="bi bi-info-circle"></i> ¿Primera vez?</b> Descargá la plantilla guía desde el botón de arriba (<i>Descargar plantilla Excel</i>) y completala.
+      <ul class="mb-0 ps-3 mt-1">
+        <li>Podés agregar todas las columnas extra que quieras (ej. edad, obra social, plan): en el paso siguiente elegís a qué campo va cada columna.</li>
+        <li>Para usar esa columna después en filtros, tarjetas o mensajes, creá antes el campo en {% if 'campos' in perms_crm %}<a href="{% url 'crm:campos' %}">Configuración → Campos personalizados</a>{% else %}Configuración → Campos personalizados{% endif %} y elegilo al mapear (aparece con ★).</li>
+        <li>Las columnas que no tengan campo se pueden guardar como “Dato extra” (quedan en la ficha) o ignorarse.</li>
+        <li>Cada fila necesita al menos teléfono, email o DNI.</li>
+      </ul>
+    </div>
     <form method="post" enctype="multipart/form-data">{% csrf_token %}
       {% for f in form %}<div class="mb-3"><label class="form-label">{{ f.label }}</label>{{ f }}{% if f.help_text %}<div class="form-text">{{ f.help_text }}</div>{% endif %}{{ f.errors }}</div>{% endfor %}
       <button class="btn btn-primary"><i class="bi bi-arrow-right"></i> Siguiente: elegir columnas</button>

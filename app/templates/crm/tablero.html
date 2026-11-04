@@ -45,7 +45,8 @@
   </select>
   <label class="btn btn-sm btn-outline-danger {% if filtros.prioritaria %}active{% endif %}" title="Solo prioridad (ej. reingresos)"><input type="checkbox" name="prioritaria" value="1" class="d-none" onchange="this.form.submit()" {% if filtros.prioritaria %}checked{% endif %}>🔥 Prioridad</label>
   <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-funnel"></i> Filtrar</button>
-  {% if filtros.q or filtros.agente or filtros.origen or filtros.sin_actividad or filtros.pausadas or filtros.pauta or filtros.lote or filtros.prioritaria %}<a href="?embudo={{ embudo.pk }}" class="btn btn-link btn-sm">Limpiar</a>{% endif %}
+  {% if filtros.q or filtros.agente or filtros.origen or filtros.sin_actividad or filtros.pausadas or filtros.pauta or filtros.lote or filtros.prioritaria or fc_valores %}<a href="?embudo={{ embudo.pk }}" class="btn btn-link btn-sm">Limpiar</a>{% endif %}
+  {% include "crm/_filtro_campos.html" %}
 </form>
 
 <div class="board-wrap">

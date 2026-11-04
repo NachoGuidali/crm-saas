@@ -1,0 +1,95 @@
+{# Armador de condiciones por campo ("Edad es mayor que 30"). Va dentro del <form> de filtros; al enviar arma los cf=campo|op|valor. #}
+<div class="filtro-campos w-100" id="filtroCampos">
+  {% for v in fc_valores %}<input type="hidden" name="cf" value="{{ v }}">{% endfor %}
+  <div class="fc-filas d-flex flex-column gap-1"></div>
+  <button type="button" class="btn btn-link btn-sm px-0 fc-agregar"><i class="bi bi-plus-circle"></i> Filtrar por campo <span class="muted">(ej. Edad mayor que 30)</span></button>
+</div>
+<script>
+(function () {
+  const META = {{ fc_meta|safe }};
+  const caja = document.getElementById('filtroCampos');
+  const form = caja.closest('form');
+  const filas = caja.querySelector('.fc-filas');
+  const campos = Object.fromEntries(META.campos.map(c => [c.k, c]));
+
+  function el(tag, attrs, txt) {
+    const e = document.createElement(tag);
+    Object.assign(e, attrs || {});
+    if (txt !== undefined) e.textContent = txt;
+    return e;
+  }
+  function etiquetaOp(op, tipo) {
+    return (tipo === 'fecha' && META.relabel_fecha[op]) || META.labels[op] || op;
+  }
+  function controlValor(campo, valor) {
+    let c;
+    if (campo && (campo.t === 'lista' || campo.t === 'sino')) {
+      c = el('select', {className: 'form-select form-select-sm fc-valor', style: 'max-width:220px'});
+      const ops = campo.t === 'sino' ? [['true', 'Sí'], ['false', 'No']] : campo.o.map(o => [o, o]);
+      ops.forEach(([v, l]) => c.appendChild(el('option', {value: v}, l)));
+      if (valor) c.value = valor;
+    } else {
+      c = el('input', {className: 'form-control form-control-sm fc-valor', placeholder: 'Valor', style: 'max-width:200px',
+                       type: (campo && META.tipo_valor[campo.t]) || 'text', value: valor || ''});
+      c.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); form.requestSubmit(); } });
+    }
+    return c;
+  }
+  function adaptar(fila, valor) {
+    const campo = campos[fila.querySelector('.fc-campo').value];
+    const selOp = fila.querySelector('.fc-op');
+    const ops = (campo && META.por_tipo[campo.t]) || Object.keys(META.labels);
+    const actual = selOp.value;
+    selOp.innerHTML = '';
+    ops.forEach(op => selOp.appendChild(el('option', {value: op}, etiquetaOp(op, campo && campo.t))));
+    selOp.value = ops.includes(actual) ? actual : ops[0];
+    const viejo = fila.querySelector('.fc-valor');
+    const nuevo = controlValor(campo, valor !== undefined ? valor : (viejo && viejo.tagName === 'INPUT' ? viejo.value : ''));
+    viejo.replaceWith(nuevo);
+    mostrarValor(fila);
+  }
+  function mostrarValor(fila) {
+    const sin = META.sin_valor.includes(fila.querySelector('.fc-op').value);
+    fila.querySelector('.fc-valor').style.display = sin ? 'none' : '';
+  }
+  function agregar(clave, op, valor) {
+    const fila = el('div', {className: 'd-flex flex-wrap gap-1 align-items-center fc-fila'});
+    const selCampo = el('select', {className: 'form-select form-select-sm fc-campo', style: 'max-width:240px'});
+    const grupos = [['Datos del contacto', META.campos.filter(c => c.k.startsWith('c:'))],
+                    ['Campos personalizados', META.campos.filter(c => c.k.startsWith('cp:'))]];
+    grupos.forEach(([titulo, lista]) => {
+      if (!lista.length) return;
+      const g = el('optgroup', {label: titulo});
+      lista.forEach(c => g.appendChild(el('option', {value: c.k}, c.l)));
+      selCampo.appendChild(g);
+    });
+    if (clave && campos[clave]) selCampo.value = clave;
+    const selOp = el('select', {className: 'form-select form-select-sm fc-op', style: 'max-width:200px'});
+    const quitar = el('button', {type: 'button', className: 'btn btn-sm btn-link text-danger px-1', title: 'Quitar condición'});
+    quitar.innerHTML = '<i class="bi bi-x-lg"></i>';
+    fila.append(selCampo, selOp, el('input', {className: 'fc-valor'}), quitar);
+    filas.appendChild(fila);
+    if (op) selOp.appendChild(el('option', {value: op}));
+    selOp.value = op || '';
+    adaptar(fila, valor);
+    selCampo.addEventListener('change', () => adaptar(fila));
+    selOp.addEventListener('change', () => mostrarValor(fila));
+    quitar.addEventListener('click', () => fila.remove());
+  }
+
+  caja.querySelectorAll('input[name="cf"]').forEach(h => {
+    const [k, op, ...resto] = h.value.split('|');
+    agregar(k, op, resto.join('|'));  // el hidden queda: si algo hace form.submit() (sin evento) se conserva
+  });
+  caja.querySelector('.fc-agregar').addEventListener('click', () => agregar());
+  form.addEventListener('submit', () => {
+    caja.querySelectorAll('input[name="cf"]').forEach(h => h.remove());
+    filas.querySelectorAll('.fc-fila').forEach(f => {
+      const op = f.querySelector('.fc-op').value;
+      const valor = META.sin_valor.includes(op) ? '' : f.querySelector('.fc-valor').value.trim();
+      if (!META.sin_valor.includes(op) && !valor) return;
+      caja.appendChild(el('input', {type: 'hidden', name: 'cf', value: `${f.querySelector('.fc-campo').value}|${op}|${valor}`}));
+    });
+  });
+})();
+</script>
