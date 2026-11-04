@@ -152,6 +152,70 @@ class DisparadoresTests(TestCase):
         ej.refresh_from_db()
         self.assertEqual(ej.detalle, 'El cliente respondió.')
 
+    def _chat(self, entrante_hace, saliente_hace, bot=True):
+        from apps.whatsapp.models import Conversacion, LineaWhatsApp
+        ahora = timezone.now()
+        return Conversacion.objects.create(
+            linea=LineaWhatsApp.objects.create(nombre='Bot', proveedor='demo'), telefono=self.op.contacto.telefono,
+            contacto=self.op.contacto, bot_activo=bot, ultimo_entrante_at=ahora - entrante_hace,
+            ultimo_mensaje_at=ahora - saliente_hace)
+
+    def _silencio(self, **kw):
+        return self.A.objects.create(embudo=self.embudo, etapa=self.etapas[0], nombre='Retomar', disparador='silencio',
+                                     tipo='notif_agente', demora_minutos=360, solo_en_horario=False, **kw)
+
+    @mock.patch('apps.automatizaciones.services._encolar')
+    def test_silencio_dispara_una_vez_por_silencio(self, _encolar):
+        from apps.automatizaciones.services import ejecutar, revisar_sin_actividad
+        from apps.whatsapp.models import Conversacion, Mensaje
+        acc = self._silencio(solo_si_bot_activo=True)
+        conv = self._chat(timedelta(hours=7), timedelta(hours=6, minutes=50))
+        self.assertEqual(revisar_sin_actividad(), 1)
+        self.assertEqual(revisar_sin_actividad(), 0)  # mismo silencio: no repite
+        self.assertEqual(ejecutar(self._ultima(acc).pk), 'ejecutada')
+        # Vuelve a escribir, se le contesta y se vuelve a callar: puede dispararse otra vez.
+        from apps.automatizaciones.models import EjecucionAccion
+        ahora = timezone.now()
+        EjecucionAccion.objects.filter(accion=acc).update(created_at=ahora - timedelta(hours=8))
+        Conversacion.objects.filter(pk=conv.pk).update(ultimo_entrante_at=ahora - timedelta(hours=6, minutes=10),
+                                                       ultimo_mensaje_at=ahora - timedelta(hours=6))
+        self.assertEqual(revisar_sin_actividad(), 1)
+        # Si escribe antes de que se ejecute, se omite.
+        ej = self._ultima(acc)
+        Mensaje.objects.create(conversacion=conv, direccion='in', contenido='acá estoy')
+        self.assertEqual(ejecutar(ej.pk), 'omitida')
+        ej.refresh_from_db()
+        self.assertEqual(ej.detalle, 'El cliente volvió a escribir.')
+
+    def test_silencio_no_dispara_si_falta_tiempo_lo_ultimo_es_del_cliente_o_es_viejo(self):
+        from apps.automatizaciones.services import revisar_sin_actividad
+        from apps.whatsapp.models import Conversacion
+        self._silencio()
+        conv = self._chat(timedelta(hours=2), timedelta(hours=1))
+        self.assertEqual(revisar_sin_actividad(), 0)  # todavía no pasaron 6 h
+        ahora = timezone.now()
+        Conversacion.objects.filter(pk=conv.pk).update(ultimo_entrante_at=ahora - timedelta(hours=7),
+                                                       ultimo_mensaje_at=ahora - timedelta(hours=7))
+        self.assertEqual(revisar_sin_actividad(), 0)  # lo último lo escribió el cliente: nadie le contestó
+        Conversacion.objects.filter(pk=conv.pk).update(ultimo_entrante_at=ahora - timedelta(days=10),
+                                                       ultimo_mensaje_at=ahora - timedelta(days=9))
+        self.assertEqual(revisar_sin_actividad(), 0)  # charla vieja: fuera de la ventana
+
+    @mock.patch('apps.automatizaciones.services._encolar')
+    def test_solo_si_bot_activo(self, _encolar):
+        from apps.automatizaciones.services import ejecutar, revisar_sin_actividad
+        from apps.whatsapp.models import Conversacion
+        acc = self._silencio(solo_si_bot_activo=True)
+        conv = self._chat(timedelta(hours=7), timedelta(hours=6, minutes=50), bot=False)
+        self.assertEqual(revisar_sin_actividad(), 0)  # lo atiende un agente
+        Conversacion.objects.filter(pk=conv.pk).update(bot_activo=True)
+        self.assertEqual(revisar_sin_actividad(), 1)
+        Conversacion.objects.filter(pk=conv.pk).update(bot_activo=False)  # lo tomó un agente antes de ejecutar
+        ej = self._ultima(acc)
+        self.assertEqual(ejecutar(ej.pk), 'omitida')
+        ej.refresh_from_db()
+        self.assertIn('bot ya no atiende', ej.detalle)
+
     def test_sin_actividad_cierra_como_sin_respuesta(self):
         from apps.automatizaciones.services import ejecutar, revisar_sin_actividad
         from apps.crm.models import Oportunidad, Tipificacion

@@ -26,6 +26,7 @@ class AccionEtapa(models.Model):
     DISP_DESPUES_DE = 'despues_de'
     DISP_REINGRESO = 'reingreso'
     DISP_CAMPO = 'campo'
+    DISP_SILENCIO = 'silencio'
     DISPARADORES = [
         (DISP_ENTRADA, 'Al entrar a la etapa'),
         (DISP_SIN_RESPUESTA, 'Si el cliente no responde (en el tiempo de demora desde que entró a la etapa)'),
@@ -34,6 +35,7 @@ class AccionEtapa(models.Model):
         (DISP_DESPUES_DE, 'Después de que se ejecutó otra automatización (secuencia)'),
         (DISP_REINGRESO, 'Cuando el lead reingresa (vuelve a escribir, llenar un formulario o se importa de nuevo)'),
         (DISP_CAMPO, 'Cuando se completa o cambia un campo del contacto'),
+        (DISP_SILENCIO, 'Si el cliente respondió y después dejó de contestar (tiempo de demora desde su último mensaje)'),
     ]
     TIPO_CHOICES = [
         (TIPO_WHATSAPP, 'Enviar WhatsApp al prospecto'),
@@ -84,6 +86,10 @@ class AccionEtapa(models.Model):
     solo_si_sigue_en_etapa = models.BooleanField(
         default=True, verbose_name='Solo si sigue en esa etapa al momento de ejecutar',
         help_text='Evita mandar un seguimiento si el prospecto ya avanzó o se cerró.',
+    )
+    solo_si_bot_activo = models.BooleanField(
+        default=False, verbose_name='Solo si el bot sigue atendiendo el chat',
+        help_text='No se hace si un agente ya tomó la conversación de WhatsApp (o el bot ya derivó).',
     )
     solo_en_horario = models.BooleanField(
         default=True, verbose_name='Ejecutar solo en el horario de atención del embudo',

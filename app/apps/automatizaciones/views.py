@@ -18,7 +18,7 @@ class AccionForm(forms.ModelForm):
     class Meta:
         model = AccionEtapa
         fields = ['nombre', 'etapa', 'otras_etapas', 'todas_las_etapas', 'disparador', 'accion_previa', 'tipo', 'mover_a',
-                  'tipificacion', 'plantilla_email', 'activa', 'solo_si_sigue_en_etapa', 'solo_en_horario', 'plantilla',
+                  'tipificacion', 'plantilla_email', 'activa', 'solo_si_sigue_en_etapa', 'solo_si_bot_activo', 'solo_en_horario', 'plantilla',
                   'texto', 'linea', 'email_asunto', 'tarea_titulo', 'tarea_vence_horas', 'modo_embudo', 'embudo_destino',
                   'etapa_destino', 'volver_a', 'asignar_destino', 'usuario_destino', 'reparto', 'volver_a_etapa',
                   'etiqueta', 'solo_pautas', 'solo_etiquetas', 'excluir_etiquetas']
@@ -99,7 +99,8 @@ class AccionForm(forms.ModelForm):
             self.add_error('etiqueta', 'Elegí la etiqueta.')
         if tipo == AccionEtapa.TIPO_EMAIL and d.get('plantilla_email'):
             self._errors.pop('texto', None)
-        if disp in (AccionEtapa.DISP_SIN_RESPUESTA, AccionEtapa.DISP_SIN_ACTIVIDAD) and not d.get('demora_valor'):
+        if disp in (AccionEtapa.DISP_SIN_RESPUESTA, AccionEtapa.DISP_SIN_ACTIVIDAD, AccionEtapa.DISP_SILENCIO) \
+                and not d.get('demora_valor'):
             self.add_error('demora_valor', 'Indicá cuánto tiempo esperar.')
         if tipo == AccionEtapa.TIPO_ETAPA:
             destino, tip = d.get('mover_a'), d.get('tipificacion')

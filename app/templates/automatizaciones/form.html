@@ -90,6 +90,7 @@
     <div class="small">
       <label class="d-flex gap-2">{{ form.activa }} Activa</label>
       <label class="d-flex gap-2">{{ form.solo_si_sigue_en_etapa }} {{ form.solo_si_sigue_en_etapa.label }}</label>
+      <label class="d-flex gap-2" title="{{ form.solo_si_bot_activo.help_text }}">{{ form.solo_si_bot_activo }} {{ form.solo_si_bot_activo.label }} <span class="muted">(no le escribe a quien ya atiende un agente)</span></label>
       <label class="d-flex gap-2">{{ form.solo_en_horario }} {{ form.solo_en_horario.label }}</label>
       <a class="small d-inline-block mt-2" data-bs-toggle="collapse" href="#condExtra">+ Solo para ciertas campañas o etiquetas</a>
       <div class="collapse {% if form.instance.pk and form.instance.resumen_condiciones %}show{% endif %}" id="condExtra">
@@ -134,6 +135,7 @@
     sin_actividad: ['Sin ninguna actividad durante', 'Si la tarjeta no tiene movimientos (llamadas, mensajes, notas, cambios) durante ese tiempo.'],
     reingreso: ['Cuánto esperar después de que reingresa', 'Cuando la persona vuelve a entrar (escribe de nuevo, llena otro formulario, se importa de nuevo) y no se duplicó porque ya tenía la tarjeta.'],
     despues_de: ['Cuánto esperar después de esa automatización', 'Cuando la automatización elegida se ejecutó (por ejemplo, se envió el mensaje de bienvenida).'],
+    silencio: ['Si deja de contestar durante', 'El cliente escribió, se le contestó (bot o agente) y no volvió a escribir en ese tiempo. Una vez por cada silencio; si vuelve a escribir, no se hace. Ideal para un "¿querés retomar?".'],
     campo: ['Cuánto esperar después de cambiar el campo', 'Cuando el agente (o una integración como n8n) completa o cambia un campo del contacto y se cumplen las condiciones de campo de más abajo.'],
   };
   const updDisp = () => {
@@ -161,6 +163,7 @@
       despues_de: `Después de la automatización <b>${esc(sel(previa)) || '…'}</b>`,
       reingreso: `Cuando el lead <b>reingresa</b> estando en <b>${et}</b>`,
       campo: `Cuando <b>cambia un campo</b> (según las condiciones) estando en <b>${et}</b>`,
+      silencio: `Si el cliente, estando en <b>${et}</b>, <b>deja de contestar ${espera || '…'}</b> después de su último mensaje`,
     }[disp.value];
     if (espera && ['entrada', 'respuesta', 'despues_de', 'reingreso', 'campo'].includes(disp.value)) cuando += `, esperar <b>${espera}</b> y`;
     let que = ACC[tipo.value] || '';
@@ -171,6 +174,7 @@
     if (tipo.value === 'etapa' && sel($('id_mover_a'))) que = `mover la tarjeta a <b>${esc(sel($('id_mover_a')))}</b>` + (sel($('id_tipificacion')) ? ` (${esc(sel($('id_tipificacion')))})` : '');
     const conds = [];
     if ($('id_solo_si_sigue_en_etapa').checked) conds.push('solo si sigue en esa etapa');
+    if ($('id_solo_si_bot_activo').checked) conds.push('solo si el bot sigue atendiendo el chat');
     if ($('id_solo_en_horario').checked) conds.push('dentro del horario de atención');
     const marcadas = n => [...document.querySelectorAll(`[name=${n}]:checked`)].map(c => esc(c.parentElement.textContent.trim()));
     if (marcadas('solo_pautas').length) conds.push('solo pautas: ' + marcadas('solo_pautas').join(', '));

@@ -238,6 +238,44 @@ def revisar_sin_actividad():
         for op in ops:
             if _programar_ya(accion, op, _historial_actual(op)):
                 n += 1
+    n += _revisar_silencios(ahora)
+    return n
+
+
+# Charlas cuyo último mensaje del cliente es más viejo que esto (además de la demora) no se reenganchan:
+# evita escribirle de golpe a toda la base vieja al crear la automatización.
+VENTANA_SILENCIO = timedelta(hours=48)
+
+
+def _revisar_silencios(ahora):
+    """
+    "Si dejó de contestar": el cliente escribió, se le contestó (bot o agente) y no volvió a escribir en X.
+    Se mide desde el último mensaje entrante de su chat de WhatsApp más reciente. Una vez por cada silencio:
+    si vuelve a escribir y se vuelve a callar, se puede disparar de nuevo.
+    """
+    from django.db.models import Subquery
+    from apps.crm.models import Oportunidad
+    from apps.whatsapp.models import Conversacion
+    n = 0
+    for accion in AccionEtapa.objects.filter(activa=True, disparador=AccionEtapa.DISP_SILENCIO,
+                                             demora_minutos__gt=0).select_related('embudo'):
+        limite = ahora - timedelta(minutes=accion.demora_minutos)
+        convs = Conversacion.objects.filter(contacto_id=OuterRef('contacto_id'), ultimo_entrante_at__isnull=False)
+        if accion.solo_si_bot_activo:
+            convs = convs.filter(bot_activo=True)
+        convs = convs.order_by('-ultimo_entrante_at')
+        ops = (Oportunidad.objects.filter(etapa_id__in=accion.ids_etapas(), estado=Oportunidad.ESTADO_ABIERTA)
+               .annotate(_ent=Subquery(convs.values('ultimo_entrante_at')[:1]),
+                         _msg=Subquery(convs.values('ultimo_mensaje_at')[:1]))
+               .filter(_ent__lt=limite, _ent__gte=limite - VENTANA_SILENCIO, _msg__gt=F('_ent'))
+               .exclude(Exists(EjecucionAccion.objects.filter(accion=accion, oportunidad=OuterRef('pk'),
+                                                             created_at__gte=OuterRef('_ent'))))
+               .select_related('embudo')[:300])
+        for op in ops:
+            cuando = proxima_apertura(op.embudo, ahora) if accion.solo_en_horario else ahora
+            ejec = EjecucionAccion.objects.create(accion=accion, oportunidad=op, historial=None, programada_para=cuando)
+            _encolar(ejec, cuando, ahora)
+            n += 1
     return n
 
 
@@ -281,7 +319,7 @@ def ejecutar(ejecucion_id):
         desde = None
         if accion.disparador == AccionEtapa.DISP_SIN_RESPUESTA and ejec.historial_id:
             desde = ejec.historial.created_at
-        elif accion.disparador == AccionEtapa.DISP_SIN_ACTIVIDAD:
+        elif accion.disparador in (AccionEtapa.DISP_SIN_ACTIVIDAD, AccionEtapa.DISP_SILENCIO):
             desde = ejec.created_at
         estado, detalle = _correr(accion, op, desde,
                                   etapa_ref=ejec.historial.etapa_nueva_id if ejec.historial_id else None)
@@ -329,6 +367,12 @@ def _correr(accion, op, ejec_desde=None, etapa_ref=None):
         return E.ESTADO_OMITIDA, motivo
     if accion.disparador == AccionEtapa.DISP_SIN_RESPUESTA and ejec_desde is not None and _respondio_desde(op, ejec_desde):
         return E.ESTADO_OMITIDA, 'El cliente respondió.'
+    if accion.disparador == AccionEtapa.DISP_SILENCIO and ejec_desde is not None and _respondio_desde(op, ejec_desde):
+        return E.ESTADO_OMITIDA, 'El cliente volvió a escribir.'
+    if accion.solo_si_bot_activo:
+        from apps.whatsapp.models import Conversacion
+        if not Conversacion.objects.filter(contacto_id=op.contacto_id, bot_activo=True).exists():
+            return E.ESTADO_OMITIDA, 'El bot ya no atiende el chat (lo tomó un agente o derivó).'
     if accion.disparador == AccionEtapa.DISP_SIN_ACTIVIDAD and ejec_desde is not None \
             and op.ultima_actividad_at and op.ultima_actividad_at > ejec_desde:
         return E.ESTADO_OMITIDA, 'Hubo actividad antes de ejecutar.'
