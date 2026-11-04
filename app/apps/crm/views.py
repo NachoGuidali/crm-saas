@@ -226,6 +226,8 @@ def _contexto_filtros(request, embudo, etapas, tipificaciones, campos):
             'lote': [(str(l.pk), str(l)[:60]) for l in lotes],
         },
         'campos_fecha': [(k, label) for k, label, _ in crm.CAMPOS_FECHA_FILTRO],
+        'filtros_seguimiento': [(clave, titulo, opciones) for clave, (titulo, opciones)
+                                in crm.FILTROS_SEGUIMIENTO.items()],
         'campos_filtro': [c for c in campos if c.filtrable],
         'filtros': request.GET,
         **_contexto_filtro_campos(request, embudo),
@@ -280,6 +282,18 @@ def _chips_filtros(request, etapas, tipificaciones):
             params.pop(clave, None)
             params.pop('page', None)
             chips.append((f'{texto} {request.GET[clave] if clave != "estancados" else ""}'.strip(), params.urlencode()))
+    for clave, (titulo, opciones) in crm.FILTROS_SEGUIMIENTO.items():
+        valor = request.GET.get(clave)
+        if valor:
+            params = request.GET.copy()
+            params.pop(clave, None)
+            params.pop('page', None)
+            chips.append((f'{titulo}: {dict(opciones).get(valor, valor)}', params.urlencode()))
+    if (request.GET.get('dias_etapa') or '').isdigit():
+        params = request.GET.copy()
+        params.pop('dias_etapa', None)
+        params.pop('page', None)
+        chips.append((f'En la etapa hace ≥ {request.GET["dias_etapa"]} días', params.urlencode()))
     from . import filtro_campos
     for texto, crudo in filtro_campos.chips(request.GET):
         params = request.GET.copy()

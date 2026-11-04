@@ -1202,5 +1202,75 @@ def filtrar_oportunidades(qs, params, user):
                 qs = qs.filter(**{f'contacto__datos_extra__{slug}': valor == 'true'})
             else:
                 qs = qs.filter(**{f'contacto__datos_extra__{slug}__icontains': valor})
+    qs = _filtros_seguimiento(qs, params)
     from .filtro_campos import aplicar as filtrar_por_campos
     return filtrar_por_campos(qs, params)
+
+
+# Filtros de seguimiento (selects de "Más filtros"): valor → etiqueta, para la pantalla y los chips.
+FILTROS_SEGUIMIENTO = {
+    'chat': ('WhatsApp', [('bot', 'Lo atiende el bot'), ('derivado', 'El bot derivó (falta tomar)'),
+                          ('agente', 'Lo atiende un agente'), ('sin_chat', 'Sin chat')]),
+    'respuesta': ('Respuesta', [('respondio', 'Respondió alguna vez'), ('nunca', 'Nunca respondió'),
+                                ('esperando', 'Esperando respuesta nuestra')]),
+    'tareas': ('Tareas', [('vencida', 'Con tarea vencida'), ('sin_pendiente', 'Sin tarea pendiente'),
+                          ('hoy', 'Recontactar hoy')]),
+    'contactable': ('Contacto', [('si', 'Contactable'), ('no_contactar', 'Pidió no contactar'),
+                                 ('tel_invalido', 'Teléfono inválido'), ('sin_telefono', 'Sin teléfono'),
+                                 ('sin_email', 'Sin email')]),
+}
+
+
+def _filtros_seguimiento(qs, params):
+    from django.db.models import Exists, OuterRef
+    from apps.telefonia.models import Llamada
+    from apps.whatsapp.models import Conversacion
+    from .models import Tarea
+    convs = Conversacion.objects.filter(contacto_id=OuterRef('contacto_id'))
+    chat = params.get('chat')
+    if chat == 'bot':
+        qs = qs.filter(Exists(convs.filter(bot_activo=True)))
+    elif chat == 'derivado':
+        qs = qs.filter(Exists(convs.filter(bot_derivada=True)))
+    elif chat == 'agente':
+        qs = qs.filter(Exists(convs.filter(bot_activo=False, bot_derivada=False)))
+    elif chat == 'sin_chat':
+        qs = qs.exclude(Exists(convs))
+
+    respuesta = params.get('respuesta')
+    if respuesta in ('respondio', 'nunca'):
+        respondio = (Exists(convs.filter(ultimo_entrante_at__isnull=False))
+                     | Exists(Llamada.objects.filter(contacto_id=OuterRef('contacto_id'),
+                                                     estado=Llamada.ESTADO_ATENDIDA)))
+        qs = qs.filter(respondio) if respuesta == 'respondio' else qs.exclude(respondio)
+    elif respuesta == 'esperando':
+        # Lo último del chat lo escribió el cliente: nadie le contestó todavía.
+        qs = qs.filter(Exists(convs.filter(ultimo_entrante_at__isnull=False,
+                                           ultimo_entrante_at__gte=F('ultimo_mensaje_at'))))
+
+    tareas = params.get('tareas')
+    pendientes = Tarea.objects.filter(oportunidad_id=OuterRef('pk'), estado=Tarea.ESTADO_PENDIENTE)
+    ahora = timezone.now()
+    if tareas == 'vencida':
+        qs = qs.filter(Exists(pendientes.filter(vence_at__lt=ahora)))
+    elif tareas == 'sin_pendiente':
+        qs = qs.exclude(Exists(pendientes))
+    elif tareas == 'hoy':
+        hoy = timezone.localdate()
+        qs = qs.filter(Q(proximo_contacto_at__date=hoy) | Exists(pendientes.filter(vence_at__date=hoy)))
+
+    contactable = params.get('contactable')
+    if contactable == 'si':
+        qs = qs.exclude(contacto__telefono='').filter(contacto__no_contactar=False, contacto__telefono_invalido=False)
+    elif contactable == 'no_contactar':
+        qs = qs.filter(contacto__no_contactar=True)
+    elif contactable == 'tel_invalido':
+        qs = qs.filter(contacto__telefono_invalido=True)
+    elif contactable == 'sin_telefono':
+        qs = qs.filter(contacto__telefono='')
+    elif contactable == 'sin_email':
+        qs = qs.filter(contacto__email='')
+
+    if str(params.get('dias_etapa') or '').isdigit():
+        qs = qs.filter(etapa_desde__lt=ahora - timedelta(days=int(params['dias_etapa'])))
+    return qs

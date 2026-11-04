@@ -30,7 +30,7 @@
     <button class="btn btn-primary btn-sm"><i class="bi bi-funnel"></i> Filtrar</button>
     <button type="button" class="btn btn-link btn-sm" data-bs-toggle="collapse" data-bs-target="#masFiltros">Más filtros</button>
   </div>
-  <div class="collapse {% if sel.pauta or sel.origen or sel.tipificacion or sel.etiqueta or filtros.intentos_min or filtros.intentos_max or filtros.ingresos_min or filtros.puntaje_min or filtros.sin_actividad or filtros.sin_calificar or filtros.vencida or fc_valores %}show{% endif %}" id="masFiltros">
+  <div class="collapse {% if sel.pauta or sel.origen or sel.tipificacion or sel.etiqueta or filtros.intentos_min or filtros.intentos_max or filtros.ingresos_min or filtros.puntaje_min or filtros.sin_actividad or filtros.sin_calificar or filtros.vencida or filtros.chat or filtros.respuesta or filtros.tareas or filtros.contactable or filtros.dias_etapa or fc_valores %}show{% endif %}" id="masFiltros">
     <div class="toolbar mt-2">
       {% include "crm/_multi.html" with nombre="pauta" titulo="Pauta" opciones=opciones.pauta sel=sel.pauta %}
       {% include "crm/_multi.html" with nombre="origen" titulo="Canal" opciones=opciones.origen sel=sel.origen %}
@@ -48,6 +48,11 @@
       </select>
       <label class="small d-flex gap-1 align-items-center"><input type="checkbox" name="sin_calificar" value="1" class="form-check-input mt-0" {% if filtros.sin_calificar %}checked{% endif %}> Con llamadas sin calificar</label>
       <label class="small d-flex gap-1 align-items-center"><input type="checkbox" name="vencida" value="1" class="form-check-input mt-0" {% if filtros.vencida %}checked{% endif %}> Ficha vencida</label>
+      {% for clave, titulo, opciones in filtros_seguimiento %}<select name="{{ clave }}" class="form-select form-select-sm" style="max-width:230px" title="{{ titulo }}">
+        <option value="">{{ titulo }}: todos</option>
+        {% for v, l in opciones %}<option value="{{ v }}" {% if filtros|get_item:clave == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+      </select>{% endfor %}
+      <input type="number" min="1" name="dias_etapa" value="{{ filtros.dias_etapa }}" class="form-control form-control-sm" placeholder="Días en la etapa ≥" style="max-width:160px" title="Lleva al menos N días en la etapa actual">
       {% for c in campos_filtro %}{% with clave='cp_'|add:c.slug %}
       {% if c.tipo == 'lista' %}<select name="{{ clave }}" class="form-select form-select-sm"><option value="">{{ c.nombre }}</option>{% for o in c.opciones %}<option value="{{ o }}" {% if filtros|get_item:clave == o %}selected{% endif %}>{{ o }}</option>{% endfor %}</select>
       {% elif c.tipo == 'sino' %}<select name="{{ clave }}" class="form-select form-select-sm"><option value="">{{ c.nombre }}</option><option value="true" {% if filtros|get_item:clave == 'true' %}selected{% endif %}>{{ c.nombre }}: Sí</option><option value="false" {% if filtros|get_item:clave == 'false' %}selected{% endif %}>{{ c.nombre }}: No</option></select>

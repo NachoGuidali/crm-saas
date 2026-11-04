@@ -861,7 +861,7 @@ class FiltrosCompletosTests(BaseCRM):
     """Lista y tablero tienen el mismo set de filtros, incluida la base importada (aunque no haya bases)."""
     NOMBRES = ['q', 'etapa', 'agente', 'estado', 'fecha', 'desde', 'hasta', 'prioritaria', 'pauta', 'origen',
                'tipificacion', 'intentos_min', 'intentos_max', 'puntaje_min', 'ingresos_min', 'sin_actividad',
-               'sin_calificar', 'vencida']
+               'sin_calificar', 'vencida', 'chat', 'respuesta', 'tareas', 'contactable', 'dias_etapa']
 
     def setUp(self):
         super().setUp()
@@ -882,3 +882,57 @@ class FiltrosCompletosTests(BaseCRM):
     def test_base_importada_visible_sin_bases(self):
         for url in ('/oportunidades/', '/tablero/'):
             self.assertContains(self.client.get(url), 'Base importada')
+
+
+class FiltrosSeguimientoTests(BaseCRM):
+    """WhatsApp (bot / derivado / agente / sin chat), respuesta, tareas, contactabilidad y días en la etapa."""
+
+    def setUp(self):
+        super().setUp()
+        from apps.whatsapp.models import Conversacion, LineaWhatsApp
+        self.linea = LineaWhatsApp.objects.create(nombre='L', proveedor='demo')
+        ahora = timezone.now()
+        self.ops = {}
+        for i, nombre in enumerate(['Bot', 'Derivado', 'Agente', 'SinChat']):
+            c = Contacto.objects.create(nombre=nombre, telefono=f'11555500{i:02d}')
+            self.ops[nombre] = Oportunidad.objects.create(contacto=c, embudo=self.embudo, etapa=self.etapas[0])
+        conv = lambda n, **kw: Conversacion.objects.create(linea=self.linea, telefono=self.ops[n].contacto.telefono,
+                                                           contacto=self.ops[n].contacto, **kw)
+        conv('Bot', bot_activo=True, ultimo_entrante_at=ahora - timedelta(hours=2), ultimo_mensaje_at=ahora - timedelta(hours=1))
+        conv('Derivado', bot_derivada=True, ultimo_entrante_at=ahora, ultimo_mensaje_at=ahora)
+        conv('Agente', ultimo_mensaje_at=ahora)
+
+    def nombres(self, **params):
+        return set(crm.filtrar_oportunidades(Oportunidad.objects.all(), params, None)
+                   .values_list('contacto__nombre', flat=True))
+
+    def test_chat_y_respuesta(self):
+        self.assertEqual(self.nombres(chat='bot'), {'Bot'})
+        self.assertEqual(self.nombres(chat='derivado'), {'Derivado'})
+        self.assertEqual(self.nombres(chat='agente'), {'Agente'})
+        self.assertEqual(self.nombres(chat='sin_chat'), {'SinChat'})
+        self.assertEqual(self.nombres(respuesta='respondio'), {'Bot', 'Derivado'})
+        self.assertEqual(self.nombres(respuesta='nunca'), {'Agente', 'SinChat'})
+        self.assertEqual(self.nombres(respuesta='esperando'), {'Derivado'})
+
+    def test_tareas_contactable_y_dias_en_etapa(self):
+        ahora = timezone.now()
+        Tarea.objects.create(oportunidad=self.ops['Bot'], titulo='x', vence_at=ahora - timedelta(hours=1))
+        Tarea.objects.create(oportunidad=self.ops['Agente'], titulo='y', vence_at=ahora + timedelta(days=3))
+        Oportunidad.objects.filter(pk=self.ops['Derivado'].pk).update(proximo_contacto_at=ahora)
+        self.assertEqual(self.nombres(tareas='vencida'), {'Bot'})
+        self.assertEqual(self.nombres(tareas='sin_pendiente'), {'Derivado', 'SinChat'})
+        self.assertIn('Derivado', self.nombres(tareas='hoy'))
+        Contacto.objects.filter(pk=self.ops['SinChat'].contacto_id).update(no_contactar=True)
+        self.assertEqual(self.nombres(contactable='no_contactar'), {'SinChat'})
+        self.assertEqual(self.nombres(contactable='si'), {'Bot', 'Derivado', 'Agente'})
+        self.assertEqual(self.nombres(contactable='sin_email'), {'Bot', 'Derivado', 'Agente', 'SinChat'})
+        Oportunidad.objects.filter(pk=self.ops['Agente'].pk).update(etapa_desde=ahora - timedelta(days=10))
+        self.assertEqual(self.nombres(dias_etapa='7'), {'Agente'})
+
+    def test_chips_en_lista(self):
+        self.client.force_login(User.objects.create_superuser('root', 'r@x.com', 'x', rol=User.ROL_ADMIN))
+        r = self.client.get('/oportunidades/', {'chat': 'derivado', 'dias_etapa': '3'})
+        self.assertContains(r, 'WhatsApp: El bot derivó (falta tomar)')
+        self.assertContains(r, 'En la etapa hace ≥ 3 días')
+        self.assertContains(self.client.get('/tablero/', {'chat': 'bot'}), f'/oportunidades/{self.ops["Bot"].pk}/')
