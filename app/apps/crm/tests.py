@@ -855,3 +855,30 @@ class FiltroPorCampoTests(BaseCRM):
         r = self.client.get('/tablero/', {'cf': 'c:edad|>|30'})
         self.assertContains(r, f'/oportunidades/{self.ops["Beto"].pk}/')
         self.assertNotContains(r, f'/oportunidades/{self.ops["Ana"].pk}/')
+
+
+class FiltrosCompletosTests(BaseCRM):
+    """Lista y tablero tienen el mismo set de filtros, incluida la base importada (aunque no haya bases)."""
+    NOMBRES = ['q', 'etapa', 'agente', 'estado', 'fecha', 'desde', 'hasta', 'prioritaria', 'pauta', 'origen',
+               'tipificacion', 'intentos_min', 'intentos_max', 'puntaje_min', 'ingresos_min', 'sin_actividad',
+               'sin_calificar', 'vencida']
+
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(User.objects.create_superuser('root', 'r@x.com', 'x', rol=User.ROL_ADMIN))
+
+    def test_mismos_filtros_en_lista_y_tablero(self):
+        ImportacionLote.objects.create(embudo=self.embudo, nombre_archivo='base_sept.xlsx', fuente='Base centro médico')
+        for url in ('/oportunidades/', '/tablero/'):
+            html = self.client.get(url).content.decode()
+            for nombre in self.NOMBRES:
+                self.assertIn(f'name="{nombre}"', html, f'{url} sin filtro {nombre}')
+            self.assertIn('name="lote"', html, url)
+            self.assertIn('Base centro médico', html, url)
+            self.assertNotIn('base_sept.xlsx', html, url)
+            self.assertIn('id="filtroCampos"', html, url)
+        self.assertIn('name="pausadas"', self.client.get('/tablero/').content.decode())
+
+    def test_base_importada_visible_sin_bases(self):
+        for url in ('/oportunidades/', '/tablero/'):
+            self.assertContains(self.client.get(url), 'Base importada')

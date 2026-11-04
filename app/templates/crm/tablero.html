@@ -11,43 +11,7 @@
   </div>
 </div>
 
-<form class="toolbar mb-3" method="get">
-  <input type="hidden" name="embudo" value="{{ embudo.pk }}">
-  <input type="search" name="q" value="{{ filtros.q }}" class="form-control form-control-sm" placeholder="Nombre, teléfono, email…" style="min-width:220px">
-  {% if user.ve_todo %}
-  <select name="agente" class="form-select form-select-sm">
-    <option value="">Todos los agentes</option>
-    <option value="ninguno" {% if filtros.agente == 'ninguno' %}selected{% endif %}>Sin asignar</option>
-    {% for a in agentes %}<option value="{{ a.pk }}" {% if filtros.agente == a.pk|stringformat:'s' %}selected{% endif %}>{{ a.display_name }}</option>{% endfor %}
-  </select>
-  {% endif %}
-  <select name="origen" class="form-select form-select-sm">
-    <option value="">Cualquier canal</option>
-    {% for k, v in origenes %}<option value="{{ k }}" {% if filtros.origen == k %}selected{% endif %}>{{ v }}</option>{% endfor %}
-  </select>
-  <select name="pauta" class="form-select form-select-sm" title="Pauta / campaña">
-    <option value="">Todas las pautas</option>
-    <option value="ninguna" {% if filtros.pauta == 'ninguna' %}selected{% endif %}>Sin pauta</option>
-    {% for p in pautas %}<option value="{{ p.pk }}" {% if filtros.pauta == p.pk|stringformat:'s' %}selected{% endif %}>{{ p.nombre }}</option>{% endfor %}
-  </select>
-  {% if lotes %}<select name="lote" class="form-select form-select-sm" title="Base importada" style="max-width:220px">
-    <option value="">Todas las bases</option>
-    {% for l in lotes %}<option value="{{ l.pk }}" {% if filtros.lote == l.pk|stringformat:'s' %}selected{% endif %}>{{ l }}</option>{% endfor %}
-  </select>{% endif %}
-  <select name="sin_actividad" class="form-select form-select-sm">
-    <option value="">Cualquier actividad</option>
-    <option value="3" {% if filtros.sin_actividad == '3' %}selected{% endif %}>Sin actividad +3 días</option>
-    <option value="7" {% if filtros.sin_actividad == '7' %}selected{% endif %}>Sin actividad +7 días</option>
-  </select>
-  <select name="pausadas" class="form-select form-select-sm">
-    <option value="">Incluir pausadas</option>
-    <option value="0" {% if filtros.pausadas == '0' %}selected{% endif %}>Ocultar pausadas</option>
-  </select>
-  <label class="btn btn-sm btn-outline-danger {% if filtros.prioritaria %}active{% endif %}" title="Solo prioridad (ej. reingresos)"><input type="checkbox" name="prioritaria" value="1" class="d-none" onchange="this.form.submit()" {% if filtros.prioritaria %}checked{% endif %}>🔥 Prioridad</label>
-  <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-funnel"></i> Filtrar</button>
-  {% if filtros.q or filtros.agente or filtros.origen or filtros.sin_actividad or filtros.pausadas or filtros.pauta or filtros.lote or filtros.prioritaria or fc_valores %}<a href="?embudo={{ embudo.pk }}" class="btn btn-link btn-sm">Limpiar</a>{% endif %}
-  {% include "crm/_filtro_campos.html" %}
-</form>
+{% include "crm/_filtros_oportunidades.html" with tablero=True %}
 
 <div class="board-wrap">
   <div class="board" id="board">

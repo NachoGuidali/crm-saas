@@ -134,7 +134,7 @@ class TableroView(LoginRequiredMixin, View):
             'tipificaciones': tipificaciones_de(embudo), 'filtros': request.GET,
             'origenes': Oportunidad.ORIGEN_CHOICES, 'pautas': Pauta.objects.filter(activa=True).order_by('nombre'),
             'lotes': ImportacionLote.objects.filter(embudo=embudo).order_by('-created_at')[:50],
-            **_contexto_filtro_campos(request, embudo),
+            **_contexto_filtros(request, embudo, etapas, tipificaciones_de(embudo), CampoPersonalizado.activos(embudo)),
         })
 
     @staticmethod
@@ -195,25 +195,10 @@ class OportunidadListView(LoginRequiredMixin, View):
         from apps.telefonia.models import CampaniaDiscado
         etapas = etapas_de(embudo) if embudo else []
         tipificaciones = tipificaciones_de(embudo) if embudo else []
-        sel = {k: set(request.GET.getlist(k)) for k in ('etapa', 'agente', 'estado', 'origen', 'tipificacion', 'lote',
-                                                         'etiqueta', 'pauta')}
         return render(request, 'crm/oportunidades.html', {
-            'sel': sel, 'chips': _chips_filtros(request, etapas, tipificaciones),
-            'opciones': {
-                'etapa': [(str(e.pk), e.nombre) for e in etapas],
-                'agente': [('ninguno', 'Sin asignar')] + [(str(a.pk), a.display_name) for a in agentes_activos()],
-                'estado': list(Oportunidad.ESTADO_CHOICES), 'origen': list(Oportunidad.ORIGEN_CHOICES),
-                'tipificacion': [(str(t.pk), f'{t.get_resultado_display()} · {t.nombre}') for t in tipificaciones],
-                'etiqueta': [(str(e.pk), e.nombre) for e in Etiqueta.objects.all()],
-                'pauta': [('ninguna', 'Sin pauta')] + [(str(p.pk), p.nombre) for p in
-                                                        Pauta.objects.all()],
-                'lote': [(str(l.pk), (l.fuente or l.nombre_archivo)[:40])
-                         for l in (ImportacionLote.objects.filter(embudo=embudo)[:30] if embudo else [])],
-            },
-            'campos_fecha': [(k, label) for k, label, _ in crm.CAMPOS_FECHA_FILTRO],
+            **_contexto_filtros(request, embudo, etapas, tipificaciones, campos),
             'total_filtrado': page.paginator.count,
             'campos_columna': [c for c in campos if c.mostrar_en_lista],
-            'campos_filtro': [c for c in campos if c.filtrable],
             'page': page, 'embudo': embudo, 'embudos': embudos, 'filtros': request.GET,
             'query': query_sin_page(request), 'agentes': agentes_activos(),
             'etapas': etapas, 'estados': Oportunidad.ESTADO_CHOICES,
@@ -221,8 +206,30 @@ class OportunidadListView(LoginRequiredMixin, View):
             'tipificaciones': tipificaciones,
             'lotes': ImportacionLote.objects.filter(embudo=embudo)[:30] if embudo else [],
             'campanias': CampaniaDiscado.objects.exclude(estado=CampaniaDiscado.ESTADO_FINALIZADA),
-            **_contexto_filtro_campos(request, embudo),
         })
+
+
+def _contexto_filtros(request, embudo, etapas, tipificaciones, campos):
+    """Todo lo que necesita el formulario de filtros compartido por lista y tablero (_filtros_oportunidades.html)."""
+    lotes = ImportacionLote.objects.filter(embudo=embudo).order_by('-created_at')[:50] if embudo else []
+    return {
+        'sel': {k: set(request.GET.getlist(k)) for k in ('etapa', 'agente', 'estado', 'origen', 'tipificacion', 'lote',
+                                                         'etiqueta', 'pauta')},
+        'chips': _chips_filtros(request, etapas, tipificaciones),
+        'opciones': {
+            'etapa': [(str(e.pk), e.nombre) for e in etapas],
+            'agente': [('ninguno', 'Sin asignar')] + [(str(a.pk), a.display_name) for a in agentes_activos()],
+            'estado': list(Oportunidad.ESTADO_CHOICES), 'origen': list(Oportunidad.ORIGEN_CHOICES),
+            'tipificacion': [(str(t.pk), f'{t.get_resultado_display()} · {t.nombre}') for t in tipificaciones],
+            'etiqueta': [(str(e.pk), e.nombre) for e in Etiqueta.objects.all()],
+            'pauta': [('ninguna', 'Sin pauta')] + [(str(p.pk), p.nombre) for p in Pauta.objects.all()],
+            'lote': [(str(l.pk), str(l)[:60]) for l in lotes],
+        },
+        'campos_fecha': [(k, label) for k, label, _ in crm.CAMPOS_FECHA_FILTRO],
+        'campos_filtro': [c for c in campos if c.filtrable],
+        'filtros': request.GET,
+        **_contexto_filtro_campos(request, embudo),
+    }
 
 
 def _contexto_filtro_campos(request, embudo):
