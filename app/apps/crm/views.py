@@ -531,6 +531,11 @@ class OportunidadDetalleView(LoginRequiredMixin, View):
             'ejecuciones': op.ejecuciones.select_related('accion').order_by('-created_at')[:15],
         }
         ctx.update(contexto_chat(request, contacto, op))
+        from apps.firmas import services as firmas
+        if firmas.habilitado():
+            from apps.firmas.models import FormularioFirma
+            ctx['firmas'] = op.firmas.select_related('formulario', 'creada_por')[:20]
+            ctx['formularios_firma'] = FormularioFirma.objects.filter(activo=True)
         return render(request, 'crm/oportunidad_detalle.html', ctx)
 
 

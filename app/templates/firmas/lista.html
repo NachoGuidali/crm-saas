@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Formularios de firma{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-pen"></i> Formularios de firma <span class="sub">firma electrónica desde un link</span></h1>
+  <a href="{% url 'firmas:nuevo' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Nuevo formulario</a></div>
+<div class="row g-3">
+  <div class="col-lg-7"><div class="card"><div class="table-responsive"><table class="table table-sm mb-0">
+    <thead><tr><th>Formulario</th><th class="text-end">Enviados</th><th class="text-end">Firmados</th><th>Vence</th><th></th></tr></thead>
+    <tbody>{% for f in formularios %}<tr>
+      <td><a href="{% url 'firmas:editar' f.pk %}">{{ f.nombre }}</a>{% if not f.activo %} <span class="chip">inactivo</span>{% endif %}<div class="small muted">{{ f.titulo|truncatechars:60 }}</div></td>
+      <td class="text-end">{{ f.n_enviadas }}</td><td class="text-end">{{ f.n_firmadas }}</td>
+      <td class="small">{% if f.vence_dias %}{{ f.vence_dias }} días{% else %}No vence{% endif %}</td>
+      <td class="text-end"><a href="{% url 'firmas:vista_previa' f.pk %}" target="_blank" class="btn btn-xs btn-outline-secondary"><i class="bi bi-eye"></i> Ver</a></td>
+    </tr>{% empty %}<tr><td colspan="5" class="muted text-center py-4">Todavía no hay formularios. Creá uno (ej. "Declaración jurada").</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+  <div class="form-text mt-2">Se envían desde la ficha del lead (tarjeta <b>Firmas</b>), por automatización ("Enviar un formulario para firmar") o desde el bot (API <code>/api/v1/firmas/</code>).
+    Al firmarse, el PDF queda en la ficha y podés disparar automatizaciones con "Cuando se recibe un formulario firmado".</div></div>
+  <div class="col-lg-5"><div class="card"><div class="card-header">Últimos envíos</div>
+    <div class="table-responsive"><table class="table table-sm mb-0"><tbody>{% for s in recientes %}<tr>
+      <td><a href="{{ s.oportunidad.get_absolute_url }}#firmas">{{ s.contacto.nombre|default:s.contacto.telefono }}</a><div class="small muted">{{ s.formulario }}</div></td>
+      <td><span class="chip {% if s.estado == 'firmada' %}ok{% elif s.vencida or s.estado == 'anulada' %}danger{% elif s.estado == 'abierta' %}info{% endif %}">{{ s.estado_display }}</span></td>
+      <td class="small text-nowrap muted">{{ s.created_at|date:"d/m H:i" }}</td>
+    </tr>{% empty %}<tr><td class="muted text-center py-3">Sin envíos todavía.</td></tr>{% endfor %}</tbody></table></div>
+  </div></div>
+</div>
+{% endblock %}

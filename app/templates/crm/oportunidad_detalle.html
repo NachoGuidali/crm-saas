@@ -188,6 +188,8 @@
     </div>
     {% endif %}
 
+    {% if 'firmas' in funciones_cliente %}{% include "firmas/_ficha.html" %}{% endif %}
+
     {% if ejecuciones %}
     <div class="card">
       <div class="card-header">Automatizaciones</div>

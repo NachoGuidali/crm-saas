@@ -1,0 +1,39 @@
+{# Tarjeta "Firmas" de la ficha del lead: enviar un formulario para firmar y ver los firmados. #}
+<div class="card mb-3" id="firmas">
+  <div class="card-header d-flex justify-content-between align-items-center"><span><i class="bi bi-pen"></i> Firmas</span>
+    {% if formularios_firma %}<button class="btn btn-xs btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#nuevaFirma"><i class="bi bi-send"></i> Enviar para firmar</button>{% endif %}</div>
+  <div class="card-body small">
+    {% if formularios_firma %}
+    <form method="post" action="{% url 'firmas:enviar' op.pk %}" class="collapse mb-3" id="nuevaFirma">{% csrf_token %}
+      <select name="formulario" class="form-select form-select-sm mb-2" required>{% for f in formularios_firma %}<option value="{{ f.pk }}">{{ f.nombre }}</option>{% endfor %}</select>
+      <div class="d-flex flex-wrap gap-3 mb-2">
+        <label class="d-flex gap-1"><input type="checkbox" class="form-check-input" name="canal" value="email" {% if contacto.email %}checked{% else %}disabled{% endif %}> Email{% if not contacto.email %} <span class="muted">(sin email)</span>{% endif %}</label>
+        <label class="d-flex gap-1"><input type="checkbox" class="form-check-input" name="canal" value="whatsapp" {% if contacto.puede_recibir_mensajes %}checked{% else %}disabled{% endif %}> WhatsApp</label>
+      </div>
+      <button class="btn btn-primary btn-sm">Enviar</button>
+      <div class="form-text">Sin tildar nada solo se genera el link, para copiarlo y mandarlo por donde quieras.</div>
+    </form>
+    {% elif 'firmas' in perms_crm %}<div class="muted mb-2">No hay formularios activos. <a href="{% url 'firmas:nuevo' %}">Crear uno</a></div>{% endif %}
+    {% for s in firmas %}
+    <div class="d-flex justify-content-between align-items-start gap-2 {% if not forloop.last %}border-bottom pb-2 mb-2{% endif %}">
+      <div><b>{{ s.formulario }}</b>
+        <div class="muted" style="font-size:11px">{{ s.created_at|date:"d/m H:i" }} · {{ s.get_origen_display }}{% if s.creada_por %} · {{ s.creada_por.display_name }}{% endif %}{% if s.enviada_email %} · email{% endif %}{% if s.enviada_whatsapp %} · WhatsApp{% endif %}
+          {% if s.estado == 'firmada' %}<br>Firmó el {{ s.firmada_at|date:"d/m/Y H:i" }}{% elif s.abierta_at %}<br>Lo abrió el {{ s.abierta_at|date:"d/m H:i" }}{% endif %}</div></div>
+      <div class="text-end text-nowrap">
+        <span class="chip {% if s.estado == 'firmada' %}ok{% elif s.vencida or s.estado == 'anulada' %}danger{% elif s.estado == 'abierta' %}info{% endif %}">{{ s.estado_display }}</span>
+        <div class="mt-1">
+          {% if s.estado == 'firmada' %}<a href="{% url 'firmas:pdf' s.pk %}?ver=1" target="_blank" class="btn btn-xs btn-outline-secondary" title="Ver PDF"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
+          {% elif s.firmable %}<button type="button" class="btn btn-xs btn-outline-secondary copiar-link" data-link="{{ s.url }}" title="Copiar link"><i class="bi bi-link-45deg"></i></button>
+            <form method="post" action="{% url 'firmas:anular' s.pk %}" class="d-inline" onsubmit="return confirm('¿Anular este link? El lead ya no va a poder firmarlo.')">{% csrf_token %}<button class="btn btn-xs btn-outline-danger" title="Anular"><i class="bi bi-x-lg"></i></button></form>{% endif %}
+        </div>
+      </div>
+    </div>
+    {% empty %}<div class="muted">Todavía no se le envió ningún formulario.</div>{% endfor %}
+  </div>
+</div>
+<script>
+document.querySelectorAll('.copiar-link').forEach(b => b.addEventListener('click', () => {
+  navigator.clipboard.writeText(b.dataset.link).then(() => { b.innerHTML = '<i class="bi bi-check2"></i>'; setTimeout(() => b.innerHTML = '<i class="bi bi-link-45deg"></i>', 1500); },
+    () => prompt('Copiá el link:', b.dataset.link));
+}));
+</script>

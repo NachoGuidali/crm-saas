@@ -21,7 +21,7 @@ class AccionForm(forms.ModelForm):
                   'tipificacion', 'plantilla_email', 'activa', 'solo_si_sigue_en_etapa', 'solo_si_bot_activo', 'solo_en_horario', 'plantilla',
                   'texto', 'linea', 'email_asunto', 'tarea_titulo', 'tarea_vence_horas', 'modo_embudo', 'embudo_destino',
                   'etapa_destino', 'volver_a', 'asignar_destino', 'usuario_destino', 'reparto', 'volver_a_etapa',
-                  'etiqueta', 'solo_pautas', 'solo_etiquetas', 'excluir_etiquetas']
+                  'etiqueta', 'formulario_firma', 'canal_firma', 'solo_pautas', 'solo_etiquetas', 'excluir_etiquetas']
         widgets = {'texto': forms.Textarea(attrs={'rows': 4}), 'otras_etapas': forms.CheckboxSelectMultiple,
                    'solo_pautas': forms.CheckboxSelectMultiple, 'solo_etiquetas': forms.CheckboxSelectMultiple,
                    'excluir_etiquetas': forms.CheckboxSelectMultiple}
@@ -31,11 +31,22 @@ class AccionForm(forms.ModelForm):
         self.embudo = embudo
         self.fields['etapa'].required = False
         self.fields['reparto'].required = False
+        self.fields['canal_firma'].required = False
         from apps.pautas.models import Pauta
         self.fields['solo_pautas'].queryset = Pauta.objects.filter(activa=True).order_by('nombre')
         from .models import PlantillaEmail
         self.fields['plantilla_email'].queryset = PlantillaEmail.objects.filter(activa=True)
         self.fields['accion_previa'].queryset = AccionEtapa.objects.none()
+        from apps.firmas.models import FormularioFirma
+        from apps.firmas.services import habilitado as firmas_habilitado
+        self.fields['formulario_firma'].queryset = FormularioFirma.objects.filter(activo=True)
+        if not firmas_habilitado():  # módulo extra apagado: no se ofrecen la acción ni el disparador
+            actual_tipo, actual_disp = self.instance.tipo if self.instance.pk else None, \
+                self.instance.disparador if self.instance.pk else None
+            self.fields['tipo'].choices = [c for c in self.fields['tipo'].choices
+                                           if c[0] != AccionEtapa.TIPO_FIRMA or c[0] == actual_tipo]
+            self.fields['disparador'].choices = [c for c in self.fields['disparador'].choices
+                                                 if c[0] != AccionEtapa.DISP_FIRMA or c[0] == actual_disp]
         if embudo is not None:
             self.fields['etapa'].queryset = embudo.etapas.order_by('orden')
             self.fields['mover_a'].queryset = embudo.etapas.order_by('orden')
@@ -77,6 +88,7 @@ class AccionForm(forms.ModelForm):
         d = super().clean()
         tipo = d.get('tipo')
         d['reparto'] = d.get('reparto') or AccionEtapa.REPARTO_MENOR_CARGA
+        d['canal_firma'] = d.get('canal_firma') or 'email'
         if tipo == AccionEtapa.TIPO_WHATSAPP and not (d.get('plantilla') or d.get('texto')):
             self.add_error('plantilla', 'Elegí una plantilla o escribí un texto.')
         if tipo == AccionEtapa.TIPO_SMS and not d.get('texto'):
@@ -95,6 +107,8 @@ class AccionForm(forms.ModelForm):
             self.add_error('etapa', 'Elegí la etapa.')
         if disp == AccionEtapa.DISP_DESPUES_DE:
             d['todas_las_etapas'], d['otras_etapas'] = False, []
+        if tipo == AccionEtapa.TIPO_FIRMA and not d.get('formulario_firma'):
+            self.add_error('formulario_firma', 'Elegí qué formulario enviar.')
         if tipo == AccionEtapa.TIPO_ETIQUETA and not d.get('etiqueta'):
             self.add_error('etiqueta', 'Elegí la etiqueta.')
         if tipo == AccionEtapa.TIPO_EMAIL and d.get('plantilla_email'):

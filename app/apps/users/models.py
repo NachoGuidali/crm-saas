@@ -25,6 +25,7 @@ PERMISOS = [
     ('automatizaciones', 'Configurar automatizaciones y mensajes automáticos', 'Configuración'),
     ('integraciones', 'API keys e integraciones externas', 'Configuración'),
     ('postventa', 'Clientes / Postventa: cuentas, proyectos y tareas', 'Postventa'),
+    ('firmas', 'Configurar formularios de firma electrónica', 'Configuración'),
     ('usuarios', 'Alta, baja y edición de usuarios', 'Administración'),
 ]
 PERMISOS_DICT = {slug: label for slug, label, _ in PERMISOS}

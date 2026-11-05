@@ -36,7 +36,7 @@ def media_protegida(request, ruta):
     from core.media_firmada import ruta_firmada_valida
     saliente = ruta.startswith('whatsapp/salientes/')
     # Imágenes de emails/difusiones (flyers): públicas, las tiene que abrir el cliente de correo sin login.
-    publico = ruta.startswith('email/')
+    publico = ruta.startswith(('email/', 'firmas/publico/'))  # + logos de los formularios de firma
     firmada = saliente and ruta_firmada_valida(request.GET.get('sig', ''), ruta)
     if not firmada and not publico and not request.user.is_authenticated:
         if saliente:

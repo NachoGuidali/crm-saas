@@ -72,6 +72,7 @@ TENANT_APPS = [
     'apps.pautas',
     'apps.reportes',
     'apps.cuentas',
+    'apps.firmas',
 ]
 INSTALLED_APPS = SHARED_APPS + [a for a in TENANT_APPS if a not in SHARED_APPS]
 

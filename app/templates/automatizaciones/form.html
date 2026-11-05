@@ -18,6 +18,7 @@
 
   <div class="paso"><h6><b>1.</b> Cuándo</h6>
     {{ form.disparador }}
+    <div class="mt-2" id="boxFormFirma" style="display:none"><label class="form-label small">¿Qué formulario? <span class="muted">(vacío = cualquiera)</span></label><select class="form-select" id="formFirmaDisp"></select></div>
     <div class="row g-2 mt-1">
       <div class="col-md-6" id="boxEtapa"><label class="form-label small">Etapa</label>{{ form.etapa }}{{ form.etapa.errors }}</div>
       <div class="col-md-6 d-flex align-items-end" id="boxTodas"><label class="small d-flex gap-2">{{ form.todas_las_etapas }} {{ form.todas_las_etapas.label }}</label></div>
@@ -37,6 +38,9 @@
   <div class="paso"><h6><b>3.</b> Qué hacer</h6>
     {{ form.tipo }}
     <div class="row g-2 mt-1">
+      <div class="col-md-8 t t-firma"><label class="form-label small">Formulario para firmar</label>{{ form.formulario_firma }}{{ form.formulario_firma.errors }}
+        <div class="form-text">Se genera un link único para este lead (el texto del email/WhatsApp se configura en el formulario). <a href="{% url 'firmas:lista' %}" target="_blank">Formularios</a></div></div>
+      <div class="col-md-4 t t-firma"><label class="form-label small">{{ form.canal_firma.label }}</label>{{ form.canal_firma }}</div>
       <div class="col-12 t t-whatsapp"><label class="form-label small">Plantilla de WhatsApp</label>{{ form.plantilla }}{{ form.plantilla.errors }}<div class="form-text">{{ form.plantilla.help_text }}</div></div>
       <div class="col-12 t t-whatsapp"><label class="form-label small">Línea</label>{{ form.linea }}<div class="form-text">{{ form.linea.help_text }}</div></div>
       <div class="col-12 t t-email"><label class="form-label small">Plantilla de email</label>{{ form.plantilla_email }}{{ form.plantilla_email.errors }}<div class="form-text"><a href="{% url 'automatizaciones:plantillas_email' %}" target="_blank">Crear o editar plantillas de email</a> · o escribí asunto y texto abajo.</div></div>
@@ -135,9 +139,22 @@
     sin_actividad: ['Sin ninguna actividad durante', 'Si la tarjeta no tiene movimientos (llamadas, mensajes, notas, cambios) durante ese tiempo.'],
     reingreso: ['Cuánto esperar después de que reingresa', 'Cuando la persona vuelve a entrar (escribe de nuevo, llena otro formulario, se importa de nuevo) y no se duplicó porque ya tenía la tarjeta.'],
     despues_de: ['Cuánto esperar después de esa automatización', 'Cuando la automatización elegida se ejecutó (por ejemplo, se envió el mensaje de bienvenida).'],
+    firma: ['Cuánto esperar después de que firma', 'Cuando el lead completa y firma un formulario (el elegido o cualquiera) estando en la etapa. Ej.: pasarlo a "Documentación recibida" y avisarle al vendedor.'],
     silencio: ['Si deja de contestar durante', 'El cliente escribió, se le contestó (bot o agente) y no volvió a escribir en ese tiempo. Una vez por cada silencio; si vuelve a escribir, no se hace. Ideal para un "¿querés retomar?".'],
     campo: ['Cuánto esperar después de cambiar el campo', 'Cuando el agente (o una integración como n8n) completa o cambia un campo del contacto y se cumplen las condiciones de campo de más abajo.'],
   };
+  // El mismo campo "formulario_firma" sirve para la acción (qué enviar) y para el disparador (qué firma escuchar):
+  // con el disparador "firma" se muestra un selector espejo arriba, sincronizado con el real.
+  const formFirma = $('id_formulario_firma'), espejo = $('formFirmaDisp');
+  if (formFirma) { espejo.innerHTML = formFirma.innerHTML; espejo.value = formFirma.value;
+    espejo.addEventListener('change', () => { formFirma.value = espejo.value; }); }
+  const sincFirma = () => {
+    if (!formFirma) return;
+    const porDisp = disp.value === 'firma';
+    $('boxFormFirma').style.display = porDisp && tipo.value !== 'firma' ? '' : 'none';
+    if (porDisp && tipo.value !== 'firma') espejo.value = formFirma.value;
+  };
+  tipo.addEventListener('change', sincFirma);
   const updDisp = () => {
     const d = DISP[disp.value] || DISP.entrada;
     $('lblDemora').textContent = d[0]; $('ayudaDisp').textContent = d[1];
@@ -145,12 +162,13 @@
     $('boxPrevia').style.display = disp.value === 'despues_de' ? '' : 'none';
     $('boxTodas').style.display = $('boxOtras').style.display = disp.value === 'despues_de' ? 'none' : '';
     etapa.disabled = $('id_todas_las_etapas').checked;
-    $('ayudaDemora').textContent = ['entrada', 'respuesta', 'despues_de', 'reingreso', 'campo'].includes(disp.value) ? '0 = enseguida.' : '';
+    $('ayudaDemora').textContent = ['entrada', 'respuesta', 'despues_de', 'reingreso', 'campo', 'firma'].includes(disp.value) ? '0 = enseguida.' : '';
+    sincFirma();
   };
 
   const ACC = {whatsapp: 'enviar un WhatsApp', email: 'enviar un email', sms: 'enviar un SMS', tarea: 'crear una tarea para el vendedor',
     notif_agente: 'avisar al vendedor', notif_supervisores: 'avisar a supervisión', etapa: 'mover la tarjeta', embudo: 'pasarla a otro embudo',
-    reasignar: 'reasignarla a <b>otro vendedor</b>', prioridad: 'marcarla como <b>🔥 prioridad</b>', etiqueta: 'ponerle una etiqueta'};
+    reasignar: 'reasignarla a <b>otro vendedor</b>', firma: 'enviarle un formulario para firmar', prioridad: 'marcarla como <b>🔥 prioridad</b>', etiqueta: 'ponerle una etiqueta'};
   const resumen = () => {
     const n = parseInt(dv.value || '0'), u = sel(du), espera = n ? `${n} ${u}` : '';
     const otras = [...document.querySelectorAll('[name=otras_etapas]:checked')].map(c => esc(c.parentElement.textContent.trim()));
@@ -163,9 +181,10 @@
       despues_de: `Después de la automatización <b>${esc(sel(previa)) || '…'}</b>`,
       reingreso: `Cuando el lead <b>reingresa</b> estando en <b>${et}</b>`,
       campo: `Cuando <b>cambia un campo</b> (según las condiciones) estando en <b>${et}</b>`,
+      firma: `Cuando el lead <b>firma ${sel($('id_formulario_firma')) ? '«' + esc(sel($('id_formulario_firma'))) + '»' : 'un formulario'}</b> estando en <b>${et}</b>`,
       silencio: `Si el cliente, estando en <b>${et}</b>, <b>deja de contestar ${espera || '…'}</b> después de su último mensaje`,
     }[disp.value];
-    if (espera && ['entrada', 'respuesta', 'despues_de', 'reingreso', 'campo'].includes(disp.value)) cuando += `, esperar <b>${espera}</b> y`;
+    if (espera && ['entrada', 'respuesta', 'despues_de', 'reingreso', 'campo', 'firma'].includes(disp.value)) cuando += `, esperar <b>${espera}</b> y`;
     let que = ACC[tipo.value] || '';
     if (tipo.value === 'whatsapp' && sel(pl)) que += ` (plantilla «${esc(sel(pl))}»)`;
     if (tipo.value === 'email' && sel(pe)) que += ` (plantilla «${esc(sel(pe))}»)`;

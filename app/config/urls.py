@@ -12,6 +12,7 @@ from apps.automatizaciones import views_correo as auto_correo
 from apps.integraciones import landing
 from apps.reportes import views as reportes_views
 from apps.telefonia.urls import api_urlpatterns as api_telefonia
+from apps.firmas import urls as firmas_urls
 
 urlpatterns = [
     path('robots.txt', robots_privado, name='robots_privado'),
@@ -32,8 +33,10 @@ urlpatterns = [
     path('integraciones/', include('apps.integraciones.urls')),
     path('pautas/', include('apps.pautas.urls')),
     path('clientes/', include('apps.cuentas.urls')),
+    path('firmas/', include('apps.firmas.urls')),
+    path('f/', include(firmas_urls.publicas)),
     path('', include('apps.crm.urls')),
-] + api_telefonia + api_integraciones
+] + api_telefonia + api_integraciones + firmas_urls.api_urlpatterns
 
 urlpatterns.insert(0, re_path(r'^media/(?P<ruta>.+)$', media_protegida, name='media'))
 

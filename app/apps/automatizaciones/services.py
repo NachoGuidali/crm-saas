@@ -160,6 +160,25 @@ def cliente_respondio(op):
     return sum(1 for a in acciones if _programar_ya(a, op, historial))
 
 
+def formulario_firmado(sol):
+    """El lead firmó un formulario: dispara "Cuando se recibe un formulario firmado" (de ese formulario o cualquiera)."""
+    from django.db.models import Q
+    op = sol.oportunidad
+    acciones = list(AccionEtapa.objects.filter(AccionEtapa.q_etapa(op.etapa_id, op.embudo_id), activa=True,
+                                               disparador=AccionEtapa.DISP_FIRMA)
+                    .filter(Q(formulario_firma__isnull=True) | Q(formulario_firma_id=sol.formulario_id))
+                    .distinct().select_related('embudo').order_by('orden', 'pk'))
+    ahora, n = timezone.now(), 0
+    for accion in acciones:
+        cuando = ahora + timedelta(minutes=accion.demora_minutos)
+        if accion.solo_en_horario:
+            cuando = proxima_apertura(op.embudo, cuando)
+        ejec = EjecucionAccion.objects.create(accion=accion, oportunidad=op, historial=None, programada_para=cuando)
+        _encolar(ejec, cuando, ahora)
+        n += 1
+    return n
+
+
 def lead_reingreso(op):
     """El lead volvió a entrar (formulario, WhatsApp, importación): dispara las automatizaciones "Cuando reingresa".
     Cada automatización corre como máximo una vez por hora por oportunidad (evita ráfagas de formularios)."""
@@ -381,6 +400,23 @@ def _correr(accion, op, ejec_desde=None, etapa_ref=None):
         return E.ESTADO_OMITIDA, 'El prospecto está pausado.'
 
     contacto = op.contacto
+    if accion.tipo == AccionEtapa.TIPO_FIRMA:
+        from apps.firmas import services as firmas
+        if not firmas.habilitado():
+            return E.ESTADO_OMITIDA, 'El módulo de firmas no está habilitado.'
+        if accion.formulario_firma is None:
+            return E.ESTADO_OMITIDA, 'Falta elegir el formulario.'
+        if not op.activa:
+            return E.ESTADO_OMITIDA, 'La oportunidad está cerrada.'
+        try:
+            sol = firmas.crear_solicitud(accion.formulario_firma, op, origen='automatizacion', accion=accion)
+        except firmas.ErrorFirma as e:
+            return E.ESTADO_OMITIDA, str(e)
+        canales = ['email', 'whatsapp'] if accion.canal_firma == 'ambos' else [accion.canal_firma]
+        enviados, errores = firmas.enviar(sol, canales)
+        detalle = ' · '.join(enviados + errores)
+        return (E.ESTADO_EJECUTADA if enviados else E.ESTADO_OMITIDA), detalle or 'No se envió.'
+
     if accion.tipo == AccionEtapa.TIPO_WHATSAPP:
         from apps.whatsapp.services import enviar_automatico
         msg, detalle = enviar_automatico(op, plantilla=accion.plantilla, texto=accion.texto, linea=accion.linea,

@@ -19,6 +19,7 @@ class AccionEtapa(models.Model):
     TIPO_REASIGNAR = 'reasignar'
     TIPO_PRIORIDAD = 'prioridad'
     TIPO_ETIQUETA = 'etiqueta'
+    TIPO_FIRMA = 'firma'
     DISP_ENTRADA = 'entrada'
     DISP_SIN_RESPUESTA = 'sin_respuesta'
     DISP_RESPUESTA = 'respuesta'
@@ -27,6 +28,7 @@ class AccionEtapa(models.Model):
     DISP_REINGRESO = 'reingreso'
     DISP_CAMPO = 'campo'
     DISP_SILENCIO = 'silencio'
+    DISP_FIRMA = 'firma'
     DISPARADORES = [
         (DISP_ENTRADA, 'Al entrar a la etapa'),
         (DISP_SIN_RESPUESTA, 'Si el cliente no responde (en el tiempo de demora desde que entró a la etapa)'),
@@ -36,6 +38,7 @@ class AccionEtapa(models.Model):
         (DISP_REINGRESO, 'Cuando el lead reingresa (vuelve a escribir, llenar un formulario o se importa de nuevo)'),
         (DISP_CAMPO, 'Cuando se completa o cambia un campo del contacto'),
         (DISP_SILENCIO, 'Si el cliente respondió y después dejó de contestar (tiempo de demora desde su último mensaje)'),
+        (DISP_FIRMA, 'Cuando se recibe un formulario firmado'),
     ]
     TIPO_CHOICES = [
         (TIPO_WHATSAPP, 'Enviar WhatsApp al prospecto'),
@@ -49,6 +52,7 @@ class AccionEtapa(models.Model):
         (TIPO_REASIGNAR, 'Reasignar a otro vendedor (reproceso)'),
         (TIPO_PRIORIDAD, 'Marcar como prioridad'),
         (TIPO_ETIQUETA, 'Poner una etiqueta al contacto'),
+        (TIPO_FIRMA, 'Enviar un formulario para firmar'),
     ]
     REPARTO_EMBUDO = 'embudo'
     REPARTO_MENOR_CARGA = 'menor_carga'
@@ -69,7 +73,7 @@ class AccionEtapa(models.Model):
                        ('usuario', 'A un usuario fijo')]
     ICONOS = {TIPO_WHATSAPP: 'whatsapp', TIPO_EMAIL: 'envelope', TIPO_TAREA: 'calendar-plus',
               TIPO_NOTIF_AGENTE: 'bell', TIPO_NOTIF_SUPERVISORES: 'megaphone', TIPO_EMBUDO: 'signpost-split', TIPO_ETAPA: 'arrow-right-circle', TIPO_SMS: 'phone',
-              TIPO_REASIGNAR: 'arrow-left-right', TIPO_PRIORIDAD: 'fire', TIPO_ETIQUETA: 'tag'}
+              TIPO_REASIGNAR: 'arrow-left-right', TIPO_PRIORIDAD: 'fire', TIPO_ETIQUETA: 'tag', TIPO_FIRMA: 'pen'}
 
     embudo = models.ForeignKey('crm.Embudo', on_delete=models.CASCADE, related_name='acciones')
     etapa = models.ForeignKey('crm.Etapa', on_delete=models.CASCADE, related_name='acciones',
@@ -147,6 +151,12 @@ class AccionEtapa(models.Model):
                                        help_text='Opcional (ej. "Nuevo"), para que se trabaje de cero.')
     # Etiqueta
     etiqueta = models.ForeignKey('crm.Etiqueta', null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    # Firmas electrónicas (módulo extra): qué formulario enviar, o cuál escuchar en el disparador "cuando firma"
+    CANALES_FIRMA = [('email', 'Por email'), ('whatsapp', 'Por WhatsApp'), ('ambos', 'Por email y WhatsApp')]
+    formulario_firma = models.ForeignKey('firmas.FormularioFirma', null=True, blank=True, on_delete=models.SET_NULL,
+                                         related_name='+', verbose_name='Formulario de firma',
+                                         help_text='En el disparador "cuando se recibe firmado": vacío = cualquiera.')
+    canal_firma = models.CharField(max_length=10, choices=CANALES_FIRMA, default='email', verbose_name='Enviar')
 
     orden = models.PositiveSmallIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -220,6 +230,8 @@ class AccionEtapa(models.Model):
             return 'Reasigna a otro vendedor' + (f' y vuelve a {self.volver_a_etapa}' if self.volver_a_etapa_id else '')
         if self.tipo == self.TIPO_ETIQUETA:
             return f'Etiqueta «{self.etiqueta}»'
+        if self.tipo == self.TIPO_FIRMA:
+            return f'Envía «{self.formulario_firma}» ({self.get_canal_firma_display().lower()})'
         if self.tipo == self.TIPO_ETAPA:
             return f'Pasa a {self.mover_a}' + (f' ({self.tipificacion})' if self.tipificacion_id else '')
         if self.tipo != self.TIPO_EMBUDO:

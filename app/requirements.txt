@@ -9,5 +9,6 @@ whitenoise==6.7.0
 requests==2.34.2
 Pillow==12.3.0
 openpyxl==3.1.5
+fpdf2==2.8.3
 twilio==9.3.7
 cryptography==50.0.2

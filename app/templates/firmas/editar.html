@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}{{ obj|default:"Nuevo formulario de firma" }}{% endblock %}
+{% block extra_css %}
+<style>
+  .campo-fila { border: 1px solid var(--border2); border-radius: 8px; padding: 8px; margin-bottom: 6px; background: var(--bg2, transparent); }
+  .campo-fila .mover { cursor: pointer; }
+  .tipo-firma { border-left: 3px solid var(--primary, #2563eb); }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-pen"></i> {{ obj|default:"Nuevo formulario de firma" }}</h1>
+  <div class="toolbar">{% if obj %}<a href="{% url 'firmas:vista_previa' obj.pk %}" target="_blank" class="btn btn-outline-secondary btn-sm"><i class="bi bi-eye"></i> Vista previa</a>{% endif %}
+  <a href="{% url 'firmas:lista' %}" class="btn btn-outline-secondary btn-sm">Volver</a></div></div>
+
+<form method="post" enctype="multipart/form-data" id="formFirma">{% csrf_token %}
+<input type="hidden" name="campos_json" id="camposJson">
+{% if form.non_field_errors %}<div class="alert alert-danger py-2">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+{% if form.errors and not form.non_field_errors %}<div class="alert alert-danger py-2 small">Revisá los campos marcados.</div>{% endif %}
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card mb-3"><div class="card-header">Diseño</div><div class="card-body"><div class="row g-2">
+      <div class="col-md-6"><label class="form-label">Nombre interno</label>{{ form.nombre }}{{ form.nombre.errors }}<div class="form-text">{{ form.nombre.help_text }}</div></div>
+      <div class="col-md-6"><label class="form-label">Título (lo ve el lead)</label>{{ form.titulo }}{{ form.titulo.errors }}</div>
+      <div class="col-12"><label class="form-label">{{ form.documento.label }}</label>{{ form.documento }}<div class="form-text">{{ form.documento.help_text }}</div></div>
+      <div class="col-md-6"><label class="form-label">Logo</label>{{ form.logo }}{{ form.logo.errors }}</div>
+      <div class="col-3 col-md-3"><label class="form-label small">Fondo</label>{{ form.color_fondo }}</div>
+      <div class="col-3 col-md-3"><label class="form-label small">Botones</label>{{ form.color_principal }}</div>
+      <div class="col-12"><label class="form-label">{{ form.texto_final.label }}</label>{{ form.texto_final }}</div>
+    </div></div></div>
+
+    <div class="card mb-3"><div class="card-header">Envío</div><div class="card-body"><div class="row g-2">
+      <div class="col-md-5"><label class="form-label">{{ form.vence_dias.label }}</label>{{ form.vence_dias }}<div class="form-text">{{ form.vence_dias.help_text }}</div></div>
+      <div class="col-md-7 d-flex align-items-center"><label class="d-flex gap-2 small">{{ form.enviar_copia }} {{ form.enviar_copia.label }}</label></div>
+      <div class="col-12"><label class="form-label">{{ form.asunto_email.label }}</label>{{ form.asunto_email }}</div>
+      <div class="col-12"><label class="form-label">{{ form.texto_email.label }}</label>{{ form.texto_email }}<div class="form-text">{{ form.texto_email.help_text }}</div></div>
+      <div class="col-12"><label class="form-label">{{ form.texto_whatsapp.label }}</label>{{ form.texto_whatsapp }}</div>
+      <div class="col-12"><label class="d-flex gap-2 small">{{ form.activo }} Activo</label></div>
+    </div></div></div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card mb-3"><div class="card-header d-flex justify-content-between align-items-center">Campos del formulario
+      <div class="dropdown"><button type="button" class="btn btn-xs btn-primary dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-plus"></i> Agregar campo</button>
+        <ul class="dropdown-menu dropdown-menu-end" id="menuTipos"></ul></div></div>
+      <div class="card-body"><div id="campos"></div>
+        <div class="form-text">"Precargar con" completa el campo con el dato del lead: solo revisa y firma. La <b>Firma</b> se hace con el dedo (celular) o el mouse.
+          Los campos marcados como obligatorios no dejan enviar el formulario vacío.</div></div></div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-primary">Guardar</button>
+      <button class="btn btn-outline-secondary" name="preview" value="1">Guardar y seguir editando</button>
+      {% if obj %}<button name="eliminar" value="1" class="btn btn-outline-danger ms-auto" onclick="return confirm('¿Eliminar? Si ya se usó, queda desactivado.')">Eliminar</button>{% endif %}
+    </div>
+  </div>
+</div>
+</form>
+<script>
+(function () {
+  const TIPOS = {{ tipos_json|safe }}, PRELLENAR = {{ prellenar_json|safe }};
+  let campos = {{ campos_json|safe }};
+  const NOMBRE = Object.fromEntries(TIPOS);
+  const SIN_DATO = ['firma', 'acepto', 'titulo'];
+  const caja = document.getElementById('campos');
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+  let sec = campos.reduce((m, c) => Math.max(m, parseInt(String(c.id).replace(/\D/g, '')) || 0), 0);
+
+  function pintar() {
+    caja.innerHTML = '';
+    if (!campos.length) caja.innerHTML = '<div class="muted small py-3 text-center">Sin campos. Agregá al menos una Firma.</div>';
+    campos.forEach((c, i) => {
+      const fila = document.createElement('div');
+      fila.className = 'campo-fila' + (c.tipo === 'firma' ? ' tipo-firma' : '');
+      const pre = SIN_DATO.includes(c.tipo) ? '' : `<div class="col-md-6"><select class="form-select form-select-sm" data-k="prellenar">
+          <option value="">Precargar con… (nada)</option>${PRELLENAR.map(([v, l]) => `<option value="${esc(v)}" ${c.prellenar === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>`;
+      fila.innerHTML = `<div class="d-flex justify-content-between align-items-center mb-1">
+          <span class="small muted"><b>${esc(NOMBRE[c.tipo] || c.tipo)}</b></span>
+          <span><i class="bi bi-arrow-up mover me-2" data-m="-1" title="Subir"></i><i class="bi bi-arrow-down mover me-2" data-m="1" title="Bajar"></i>
+          <i class="bi bi-x-lg text-danger mover" data-q="1" title="Quitar"></i></span></div>
+        <div class="row g-1">
+          <div class="col-md-${c.tipo === 'titulo' ? 12 : 8}"><input class="form-control form-control-sm" data-k="etiqueta" placeholder="${c.tipo === 'titulo' ? 'Subtítulo' : 'Pregunta / etiqueta'}" value="${esc(c.etiqueta)}"></div>
+          ${c.tipo === 'titulo' ? '' : `<div class="col-md-4 d-flex align-items-center"><label class="small d-flex gap-1"><input type="checkbox" class="form-check-input" data-k="requerido" ${c.requerido || ['firma', 'acepto'].includes(c.tipo) ? 'checked' : ''} ${['firma', 'acepto'].includes(c.tipo) ? 'disabled' : ''}> Obligatorio</label></div>`}
+          ${c.tipo === 'lista' ? `<div class="col-12"><input class="form-control form-control-sm" data-k="opciones" placeholder="Opciones separadas por coma" value="${esc((c.opciones || []).join(', '))}"></div>` : ''}
+          <div class="col-md-6"><input class="form-control form-control-sm" data-k="ayuda" placeholder="${c.tipo === 'titulo' ? 'Texto (opcional)' : 'Ayuda (opcional)'}" value="${esc(c.ayuda)}"></div>
+          ${pre}
+        </div>`;
+      fila.querySelectorAll('[data-k]').forEach(el => el.addEventListener(el.type === 'checkbox' || el.tagName === 'SELECT' ? 'change' : 'input', () => {
+        const k = el.dataset.k;
+        c[k] = el.type === 'checkbox' ? el.checked : k === 'opciones' ? el.value.split(',').map(s => s.trim()).filter(Boolean) : el.value;
+      }));
+      fila.querySelectorAll('[data-m]').forEach(b => b.addEventListener('click', () => {
+        const j = i + parseInt(b.dataset.m);
+        if (j < 0 || j >= campos.length) return;
+        [campos[i], campos[j]] = [campos[j], campos[i]]; pintar();
+      }));
+      fila.querySelector('[data-q]').addEventListener('click', () => { campos.splice(i, 1); pintar(); });
+      caja.appendChild(fila);
+    });
+  }
+  const menu = document.getElementById('menuTipos');
+  TIPOS.forEach(([t, l]) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<a class="dropdown-item" href="#">${esc(l)}</a>`;
+    li.firstChild.addEventListener('click', e => {
+      e.preventDefault();
+      campos.push({id: 'c' + (++sec), tipo: t, etiqueta: t === 'firma' ? 'Firma' : t === 'acepto' ? 'Acepto los términos' : '',
+                   requerido: ['firma', 'acepto'].includes(t), opciones: [], ayuda: '', prellenar: ''});
+      pintar();
+      const ult = caja.lastElementChild && caja.lastElementChild.querySelector('[data-k="etiqueta"]');
+      if (ult) ult.focus();
+    });
+    menu.appendChild(li);
+  });
+  document.getElementById('formFirma').addEventListener('submit', () => {
+    document.getElementById('camposJson').value = JSON.stringify(campos);
+  });
+  pintar();
+})();
+</script>
+{% endblock %}

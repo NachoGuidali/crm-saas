@@ -1,0 +1,141 @@
+{% load crm_extras %}<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{{ snap.titulo|default:"Formulario" }}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <style>
+    :root { --fondo: {{ snap.color_fondo|default:"#F1F5F9" }}; --principal: {{ snap.color_principal|default:"#2563EB" }}; }
+    body { background: var(--fondo); color: #1e293b; min-height: 100vh; }
+    .hoja { max-width: 680px; margin: 0 auto; padding: 16px; }
+    .card { border: 0; border-radius: 14px; box-shadow: 0 6px 24px rgba(15, 23, 42, .08); }
+    .logo { max-height: 64px; max-width: 220px; object-fit: contain; }
+    h1 { font-size: 1.35rem; font-weight: 700; color: var(--principal); }
+    .documento { white-space: pre-wrap; font-size: .95rem; line-height: 1.55; background: #f8fafc; border-radius: 10px; padding: 14px; max-height: 50vh; overflow-y: auto; }
+    .btn-principal { background: var(--principal); border-color: var(--principal); color: #fff; }
+    .btn-principal:hover, .btn-principal:focus { filter: brightness(.92); color: #fff; background: var(--principal); }
+    .pad-wrap { position: relative; border: 2px dashed #cbd5e1; border-radius: 10px; background: #fff; touch-action: none; }
+    .pad-wrap.error { border-color: #dc3545; }
+    .pad-wrap canvas { width: 100%; height: 190px; display: block; cursor: crosshair; }
+    .pad-hint { position: absolute; inset: auto 0 10px 0; text-align: center; color: #94a3b8; font-size: .85rem; pointer-events: none; }
+    .pad-linea { position: absolute; left: 8%; right: 8%; bottom: 34px; border-bottom: 1px solid #cbd5e1; pointer-events: none; }
+    .form-label { font-weight: 600; font-size: .92rem; }
+    .pie { font-size: .78rem; color: #64748b; }
+  </style>
+</head>
+<body>
+<div class="hoja">
+  <div class="card"><div class="card-body p-3 p-sm-4">
+    {% if snap.logo %}<div class="mb-3"><img src="/media/{{ snap.logo }}" alt="" class="logo"></div>{% endif %}
+    <h1 class="mb-3">{{ snap.titulo }}</h1>
+
+    {% if vista_previa %}<div class="alert alert-warning py-2 small">Vista previa con datos vacíos: así lo ve el lead. Desde acá no se puede enviar.</div>{% endif %}
+
+    {% if sol and sol.estado == 'firmada' %}
+      <div class="text-center py-4">
+        <div style="font-size:3rem">✅</div>
+        <p class="fs-5 mt-2">{{ snap.texto_final }}</p>
+        <p class="small text-secondary">Firmado el {{ sol.firmada_at|date:"d/m/Y \a \l\a\s H:i" }}.{% if sol.formulario.enviar_copia and sol.contacto.email %} También te mandamos una copia por email.{% endif %}</p>
+        <a href="{% url 'firmas_publico:pdf' sol.token %}" class="btn btn-principal btn-lg mt-2">Descargar PDF firmado</a>
+      </div>
+    {% elif sol and not sol.firmable %}
+      <div class="text-center py-4">
+        <div style="font-size:3rem">⏳</div>
+        <p class="fs-5 mt-2">{% if sol.estado == 'anulada' %}Este link fue anulado.{% else %}Este link venció.{% endif %}</p>
+        <p class="text-secondary">Pedile a tu asesor que te mande uno nuevo.</p>
+      </div>
+    {% else %}
+      {% if snap.documento %}<div class="documento mb-4">{{ snap.documento }}</div>{% endif %}
+      {% if errores %}<div class="alert alert-danger py-2">{% if errores|get_item:'_' %}{{ errores|get_item:'_' }}{% else %}Revisá los datos marcados en rojo.{% endif %}</div>{% endif %}
+      <form method="post" id="formLead" novalidate>{% csrf_token %}
+        {% for c in snap.campos %}{% with clave='f_'|add:c.id err=errores|get_item:c.id %}
+        {% if c.tipo == 'titulo' %}
+          <h2 class="h6 fw-bold mt-4 mb-1">{{ c.etiqueta }}</h2>{% if c.ayuda %}<p class="small text-secondary">{{ c.ayuda }}</p>{% endif %}
+        {% elif c.tipo == 'firma' %}
+          <div class="mb-3">
+            <label class="form-label">{{ c.etiqueta }} <span class="text-danger">*</span></label>
+            <div class="pad-wrap {% if err %}error{% endif %}" data-firma="{{ clave }}"><canvas></canvas><div class="pad-linea"></div><div class="pad-hint">Firmá acá con el dedo o el mouse</div></div>
+            <input type="hidden" name="{{ clave }}">
+            <div class="d-flex justify-content-between mt-1"><span class="small text-danger">{{ err|default:"" }}</span>
+              <button type="button" class="btn btn-sm btn-link text-secondary p-0 borrar-firma">Borrar y volver a firmar</button></div>
+          </div>
+        {% elif c.tipo == 'acepto' %}
+          <div class="form-check mb-3 mt-2">
+            <input class="form-check-input {% if err %}is-invalid{% endif %}" type="checkbox" name="{{ clave }}" value="1" id="{{ clave }}" {% if datos|get_item:clave %}checked{% endif %}>
+            <label class="form-check-label" for="{{ clave }}">{{ c.etiqueta }}</label>
+            {% if err %}<div class="invalid-feedback d-block">{{ err }}</div>{% endif %}
+          </div>
+        {% else %}
+          <div class="mb-3">
+            <label class="form-label" for="{{ clave }}">{{ c.etiqueta }}{% if c.requerido %} <span class="text-danger">*</span>{% endif %}</label>
+            {% with v=datos|get_item:clave %}
+            {% if c.tipo == 'texto_largo' %}<textarea class="form-control {% if err %}is-invalid{% endif %}" name="{{ clave }}" id="{{ clave }}" rows="3">{{ v|default:"" }}</textarea>
+            {% elif c.tipo == 'lista' %}<select class="form-select {% if err %}is-invalid{% endif %}" name="{{ clave }}" id="{{ clave }}"><option value="">Elegí…</option>{% for o in c.opciones %}<option {% if v == o %}selected{% endif %}>{{ o }}</option>{% endfor %}</select>
+            {% elif c.tipo == 'sino' %}{% with vs=v|stringformat:"s"|lower %}<div>
+              <div class="form-check form-check-inline"><input class="form-check-input" type="radio" name="{{ clave }}" id="{{ clave }}_si" value="true" {% if vs == 'true' %}checked{% endif %}><label class="form-check-label" for="{{ clave }}_si">Sí</label></div>
+              <div class="form-check form-check-inline"><input class="form-check-input" type="radio" name="{{ clave }}" id="{{ clave }}_no" value="false" {% if vs == 'false' %}checked{% endif %}><label class="form-check-label" for="{{ clave }}_no">No</label></div>
+            </div>{% endwith %}
+            {% else %}<input class="form-control {% if err %}is-invalid{% endif %}" name="{{ clave }}" id="{{ clave }}" value="{{ v|default:"" }}"
+              type="{% if c.tipo == 'numero' %}text{% elif c.tipo == 'fecha' %}date{% elif c.tipo == 'email' %}email{% elif c.tipo == 'telefono' %}tel{% else %}text{% endif %}"
+              {% if c.tipo == 'numero' %}inputmode="decimal"{% endif %} autocomplete="off">{% endif %}
+            {% endwith %}
+            {% if err %}<div class="invalid-feedback d-block">{{ err }}</div>{% elif c.ayuda %}<div class="form-text">{{ c.ayuda }}</div>{% endif %}
+          </div>
+        {% endif %}
+        {% endwith %}{% endfor %}
+        <button class="btn btn-principal btn-lg w-100 mt-2" {% if vista_previa %}disabled{% endif %} id="btnEnviar">Firmar y enviar</button>
+        <p class="pie mt-3 mb-0">Al enviar, tu firma electrónica queda registrada junto con la fecha y hora, tu IP y el dispositivo,
+          y se genera un PDF con una huella digital del contenido para que no pueda modificarse.</p>
+      </form>
+    {% endif %}
+  </div></div>
+</div>
+<script>
+(function () {
+  document.querySelectorAll('.pad-wrap').forEach(wrap => {
+    const canvas = wrap.querySelector('canvas'), ctx = canvas.getContext('2d');
+    const input = wrap.parentElement.querySelector('input[type=hidden]');
+    const hint = wrap.querySelector('.pad-hint');
+    let dibujando = false, trazos = 0, ultimo = null;
+    function ajustar() {
+      const r = canvas.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+      const img = trazos ? canvas.toDataURL() : null;
+      canvas.width = r.width * dpr; canvas.height = r.height * dpr;
+      ctx.scale(dpr, dpr); ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#0f172a';
+      if (img) { const i = new Image(); i.onload = () => ctx.drawImage(i, 0, 0, r.width, r.height); i.src = img; }
+    }
+    const punto = e => { const r = canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+    canvas.addEventListener('pointerdown', e => {
+      e.preventDefault(); canvas.setPointerCapture(e.pointerId); dibujando = true; ultimo = punto(e);
+      ctx.beginPath(); ctx.arc(ultimo[0], ultimo[1], 1, 0, Math.PI * 2); ctx.fill(); hint.style.display = 'none';
+    });
+    canvas.addEventListener('pointermove', e => {
+      if (!dibujando) return; e.preventDefault();
+      const p = punto(e); ctx.beginPath(); ctx.moveTo(ultimo[0], ultimo[1]); ctx.lineTo(p[0], p[1]); ctx.stroke(); ultimo = p; trazos++;
+    });
+    const fin = () => { if (dibujando) { dibujando = false; wrap.classList.remove('error'); } };
+    canvas.addEventListener('pointerup', fin); canvas.addEventListener('pointercancel', fin); canvas.addEventListener('pointerleave', fin);
+    wrap.parentElement.querySelector('.borrar-firma').addEventListener('click', () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height); trazos = 0; hint.style.display = '';
+    });
+    wrap._valor = () => trazos > 3 ? canvas.toDataURL('image/png') : '';
+    wrap._input = input;
+    window.addEventListener('resize', ajustar); ajustar();
+  });
+  const form = document.getElementById('formLead');
+  if (!form) return;
+  form.addEventListener('submit', e => {
+    let falta = false;
+    document.querySelectorAll('.pad-wrap').forEach(w => {
+      w._input.value = w._valor();
+      if (!w._input.value) { w.classList.add('error'); falta = true; }
+    });
+    if (falta) { e.preventDefault(); document.querySelector('.pad-wrap.error').scrollIntoView({behavior: 'smooth', block: 'center'}); return; }
+    const b = document.getElementById('btnEnviar'); b.disabled = true; b.textContent = 'Enviando…';
+  });
+})();
+</script>
+</body>
+</html>
