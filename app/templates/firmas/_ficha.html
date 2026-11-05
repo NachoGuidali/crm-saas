@@ -6,9 +6,15 @@
     {% if formularios_firma %}
     <form method="post" action="{% url 'firmas:enviar' op.pk %}" class="collapse mb-3" id="nuevaFirma">{% csrf_token %}
       <select name="formulario" class="form-select form-select-sm mb-2" required>{% for f in formularios_firma %}<option value="{{ f.pk }}">{{ f.nombre }}</option>{% endfor %}</select>
-      <div class="d-flex flex-wrap gap-3 mb-2">
-        <label class="d-flex gap-1"><input type="checkbox" class="form-check-input" name="canal" value="email" {% if contacto.email %}checked{% else %}disabled{% endif %}> Email{% if not contacto.email %} <span class="muted">(sin email)</span>{% endif %}</label>
-        <label class="d-flex gap-1"><input type="checkbox" class="form-check-input" name="canal" value="whatsapp" {% if contacto.puede_recibir_mensajes %}checked{% else %}disabled{% endif %}> WhatsApp</label>
+      <div class="mb-2">
+        <div class="form-check">
+          <input type="checkbox" class="form-check-input" name="canal" value="email" id="firmaCanalEmail" {% if contacto.email %}checked{% else %}disabled{% endif %}>
+          <label class="form-check-label" for="firmaCanalEmail">Email{% if contacto.email %} <span class="muted">({{ contacto.email }})</span>{% else %} <span class="text-danger">— el contacto no tiene email</span>{% endif %}</label>
+        </div>
+        <div class="form-check">
+          <input type="checkbox" class="form-check-input" name="canal" value="whatsapp" id="firmaCanalWa" {% if contacto.puede_recibir_mensajes %}checked{% else %}disabled{% endif %}>
+          <label class="form-check-label" for="firmaCanalWa">WhatsApp{% if contacto.puede_recibir_mensajes %} <span class="muted">({{ contacto.telefono }})</span>{% elif not contacto.telefono %} <span class="text-danger">— el contacto no tiene teléfono</span>{% elif contacto.no_contactar %} <span class="text-danger">— marcado "no contactar"</span>{% else %} <span class="text-danger">— teléfono marcado como inválido</span>{% endif %}</label>
+        </div>
       </div>
       <button class="btn btn-primary btn-sm">Enviar</button>
       <div class="form-text">Sin tildar nada solo se genera el link, para copiarlo y mandarlo por donde quieras.</div>
