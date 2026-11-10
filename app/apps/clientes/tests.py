@@ -454,3 +454,43 @@ class PanelUsuariosDelClienteTests(BaseMultiCliente):
         self.assertFalse(User.objects.filter(username='laura').exists())
         resp = self.pedir(self.panel, 'post', self.url, PLATAFORMA, data={**datos, 'usr-username': 'ADMIN'})
         self.assertContains(resp, 'Ya existe un usuario')
+
+
+class VaciarClienteTests(BaseMultiCliente):
+    """`vaciar_cliente` deja un cliente en 0 sin tocar su configuración ni a los demás clientes."""
+
+    def _datos(self):
+        from apps.crm.services import ingresar_prospecto
+        from apps.crm.models import Embudo, Oportunidad
+        from apps.whatsapp.models import Conversacion, Mensaje
+        from django.core.management import call_command
+        call_command('setup_inicial', '--sin-admin', verbosity=0)
+        op = ingresar_prospecto({'telefono': '1144445555', 'nombre': 'Rita'}, Embudo.objects.first(), 'web').oportunidad
+        linea = LineaWhatsApp.objects.create(nombre='Demo', proveedor='demo')
+        conv = Conversacion.objects.create(linea=linea, telefono='5491144445555', contacto=op.contacto)
+        Mensaje.objects.create(conversacion=conv, direccion='in', contenido='hola')
+        return Oportunidad
+
+    def test_vaciar_solo_ese_cliente_y_conservar_configuracion(self):
+        from io import StringIO
+        from django.core.management import call_command
+        from apps.crm.models import Embudo, Oportunidad
+        from apps.whatsapp.models import Conversacion
+        self._datos()
+        with schema_context(SCHEMA_OTRO):
+            self._datos()
+        # Sin --confirmar no borra nada
+        out = StringIO()
+        call_command('vaciar_cliente', 'otro', stdout=out)
+        self.assertIn('No se borró nada', out.getvalue())
+        with schema_context(SCHEMA_OTRO):
+            self.assertEqual(Oportunidad.objects.count(), 1)
+        call_command('vaciar_cliente', SCHEMA_OTRO, '--confirmar', stdout=StringIO())
+        with schema_context(SCHEMA_OTRO):
+            self.assertEqual((Oportunidad.objects.count(), Contacto.objects.count(), Conversacion.objects.count(),
+                              LineaWhatsApp.objects.count()), (0, 0, 0, 0))
+            self.assertTrue(Embudo.objects.exists())
+            self.assertTrue(User.objects.filter(username='admin').exists())
+        connection.set_tenant(self.cliente)
+        # El otro cliente no se tocó
+        self.assertEqual((Oportunidad.objects.count(), LineaWhatsApp.objects.count()), (1, 1))
