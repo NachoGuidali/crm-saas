@@ -1,6 +1,8 @@
 name: crm-saas
 
 x-app: &app
+  # Una sola imagen para web, workers y beat (antes se armaba una copia por servicio: 4x disco en cada build).
+  image: crm-saas-app:latest
   build: ./app
   restart: unless-stopped
   env_file: .env
