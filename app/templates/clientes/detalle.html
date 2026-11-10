@@ -70,6 +70,51 @@
   </div></div>
 </div>
 
+<h2 class="h5 mt-4 mb-3 d-flex align-items-center"><span class="me-auto"><i class="bi bi-people"></i> Usuarios del CRM</span>
+  <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#altaUsuario"><i class="bi bi-person-plus"></i> Nuevo usuario</button></h2>
+{% if not cliente.tiene_acceso %}<div class="alert alert-danger py-2 small">El cliente está <b>{{ cliente.get_estado_display|lower }}</b>: ningún usuario puede ingresar hasta reactivarlo.</div>{% endif %}
+<div class="collapse {% if abrir_alta %}show{% endif %}" id="altaUsuario"><div class="card card-body mb-3">
+  <form method="post" novalidate>{% csrf_token %}<input type="hidden" name="accion" value="usuario_nuevo">
+    <div class="row">
+      <div class="col-md-4">{% include "clientes/_campo.html" with f=form_usuario.first_name %}</div>
+      <div class="col-md-4">{% include "clientes/_campo.html" with f=form_usuario.email %}</div>
+      <div class="col-md-4">{% include "clientes/_campo.html" with f=form_usuario.username %}</div>
+      <div class="col-md-4">{% include "clientes/_campo.html" with f=form_usuario.rol %}</div>
+      <div class="col-md-8">{% include "clientes/_campo.html" with f=form_usuario.password %}</div>
+    </div>
+    <button class="btn btn-primary btn-sm">Crear usuario</button>
+  </form>
+</div></div>
+<div class="card"><div class="table-responsive"><table class="table table-sm align-middle mb-0 small">
+  <thead><tr><th>Usuario</th><th>Nombre</th><th>Email</th><th>Rol</th><th>Último ingreso</th><th>Estado</th><th class="text-end">Acceso</th></tr></thead>
+  <tbody>
+  {% for u in usuarios %}
+    <tr class="{% if not u.is_active %}text-secondary{% endif %}">
+      <td><code>{{ u.username }}</code></td>
+      <td>{{ u.get_full_name|default:"—" }}</td>
+      <td>{{ u.email|default:"—" }}</td>
+      <td>{{ u.get_rol_display }}</td>
+      <td>{{ u.last_login|date:"d/m/Y H:i"|default:"nunca" }}</td>
+      <td>{% if not u.is_active %}<span class="badge text-bg-secondary">Inactivo</span>{% elif u.debe_cambiar_password %}<span class="badge text-bg-warning">Clave temporal</span>{% else %}<span class="badge text-bg-success">Activo</span>{% endif %}</td>
+      <td class="text-end text-nowrap"><form method="post" class="d-inline">{% csrf_token %}<input type="hidden" name="usuario" value="{{ u.pk }}">
+        <button name="accion" value="usuario_temporal" class="btn btn-outline-primary btn-sm" title="Genera una contraseña nueva que se le pide cambiar al ingresar"
+          onclick="return confirm('¿Generar una contraseña temporal para {{ u.username|escapejs }}? La actual deja de funcionar.')"><i class="bi bi-key"></i> Clave temporal</button>
+        <button name="accion" value="usuario_desbloquear" class="btn btn-outline-secondary btn-sm" title="Borra los intentos fallidos (bloqueo por {{ u.username }})"><i class="bi bi-unlock"></i></button>
+        {% if not u.is_active %}<button name="accion" value="usuario_activar" class="btn btn-outline-success btn-sm">Activar</button>{% endif %}
+      </form></td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="7" class="text-center text-secondary py-3">Este cliente no tiene usuarios. Creá uno con "Nuevo usuario".</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div></div>
+{% if fallidos %}
+<details class="small mt-2"><summary class="text-secondary">Últimos ingresos fallidos ({{ fallidos|length }})</summary>
+  <ul class="mb-0 mt-1">{% for f in fallidos %}<li>{{ f.created_at|date:"d/m H:i" }} · usuario tipeado <code>{{ f.usuario_desc }}</code>{% if f.ip %} · IP {{ f.ip }}{% endif %}</li>{% endfor %}</ul>
+</details>
+{% endif %}
+<div class="form-text">La contraseña temporal se muestra una sola vez arriba de todo. Si tipeó mal muchas veces, queda bloqueado {{ bloqueo_min }} minutos: el candado lo destraba.</div>
+
 <h2 class="h5 mt-4 mb-3">Pagos</h2>
 <div class="row g-4">
   <div class="col-md-5"><div class="card card-body">

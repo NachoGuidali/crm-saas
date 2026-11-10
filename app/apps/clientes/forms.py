@@ -96,3 +96,22 @@ class PlanForm(_Bootstrap, forms.ModelForm):
 
 class IngresarForm(_Bootstrap, forms.Form):
     empresa = forms.CharField(label='Subdominio de tu empresa', max_length=40)
+
+
+class UsuarioClienteForm(_Bootstrap, forms.Form):
+    """Alta de un usuario dentro del CRM de un cliente, desde el panel (ej. el cliente quedó sin acceso)."""
+    first_name = forms.CharField(label='Nombre', max_length=150)
+    email = forms.EmailField(label='Email', required=False)
+    username = forms.CharField(label='Usuario', max_length=150)
+    rol = forms.ChoiceField(label='Rol')
+    password = forms.CharField(label='Contraseña', required=False, widget=forms.PasswordInput(render_value=False),
+                               help_text='Vacía = se genera una temporal que se le pide cambiar al ingresar.')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from apps.users.models import User
+        self.fields['rol'].choices = User.ROL_CHOICES
+        self.fields['rol'].initial = User.ROL_ADMIN
+
+    def clean_username(self):
+        return self.cleaned_data['username'].strip()

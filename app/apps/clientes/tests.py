@@ -397,3 +397,60 @@ class AuditoriaYSeguridadTests(BaseMultiCliente):
         self.assertContains(ultima, 'Demasiados intentos', status_code=200)  # A2: queda bloqueado
         with schema_context(get_public_schema_name()):
             self.assertTrue(RegistroAuditoria.objects.filter(accion='login_fallido').exists())
+
+
+class PanelUsuariosDelClienteTests(BaseMultiCliente):
+    """Desde el panel se destraba el acceso de un cliente: clave temporal, desbloqueo, activar y alta."""
+
+    def setUp(self):
+        super().setUp()
+        with schema_context(get_public_schema_name()):
+            self.super = User.objects.create_superuser('plataforma', 'p@p.com', 'clave-plataforma-1')
+            self.panel = Client()
+            self.panel.force_login(self.super)
+        self.url = f'/panel/clientes/{self.otro.pk}/'
+
+    def _login_otro(self, password):
+        return self.pedir(Client(), 'post', '/usuarios/login/', OTRO,
+                          data={'username': 'admin', 'password': password})
+
+    def test_lista_usuarios_y_clave_temporal_destraba_un_bloqueo(self):
+        from django.conf import settings
+        resp = self.pedir(self.panel, 'get', self.url, PLATAFORMA)
+        self.assertContains(resp, 'a@otro.com')
+        self.assertNotContains(resp, 'a@test.com')  # solo los usuarios de ese cliente
+        for _ in range(settings.LOGIN_MAX_INTENTOS):
+            self._login_otro('mal')
+        self.assertContains(self._login_otro('clave-del-otro-1'), 'Demasiados intentos')
+        # Candado: desbloquea sin tocar la contraseña
+        self.pedir(self.panel, 'post', self.url, PLATAFORMA,
+                   data={'accion': 'usuario_desbloquear', 'usuario': self.admin_otro.pk})
+        self.assertEqual(self._login_otro('clave-del-otro-1').status_code, 302)
+        # Clave temporal: reemplaza la anterior y se muestra una vez
+        with schema_context(SCHEMA_OTRO):
+            User.objects.filter(pk=self.admin_otro.pk).update(is_active=False)
+        resp = self.pedir(self.panel, 'post', self.url, PLATAFORMA, follow=True,
+                          data={'accion': 'usuario_temporal', 'usuario': self.admin_otro.pk})
+        temporal = resp.context['credenciales']['password']
+        self.assertContains(resp, temporal)
+        self.assertEqual(self._login_otro('clave-del-otro-1').status_code, 200)
+        self.assertEqual(self._login_otro(temporal).status_code, 302)
+        with schema_context(SCHEMA_OTRO):
+            u = User.objects.get(pk=self.admin_otro.pk)
+            self.assertTrue(u.is_active and u.debe_cambiar_password)
+        # El usuario de igual nombre del otro cliente no se tocó
+        self.admin.refresh_from_db()
+        self.assertTrue(self.admin.check_password('clave-del-cliente-1'))
+
+    def test_alta_de_usuario_desde_el_panel(self):
+        datos = {'accion': 'usuario_nuevo', 'usr-first_name': 'Laura', 'usr-email': 'l@otro.com',
+                 'usr-username': 'laura', 'usr-rol': User.ROL_ADMIN, 'usr-password': ''}
+        resp = self.pedir(self.panel, 'post', self.url, PLATAFORMA, data=datos, follow=True)
+        self.assertEqual(resp.context['credenciales']['usuario'], 'laura')
+        self.assertContains(resp, resp.context['credenciales']['password'])
+        with schema_context(SCHEMA_OTRO):
+            u = User.objects.get(username='laura')
+            self.assertEqual((u.rol, u.debe_cambiar_password), (User.ROL_ADMIN, True))
+        self.assertFalse(User.objects.filter(username='laura').exists())
+        resp = self.pedir(self.panel, 'post', self.url, PLATAFORMA, data={**datos, 'usr-username': 'ADMIN'})
+        self.assertContains(resp, 'Ya existe un usuario')

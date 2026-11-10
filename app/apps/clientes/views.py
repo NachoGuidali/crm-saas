@@ -28,7 +28,7 @@ from core.auditoria import auditar
 from core.tenancy import dominio_para
 
 from . import cobros, mercadopago, services
-from .forms import ClienteForm, IngresarForm, LinkPagoMPForm, NuevoClienteForm, PagoForm, PlanForm, SuscripcionMPForm
+from .forms import ClienteForm, IngresarForm, LinkPagoMPForm, NuevoClienteForm, PagoForm, PlanForm, SuscripcionMPForm, UsuarioClienteForm
 from apps.users.models import RegistroAuditoria
 from .models import Cliente, Dominio, Pago, Plan
 
@@ -233,6 +233,8 @@ class ClienteDetalleView(PanelMixin, View):
             return volver
         if accion.startswith('mp_'):
             return self._accion_mp(request, cliente, accion) or volver
+        if accion.startswith('usuario_'):
+            return self._accion_usuario(request, cliente, accion) or volver
         form = ClienteForm(request.POST, instance=cliente)
         if not form.is_valid():
             return self._render(request, cliente, form)
@@ -264,8 +266,70 @@ class ClienteDetalleView(PanelMixin, View):
             messages.error(request, str(e))
         return None
 
-    def _render(self, request, cliente, form=None, form_pago=None, form_mp=None, form_link=None):
+    def _accion_usuario(self, request, cliente, accion):
+        """Acceso de los usuarios del CRM del cliente: contraseña temporal, desbloqueo, activar y alta."""
+        import secrets
+        from apps.users.models import User
+        from apps.users.services import desbloquear_login
+        if accion == 'usuario_nuevo':
+            form_usuario = UsuarioClienteForm(request.POST, prefix='usr')
+            if not form_usuario.is_valid():
+                return self._render(request, cliente, form_usuario=form_usuario)
+            d = form_usuario.cleaned_data
+            with tenant_context(cliente):
+                if User.objects.filter(username__iexact=d['username']).exists():
+                    form_usuario.add_error('username', 'Ya existe un usuario con ese nombre en este cliente.')
+                    return self._render(request, cliente, form_usuario=form_usuario)
+                password = d['password'] or secrets.token_urlsafe(9)
+                User.objects.create_user(username=d['username'], email=d['email'], password=password,
+                                         first_name=d['first_name'], rol=d['rol'],
+                                         debe_cambiar_password=not d['password'])
+            auditar(RegistroAuditoria.USUARIO_ALTA, request=request, objeto=f'{cliente.nombre}: {d["username"]}',
+                    detalle='desde el panel de plataforma')
+            request.session['panel_credenciales'] = {'usuario': d['username'], 'password': password,
+                                                     'temporal': not d['password']}
+            messages.success(request, f'Usuario "{d["username"]}" creado.')
+            return None
+        with tenant_context(cliente):
+            user = get_object_or_404(User, pk=request.POST.get('usuario'))
+            if accion == 'usuario_temporal':
+                password = secrets.token_urlsafe(9)
+                user.set_password(password)
+                user.debe_cambiar_password = True
+                user.is_active = True
+                user.save(update_fields=['password', 'debe_cambiar_password', 'is_active'])
+                desbloquear_login(user.username)
+                request.session['panel_credenciales'] = {'usuario': user.username, 'password': password,
+                                                         'temporal': True}
+                detalle, texto = 'contraseña temporal', f'Contraseña temporal generada para "{user.username}".'
+            elif accion == 'usuario_desbloquear':
+                desbloquear_login(user.username)
+                detalle, texto = 'desbloqueo de login', f'"{user.username}" desbloqueado: ya puede volver a intentar.'
+            elif accion == 'usuario_activar':
+                user.is_active = True
+                user.save(update_fields=['is_active'])
+                desbloquear_login(user.username)
+                detalle, texto = 'reactivado', f'"{user.username}" está activo de nuevo.'
+            else:
+                return None
+        auditar(RegistroAuditoria.USUARIO_CAMBIO, request=request, objeto=f'{cliente.nombre}: {user.username}',
+                detalle=f'{detalle} (panel de plataforma)')
+        messages.success(request, texto)
+        return None
+
+    def _usuarios(self, cliente):
+        from apps.users.models import RegistroAuditoria as RA, User
+        try:
+            with tenant_context(cliente):
+                usuarios = list(User.objects.order_by('-is_active', 'username'))
+                fallidos = list(RA.objects.filter(accion=RA.LOGIN_FALLIDO).order_by('-created_at')[:8])
+            return usuarios, fallidos
+        except Exception:  # schema roto o a medio crear
+            return [], []
+
+    def _render(self, request, cliente, form=None, form_pago=None, form_mp=None, form_link=None, form_usuario=None):
         dominio = cliente.dominio_principal
+        usuarios, fallidos = self._usuarios(cliente)
         return render(request, 'clientes/detalle.html', {
             'cliente': cliente, 'form': form or ClienteForm(instance=cliente), 'dominio': dominio,
             'url': _url_cliente(request, dominio) if dominio else '', 'uso': _uso(cliente),
@@ -281,6 +345,9 @@ class ClienteDetalleView(PanelMixin, View):
             'link_mp': request.session.pop('panel_link_mp', None),
             'estado_mp': ESTADOS_MP.get(cliente.mp_suscripcion_estado, cliente.mp_suscripcion_estado),
             'moneda': settings.SAAS_MONEDA, 'dias_gracia': settings.SAAS_DIAS_GRACIA,
+            'usuarios': usuarios, 'fallidos': fallidos, 'bloqueo_min': settings.LOGIN_BLOQUEO_MINUTOS,
+            'form_usuario': form_usuario or UsuarioClienteForm(prefix='usr'),
+            'abrir_alta': form_usuario is not None,
         })
 
 

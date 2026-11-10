@@ -63,7 +63,15 @@ def supervisores_de(embudo=None):
 # ── Bloqueo de login por intentos fallidos ──────────────────────────────────
 
 def _clave_intentos(username, ip):
-    return f'login_fail_{(username or "").lower()}_{ip}'
+    # La "versión" por usuario permite desbloquearlo desde cualquier IP sin recorrer el cache (ver desbloquear_login).
+    u = (username or '').lower()
+    return f'login_fail_{u}_{cache.get(f"login_ver_{u}", 0)}_{ip}'
+
+
+def desbloquear_login(username):
+    """Borra los intentos fallidos de este usuario desde todas las IPs (del cliente actual)."""
+    import time
+    cache.set(f'login_ver_{(username or "").lower()}', time.time_ns(), None)
 
 
 def login_bloqueado(username, ip) -> bool:
