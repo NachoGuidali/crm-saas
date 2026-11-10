@@ -108,8 +108,28 @@
       const d = await CRM.api(`/whatsapp/conversacion/${panel.dataset.conv}/mensajes/?despues=${ultimo}&leer=1`, {silencioso: true});
       if (d.html.trim()) { msgs.insertAdjacentHTML('beforeend', d.html); ultimo = d.ultimo; bajar(); }
       Object.entries(d.estados || {}).forEach(([id, st]) => { const el = msgs.querySelector(`[data-id="${id}"] .st`); if (el) el.dataset.st = st, el.className = 'st bi ' + ({read: 'bi-check2-all leido', delivered: 'bi-check2-all', sent: 'bi-check2', failed: 'bi-exclamation-circle text-danger'}[st] || 'bi-clock'); });
+      Object.entries(d.eliminados || {}).forEach(([id, html]) => reemplazar(id, html));
       document.getElementById('avisoVentana').style.display = d.ventana ? 'none' : '';
     } catch (e) {}
   }, 5000);
+
+  // Eliminar para todos (mensajes enviados, líneas por QR, últimas 48 h)
+  function reemplazar(id, html) {
+    const viejo = msgs.querySelector(`.burbuja[data-id="${id}"]`);
+    const tmp = document.createElement('div'); tmp.innerHTML = html;
+    const nuevo = tmp.querySelector('.burbuja');
+    if (viejo && nuevo && !viejo.classList.contains('eliminado')) viejo.replaceWith(nuevo);
+  }
+  msgs.addEventListener('click', async e => {
+    const b = e.target.closest('.eliminar-msg');
+    if (!b) return;
+    if (!confirm('¿Eliminar este mensaje para todos? Se borra del WhatsApp del contacto. En el CRM queda tachado.')) return;
+    b.disabled = true;
+    try {
+      const d = await CRM.api(`/whatsapp/mensaje/${b.dataset.msg}/eliminar/`, {data: new FormData()});
+      reemplazar(b.dataset.msg, d.html);
+      CRM.toast(d.mensaje);
+    } catch (err) { b.disabled = false; }
+  });
 })();
 </script>

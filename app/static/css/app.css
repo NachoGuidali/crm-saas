@@ -109,6 +109,13 @@
 .burbuja.in { align-self: flex-start; background: var(--bg3); border-top-left-radius: 3px; }
 .burbuja.out { align-self: flex-end; background: #11432f; border-top-right-radius: 3px; }
 .burbuja.out.auto { background: #1b2f55; }
+.burbuja.eliminado { text-decoration: line-through; color: rgba(255,255,255,.5); background: var(--bg3); border: 1px dashed rgba(255,255,255,.2); }
+.burbuja.eliminado .elim-aviso, .burbuja.eliminado .elim-quien, .burbuja.eliminado .pie { text-decoration: none; }
+.burbuja .elim-aviso { font-style: italic; color: rgba(255,255,255,.75); }
+.burbuja .elim-quien { font-size: 10.5px; color: rgba(255,255,255,.45); margin-bottom: 3px; }
+.burbuja .eliminar-msg { color: rgba(255,255,255,.45); opacity: 0; transition: opacity .15s; }
+.burbuja:hover .eliminar-msg, .burbuja .eliminar-msg:focus { opacity: 1; }
+@media (hover: none) { .burbuja .eliminar-msg { opacity: 1; } }
 .burbuja .pie { font-size: 10.5px; color: rgba(255,255,255,.45); text-align: right; margin-top: 2px; display: flex; gap: 5px; justify-content: flex-end; align-items: center; }
 .burbuja .pie .bi-check2-all.leido { color: #53bdeb; }
 .burbuja.fallido { outline: 1px solid var(--red); }

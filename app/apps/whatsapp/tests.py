@@ -364,3 +364,68 @@ class BotN8nTests(WhatsAppBase):
         conv.refresh_from_db()
         self.assertFalse(conv.bot_derivada)
         self.assertEqual(conv.agente_id, self.agente.pk)
+
+
+class EliminarParaTodosTests(WhatsAppBase):
+    def setUp(self):
+        super().setUp()
+        from apps.crm.services import ingresar_prospecto
+        self.op = ingresar_prospecto({'telefono': '1144445555', 'nombre': 'Rita'}, self.embudo, 'manual').oportunidad
+        self.conv = Conversacion.objects.create(linea=self.linea, telefono='5491144445555', contacto=self.op.contacto,
+                                                agente=self.agente)
+        self.msg = Mensaje.objects.create(conversacion=self.conv, direccion='out', contenido='Precio equivocado',
+                                          wa_id='3EB0ABC', status='delivered', enviado_por=self.agente)
+        self.cl = Client()
+        self.cl.force_login(self.agente)
+
+    def _resp(self, status=200, data=None):
+        r = mock.Mock(status_code=status, ok=status < 400, text=json.dumps(data or {}))
+        r.json.return_value = data or {}
+        return r
+
+    def test_elimina_en_evolution_con_la_clave_real_y_queda_tachado(self):
+        encontrado = {'messages': {'records': [{'key': {'id': '3EB0ABC', 'remoteJid': '123456@lid', 'fromMe': True}}]}}
+        with mock.patch('requests.request', side_effect=[self._resp(200, encontrado), self._resp(200)]) as req:
+            r = self.cl.post(f'/whatsapp/mensaje/{self.msg.pk}/eliminar/')
+        self.assertEqual(r.status_code, 200, r.content)
+        metodo, url = req.call_args_list[1].args[:2]
+        self.assertEqual(metodo, 'DELETE')
+        self.assertIn('/chat/deleteMessageForEveryone/ventas', url)
+        self.assertEqual(req.call_args_list[1].kwargs['json'],
+                         {'id': '3EB0ABC', 'remoteJid': '123456@lid', 'fromMe': True})
+        self.msg.refresh_from_db()
+        self.assertEqual(self.msg.eliminado_por, self.agente)
+        self.assertContains(r, 'Mensaje borrado')
+        self.assertTrue(self.op.contacto.actividades.filter(texto__contains='Precio equivocado').exists())
+        # El chat lo muestra tachado y sin botón de eliminar
+        r = self.cl.get(f'/whatsapp/conversacion/{self.conv.pk}/mensajes/')
+        self.assertIn('eliminado', r.json()['html'])
+        self.assertNotIn('eliminar-msg', r.json()['html'])
+
+    def test_rechazos(self):
+        # Entrantes no
+        entrante = Mensaje.objects.create(conversacion=self.conv, direccion='in', contenido='hola', wa_id='IN1')
+        self.assertEqual(self.cl.post(f'/whatsapp/mensaje/{entrante.pk}/eliminar/').status_code, 400)
+        # Más de 48 h no
+        Mensaje.objects.filter(pk=self.msg.pk).update(timestamp=timezone.now() - timedelta(hours=49))
+        r = self.cl.post(f'/whatsapp/mensaje/{self.msg.pk}/eliminar/')
+        self.assertContains(r, '48 horas', status_code=400)
+        # Líneas oficiales (Meta / Twilio) no lo permiten
+        meta = LineaWhatsApp.objects.create(nombre='Oficial', proveedor='meta', meta_phone_number_id='1')
+        conv = Conversacion.objects.create(linea=meta, telefono='5491100000000', agente=self.agente)
+        m = Mensaje.objects.create(conversacion=conv, direccion='out', contenido='x', wa_id='wamid.1', status='sent')
+        self.assertFalse(m.eliminable)
+        r = self.cl.post(f'/whatsapp/mensaje/{m.pk}/eliminar/')
+        self.assertContains(r, 'no permite eliminar', status_code=400)
+        # Chat ajeno: 404
+        otro = User.objects.create_user('beto', password='x')
+        cl = Client()
+        cl.force_login(otro)
+        self.assertEqual(cl.post(f'/whatsapp/mensaje/{self.msg.pk}/eliminar/').status_code, 404)
+        self.msg.refresh_from_db()
+        self.assertIsNone(self.msg.eliminado_at)
+
+    def test_boton_solo_en_salientes_recientes(self):
+        html = self.cl.get(f'/whatsapp/conversacion/{self.conv.pk}/mensajes/').json()['html']
+        self.assertIn(f'data-msg="{self.msg.pk}"', html)
+        self.assertIn('eliminar-msg', html)

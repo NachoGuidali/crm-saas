@@ -114,6 +114,8 @@ def url_publica(url: str) -> str:
 
 class ProveedorBase:
     nombre = ''
+    # Meta Cloud API y Twilio no permiten borrar un mensaje ya enviado del teléfono del contacto.
+    elimina_para_todos = False
 
     def __init__(self, linea):
         self.linea = linea
@@ -128,6 +130,9 @@ class ProveedorBase:
     def enviar_plantilla(self, telefono: str, plantilla, valores: list) -> str:
         """Por defecto (Evolution) se manda el texto renderizado."""
         return self.enviar_texto(telefono, plantilla.renderizar(valores))
+
+    def eliminar_para_todos(self, telefono: str, wa_id: str):
+        raise ErrorProveedor('Esta línea no permite eliminar mensajes enviados.', reintentable=False)
 
     # ── Conexión ─────────────────────────────────────────────────────────
     def consultar_estado(self) -> tuple:

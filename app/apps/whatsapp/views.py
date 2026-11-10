@@ -2,6 +2,7 @@ import logging
 import mimetypes
 import os
 import uuid
+from datetime import timedelta
 
 from django import forms
 from django.conf import settings
@@ -114,6 +115,20 @@ def _conv_visible(request, pk):
     if conv is None:
         raise Http404
     return conv
+
+
+class EliminarMensajeView(LoginRequiredMixin, View):
+    """Eliminar para todos un mensaje enviado (solo líneas por QR, dentro de las 48 h)."""
+
+    def post(self, request, pk):
+        msg = get_object_or_404(Mensaje.objects.select_related('conversacion'), pk=pk)
+        msg.conversacion = _conv_visible(request, msg.conversacion_id)
+        try:
+            services.eliminar_para_todos(msg, request.user)
+        except services.ErrorEnvio as e:
+            return error(str(e))
+        html = render_to_string('whatsapp/_mensajes.html', {'mensajes': [msg]}, request=request)
+        return ok(html=html, mensaje='Mensaje eliminado para todos.')
 
 
 class GuardarAdjuntoView(LoginRequiredMixin, View):
@@ -229,8 +244,15 @@ class MensajesView(LoginRequiredMixin, View):
         estados = dict(conv.mensajes.filter(direccion=Mensaje.DIR_SALIENTE).order_by('-pk')
                        .values_list('pk', 'status')[:30])
         html = render_to_string('whatsapp/_mensajes.html', {'mensajes': mensajes}, request=request)
+        # Eliminados para todos en los últimos minutos (por otro agente): se reemplaza la burbuja.
+        eliminados = {}
+        if despues:
+            for m in conv.mensajes.filter(eliminado_at__gte=timezone.now() - timedelta(minutes=2)) \
+                    .select_related('enviado_por', 'eliminado_por'):
+                m.conversacion = conv
+                eliminados[m.pk] = render_to_string('whatsapp/_mensajes.html', {'mensajes': [m]}, request=request)
         return JsonResponse({'html': html, 'ultimo': mensajes[-1].pk if mensajes else despues,
-                             'estados': estados, 'ventana': conv.ventana_abierta})
+                             'estados': estados, 'ventana': conv.ventana_abierta, 'eliminados': eliminados})
 
 
 class EnviarView(LoginRequiredMixin, View):

@@ -10,6 +10,10 @@ RESPUESTAS = ['¡Hola! Sí, contame más 🙂', '¿Cuánto sale por mes?', 'Ahor
 
 class ProveedorDemo(ProveedorBase):
     nombre = 'Simulado'
+    elimina_para_todos = True
+
+    def eliminar_para_todos(self, telefono, wa_id):
+        return None
 
     def _id(self):
         return f'demo-{uuid.uuid4().hex[:16]}'

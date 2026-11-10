@@ -268,6 +268,37 @@ def enviar_mensaje(conv, usuario=None, texto='', plantilla=None, valores=None, a
     return mensaje
 
 
+def eliminar_para_todos(msg, usuario=None):
+    """Borra un mensaje enviado del WhatsApp del contacto. En el CRM queda tachado (no se pierde el registro)."""
+    from .proveedores import ErrorProveedor, get_proveedor
+    conv = msg.conversacion
+    if msg.eliminado_at:
+        raise ErrorEnvio('Ese mensaje ya fue eliminado.')
+    if msg.direccion != Mensaje.DIR_SALIENTE:
+        raise ErrorEnvio('Solo se pueden eliminar mensajes enviados por nosotros.')
+    if not get_proveedor(conv.linea).elimina_para_todos:
+        raise ErrorEnvio(f'La línea "{conv.linea}" ({conv.linea.get_proveedor_display()}) no permite eliminar mensajes '
+                         'enviados: WhatsApp solo lo deja hacer en líneas conectadas por QR.')
+    if not msg.wa_id or msg.status == Mensaje.STATUS_FALLIDO:
+        raise ErrorEnvio('Ese mensaje no llegó a enviarse.')
+    if timezone.now() - msg.timestamp >= Mensaje.LIMITE_ELIMINAR:
+        raise ErrorEnvio('WhatsApp solo deja eliminar para todos los mensajes de las últimas 48 horas.')
+    try:
+        get_proveedor(conv.linea).eliminar_para_todos(conv.telefono, msg.wa_id)
+    except ErrorProveedor as e:
+        raise ErrorEnvio(f'WhatsApp no lo dejó eliminar: {e}')
+    msg.eliminado_at = timezone.now()
+    msg.eliminado_por = usuario
+    msg.save(update_fields=['eliminado_at', 'eliminado_por'])
+    if conv.contacto_id:
+        from apps.crm.models import Actividad
+        resumen = (msg.contenido or msg.media_filename or msg.get_tipo_display())[:120]
+        Actividad.objects.create(contacto_id=conv.contacto_id, oportunidad=_oportunidad_de(conv.contacto),
+                                 tipo=Actividad.TIPO_WHATSAPP, usuario=usuario,
+                                 texto=f'Eliminó para todos un mensaje de WhatsApp: «{resumen}»')
+    return msg
+
+
 def _encolar(task, mensaje_id, demora):
     try:
         if demora:

@@ -262,6 +262,12 @@ class Mensaje(models.Model):
     accion = models.ForeignKey('automatizaciones.AccionEtapa', null=True, blank=True, on_delete=models.SET_NULL,
                                related_name='mensajes', help_text='Automatización que lo envió (para medir respuesta).')
     timestamp = models.DateTimeField(default=timezone.now)
+    eliminado_at = models.DateTimeField(null=True, blank=True,
+                                        help_text='Eliminado "para todos" en WhatsApp (en el CRM queda tachado).')
+    eliminado_por = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+
+    # WhatsApp deja eliminar para todos durante unos 2 días; se usa un margen un poco menor.
+    LIMITE_ELIMINAR = timedelta(hours=48)
 
     class Meta:
         ordering = ['timestamp', 'pk']
@@ -273,6 +279,14 @@ class Mensaje(models.Model):
 
     def __str__(self):
         return f'[{self.direccion}] {self.contenido[:40]}'
+
+    @property
+    def eliminable(self):
+        """Se puede borrar "para todos": saliente, ya enviado, reciente y en una línea que lo soporta."""
+        from .proveedores import get_proveedor
+        return (self.direccion == self.DIR_SALIENTE and not self.eliminado_at and bool(self.wa_id)
+                and self.status != self.STATUS_FALLIDO and timezone.now() - self.timestamp < self.LIMITE_ELIMINAR
+                and get_proveedor(self.conversacion.linea).elimina_para_todos)
 
 
 class Plantilla(models.Model):

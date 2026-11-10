@@ -84,6 +84,28 @@ class ProveedorEvolution(ProveedorBase):
                               log_body={**payload, 'media': '<media>'}, timeout=60)
         return (data.get('key') or {}).get('id', '')
 
+    elimina_para_todos = True
+
+    def _clave_mensaje(self, telefono, wa_id):
+        """La clave exacta con la que WhatsApp guardó el mensaje (el chat puede ser @lid, no el teléfono)."""
+        try:
+            data = self._post(f'/chat/findMessages/{self.instancia}', {'where': {'key': {'id': wa_id}}}, timeout=15)
+            registros = (data.get('messages') or {}).get('records') if isinstance(data, dict) else data
+            for r in registros or []:
+                key = r.get('key') or {}
+                if key.get('id') == wa_id and key.get('remoteJid'):
+                    return key
+        except ErrorProveedor as e:
+            logger.info('findMessages %s: %s', wa_id, e)
+        return {'id': wa_id, 'remoteJid': f'{telefono_para_proveedor(telefono)}@s.whatsapp.net', 'fromMe': True}
+
+    def eliminar_para_todos(self, telefono, wa_id):
+        key = self._clave_mensaje(telefono, wa_id)
+        payload = {'id': wa_id, 'remoteJid': key['remoteJid'], 'fromMe': True}
+        resp = self._http('DELETE', self._url(f'/chat/deleteMessageForEveryone/{self.instancia}'), json=payload,
+                          headers=self._headers(), timeout=20, log_body=payload)
+        self._chequear(resp, 'Evolution')
+
     # ── Conexión / QR ────────────────────────────────────────────────────
     def consultar_estado(self):
         from apps.whatsapp.models import LineaWhatsApp as L
