@@ -43,6 +43,13 @@ def _bootstrap(form):
 # ── Configuración general ──────────────────────────────────────────────────
 
 class ConfigForm(forms.ModelForm):
+    # Las keys no se muestran nunca: vacío = dejar la que está; "borrar" = quitarla.
+    nueva_anthropic = forms.CharField(required=False, label='API key de Anthropic', widget=forms.PasswordInput,
+                                      help_text='Dejala vacía para mantener la actual.')
+    nueva_openai = forms.CharField(required=False, label='API key de OpenAI', widget=forms.PasswordInput,
+                                   help_text='Dejala vacía para mantener la actual.')
+    borrar_keys = forms.MultipleChoiceField(required=False, choices=[('anthropic', 'Anthropic'), ('openai', 'OpenAI')],
+                                            widget=forms.CheckboxSelectMultiple, label='Borrar key propia')
     campos_base = forms.MultipleChoiceField(choices=[c for c in CAMPOS_BASE_AGENTE if c[0] != 'nombre'], required=False,
                                             widget=forms.CheckboxSelectMultiple, label='Datos del contacto a completar')
 
@@ -85,17 +92,47 @@ class ConfigView(ModuloMixin, View):
     def post(self, request):
         cfg = ConfigAgente.get()
         form = ConfigForm(request.POST, instance=cfg)
+        if request.POST.get('probar') in ('anthropic', 'openai'):
+            from .claves import SinClave, clave, probar
+            prov = request.POST['probar']
+            nueva = request.POST.get(f'nueva_{prov}', '').strip()
+            try:
+                key, origen = (nueva, 'nueva') if nueva else clave(prov, cfg)
+            except SinClave as e:
+                messages.error(request, str(e))
+                return redirect('agente:config')
+            ok_, msg = probar(prov, key)
+            (messages.success if ok_ else messages.error)(request, f'{msg} (key {"de la plataforma" if origen == "plataforma" else "de la empresa" if origen == "cliente" else "nueva, sin guardar"})')
+            return redirect('agente:config')
         if not form.is_valid():
             return self._render(request, form, cfg)
-        form.save()
+        cfg = form.save(commit=False)
+        d = form.cleaned_data
+        for prov in ('anthropic', 'openai'):
+            if prov in d.get('borrar_keys', []):
+                setattr(cfg, f'{prov}_api_key', '')
+            elif d.get(f'nueva_{prov}', '').strip():
+                setattr(cfg, f'{prov}_api_key', d[f'nueva_{prov}'].strip())
+        cfg.save()
+        form.save_m2m()
         messages.success(request, 'Agente guardado.' + ('' if cfg.activo else ' Está APAGADO: prendelo para que responda.'))
         return redirect('agente:config')
 
     def _render(self, request, form, cfg):
         from django.conf import settings
+        from . import claves
+        pol = claves.politica()
+        keys = []
+        for prov in ('anthropic', 'openai'):
+            propia = getattr(cfg, f'{prov}_api_key')
+            keys.append({'prov': prov, 'nombre': claves.NOMBRES[prov], 'campo': form[f'nueva_{prov}'],
+                         'propia': f'…{propia[-4:]}' if propia else '', 'plataforma': bool(claves._de_plataforma(prov)),
+                         'disponible': claves.disponible(prov, cfg)})
         return render(request, 'agente/config.html', {
-            'form': form, 'cfg': cfg, 'seccion': 'agente', 'tab': 'config',
-            'falta_key': not settings.ANTHROPIC_API_KEY, 'falta_openai': not settings.OPENAI_API_KEY,
+            'form': form, 'cfg': cfg, 'seccion': 'agente', 'tab': 'config', 'keys': keys, 'politica': pol,
+            'puede_propia': pol in ('propia', 'ambas'),
+            'falta_key': not claves.disponible(cfg.proveedor, cfg), 'falta_openai': not claves.disponible('openai', cfg),
+            'proveedor_nombre': claves.NOMBRES[cfg.proveedor],
         })
 
 
@@ -256,9 +293,10 @@ class SimuladorView(ModuloMixin, View):
     """Chatear con el agente con la configuración actual. No manda WhatsApp ni toca leads."""
 
     def get(self, request):
-        from django.conf import settings
-        return render(request, 'agente/simulador.html', {'seccion': 'agente', 'tab': 'simulador',
-                                                         'cfg': ConfigAgente.get(), 'falta_key': not settings.ANTHROPIC_API_KEY})
+        from . import claves
+        cfg = ConfigAgente.get()
+        return render(request, 'agente/simulador.html', {'seccion': 'agente', 'tab': 'simulador', 'cfg': cfg,
+                                                         'falta_key': not claves.disponible(cfg.proveedor, cfg)})
 
     def post(self, request):
         data = json_body(request)

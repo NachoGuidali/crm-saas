@@ -351,3 +351,104 @@ class TranscripcionTests(AgenteBase):
             self.assertEqual(transcripcion.transcribir(f.name), 'Hola, quiero el plan 210')
         self.assertEqual(post.call_args.kwargs['data'], {'model': 'gpt-transcribe', 'languages[]': 'es'})
         self.assertEqual(post.call_args.kwargs['headers']['Authorization'], 'Bearer sk-openai')
+
+
+# ── OpenAI falso (Responses API) ───────────────────────────────────────────
+
+def oa_texto(t):
+    return SimpleNamespace(type='message', content=[SimpleNamespace(type='output_text', text=t)])
+
+
+def oa_tool(nombre, args, call_id='call_1'):
+    return SimpleNamespace(type='function_call', name=nombre, arguments=json.dumps(args), call_id=call_id, id='fc_1')
+
+
+def oa_respuesta(*items, cacheados=0):
+    return SimpleNamespace(output=list(items), _request_id='req_oa', status='completed',
+                           usage=SimpleNamespace(input_tokens=2000, output_tokens=300,
+                                                 input_tokens_details=SimpleNamespace(cached_tokens=cacheados)))
+
+
+class OpenAIFalso:
+    def __init__(self, *guion):
+        self.guion, self.llamadas = list(guion), []
+        self.responses = SimpleNamespace(create=self._create)
+
+    def _create(self, **kw):
+        self.llamadas.append(json.loads(json.dumps(kw, default=lambda o: o.__dict__)))
+        return self.guion.pop(0)
+
+
+class OpenAITests(AgenteBase):
+    def test_mismo_circuito_con_gpt(self):
+        self.cfg.modelo = 'gpt-6.1-sol'
+        self.cfg.save()
+        oa = OpenAIFalso(
+            oa_respuesta(oa_tool('guardar_datos', {'datos': [{'campo': 'dni', 'valor': '30123456'}]})),
+            oa_respuesta(oa_texto('Hola Ana, soy Clara, asistente virtual de RAS 😊'), cacheados=1500),
+        )
+        conv = self.entrante(oa)
+        self.assertEqual(conv.mensajes.filter(direccion='out').get().contenido, 'Hola Ana, soy Clara, asistente virtual de RAS 😊')
+        conv.contacto.refresh_from_db()
+        self.assertEqual(conv.contacto.dni, '30123456')
+        req = oa.llamadas[0]
+        self.assertEqual((req['model'], req['store'], req['reasoning']), ('gpt-6.1-sol', False, {'effort': 'medium'}))
+        self.assertIn('asistente virtual de ventas de RAS', req['instructions'])
+        self.assertEqual(req['input'][-1]['role'], 'developer')  # contexto del lead
+        self.assertEqual(req['input'][-2]['content'][0]['type'], 'input_text')
+        guardar = next(t for t in req['tools'] if t['name'] == 'guardar_datos')
+        self.assertEqual((guardar['type'], guardar['strict']), ('function', True))
+        # La segunda vuelta reenvía la llamada y su resultado
+        self.assertEqual(oa.llamadas[1]['input'][-1]['type'], 'function_call_output')
+        self.assertEqual(oa.llamadas[1]['input'][-1]['call_id'], 'call_1')
+        from apps.agente.models import TurnoAgente
+        t = TurnoAgente.objects.get()
+        self.assertEqual((t.tokens_entrada, t.tokens_cache_lectura), (4000 - 1500, 1500))
+        self.assertGreater(t.costo, 0)
+
+
+class ClavesTests(AgenteBase):
+    def _politica(self, valor):
+        connection.tenant.ia_keys = valor
+        connection.tenant.save(update_fields=['ia_keys'])
+
+    def test_politicas(self):
+        from apps.agente.claves import SinClave, clave
+        with mock.patch('django.conf.settings.ANTHROPIC_API_KEY', 'sk-plataforma'):
+            self._politica('ambas')
+            self.assertEqual(clave('anthropic'), ('sk-plataforma', 'plataforma'))
+            self.cfg.anthropic_api_key = 'sk-propia'
+            self.cfg.save()
+            self.assertEqual(clave('anthropic'), ('sk-propia', 'cliente'))
+            self._politica('plataforma')
+            self.assertEqual(clave('anthropic'), ('sk-plataforma', 'plataforma'))
+            self._politica('propia')
+            self.assertEqual(clave('anthropic'), ('sk-propia', 'cliente'))
+            self.cfg.anthropic_api_key = ''
+            self.cfg.save()
+            with self.assertRaisesMessage(SinClave, 'Falta tu API key de Anthropic'):
+                clave('anthropic')
+
+    def test_pantalla_guarda_cifrada_no_la_muestra_y_prueba(self):
+        from apps.agente.models import ConfigAgente
+        self._politica('ambas')
+        datos = {'nombre': 'Clara', 'modelo': 'claude-opus-5-5', 'esfuerzo': 'medium', 'demora_segundos': 12,
+                 'max_turnos': 40, 'presupuesto_diario': '20', 'nueva_openai': 'sk-openai-secreta-9876'}
+        self.assertEqual(self.web.post('/agente/', datos).status_code, 302)
+        cfg = ConfigAgente.get()
+        self.assertEqual(cfg.openai_api_key, 'sk-openai-secreta-9876')
+        with connection.cursor() as c:  # en la base no queda en texto plano
+            c.execute('SELECT openai_api_key FROM agente_configagente')
+            self.assertNotIn('secreta', c.fetchone()[0])
+        r = self.web.get('/agente/')
+        self.assertNotContains(r, 'sk-openai-secreta')
+        self.assertContains(r, '…9876')
+        with mock.patch('apps.agente.claves.probar', return_value=(True, 'La key de OpenAI funciona.')) as probar:
+            r = self.web.post('/agente/', {**datos, 'nueva_openai': '', 'probar': 'openai'}, follow=True)
+        probar.assert_called_once_with('openai', 'sk-openai-secreta-9876')
+        self.assertContains(r, 'La key de OpenAI funciona')
+        # Vacía = se mantiene; "borrar" = se quita
+        self.web.post('/agente/', {**datos, 'nueva_openai': ''})
+        self.assertEqual(ConfigAgente.get().openai_api_key, 'sk-openai-secreta-9876')
+        self.web.post('/agente/', {**datos, 'nueva_openai': '', 'borrar_keys': ['openai']})
+        self.assertEqual(ConfigAgente.get().openai_api_key, '')

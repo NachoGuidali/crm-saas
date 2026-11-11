@@ -20,8 +20,16 @@ class ErrorTranscripcion(Exception):
     pass
 
 
+def _key():
+    from .claves import SinClave, clave
+    try:
+        return clave('openai')[0]
+    except SinClave:
+        return ''
+
+
 def disponible():
-    return bool(getattr(settings, 'OPENAI_API_KEY', ''))
+    return bool(_key())
 
 
 def _a_mp3(ruta):
@@ -39,8 +47,9 @@ def _a_mp3(ruta):
 
 def transcribir(ruta_local):
     """Texto del audio o ErrorTranscripcion."""
-    if not disponible():
-        raise ErrorTranscripcion('Falta OPENAI_API_KEY en el .env.')
+    key = _key()
+    if not key:
+        raise ErrorTranscripcion('No hay API key de OpenAI (ni de la empresa ni de la plataforma).')
     convertido = None
     try:
         ruta = ruta_local
@@ -51,7 +60,7 @@ def transcribir(ruta_local):
         with open(ruta, 'rb') as f:
             try:
                 resp = requests.post(
-                    URL, headers={'Authorization': f'Bearer {settings.OPENAI_API_KEY}'}, timeout=120,
+                    URL, headers={'Authorization': f'Bearer {key}'}, timeout=120,
                     files={'file': (os.path.basename(ruta), f)},
                     data={'model': settings.OPENAI_TRANSCRIBE_MODEL, 'languages[]': 'es'},
                 )

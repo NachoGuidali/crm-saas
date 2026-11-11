@@ -16,3 +16,4 @@ cryptography==50.0.2
 anthropic==2.8.0
 pypdf==6.21.4
 python-docx==1.2.0
+openai==3.49.0

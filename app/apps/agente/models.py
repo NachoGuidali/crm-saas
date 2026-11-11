@@ -10,16 +10,33 @@ from django.utils import timezone
 from core.cifrado import CampoCifrado
 
 MODELOS = [
-    ('claude-opus-5-5', 'Claude Opus 5.5 (el más capaz, recomendado)'),
-    ('claude-sonnet-5-5', 'Claude Sonnet 5.5 (equilibrado)'),
-    ('claude-haiku-5-5', 'Claude Haiku 5.5 (el más económico)'),
+    ('Anthropic (Claude)', [
+        ('claude-opus-5-5', 'Claude Opus 5.5 (el más capaz)'),
+        ('claude-sonnet-5-5', 'Claude Sonnet 5.5 (equilibrado)'),
+        ('claude-haiku-5-5', 'Claude Haiku 5.5 (el más económico)'),
+    ]),
+    ('OpenAI', [
+        ('gpt-6-astra', 'GPT-6 Astra (el más capaz de OpenAI)'),
+        ('gpt-6.1-sol', 'GPT-6.1 Sol (equilibrado)'),
+        ('gpt-6-luna', 'GPT-6 Luna (el más económico)'),
+        ('gpt-5.1', 'GPT-5.1 (deprecado: OpenAI lo apaga el 1/4/2027)'),
+    ]),
 ]
-# US$ por millón de tokens: entrada, salida, lectura de caché, escritura de caché (5 min)
+# US$ por millón de tokens: entrada, salida, lectura de caché, escritura de caché
 PRECIOS_MODELO = {
     'claude-opus-5-5': (4.00, 20.00, 0.20, 5.00),
     'claude-sonnet-5-5': (2.00, 10.00, 0.10, 2.50),
     'claude-haiku-5-5': (0.10, 0.50, 0.01, 0.125),
+    # OpenAI (tarifa estándar, contexto corto; la caché no cobra escritura)
+    'gpt-6-astra': (10.00, 50.00, 1.00, 10.00),
+    'gpt-6.1-sol': (2.00, 10.00, 0.10, 2.00),
+    'gpt-6-luna': (0.10, 0.50, 0.01, 0.10),
+    'gpt-5.1': (1.25, 10.00, 0.125, 1.25),
 }
+
+
+def proveedor_de(modelo):
+    return 'openai' if (modelo or '').startswith('gpt-') else 'anthropic'
 ESFUERZOS = [('low', 'Bajo (más rápido y barato)'), ('medium', 'Medio (recomendado)'), ('high', 'Alto')]
 
 # Datos del contacto que el agente puede completar además de los campos personalizados.
@@ -77,6 +94,10 @@ class ConfigAgente(models.Model):
     presupuesto_diario = models.DecimalField(max_digits=8, decimal_places=2, default=20,
                                              verbose_name='Tope de gasto por día (US$)',
                                              help_text='Al llegar, el agente deja de responder hasta el día siguiente.')
+    anthropic_api_key = CampoCifrado(blank=True, verbose_name='API key de Anthropic',
+                                     help_text='Opcional: la key propia de esta empresa (si el plan lo permite).')
+    openai_api_key = CampoCifrado(blank=True, verbose_name='API key de OpenAI',
+                                  help_text='Opcional: para modelos GPT y para transcribir audios.')
     precios_columnas = models.JSONField(default=list, blank=True)
     precios_filas = models.JSONField(default=list, blank=True)
     precios_url = models.CharField(max_length=500, blank=True, verbose_name='Link de Google Sheets',
@@ -96,6 +117,10 @@ class ConfigAgente(models.Model):
     def get(cls):
         obj = cls.objects.first()
         return obj or cls.objects.create()
+
+    @property
+    def proveedor(self):
+        return proveedor_de(self.modelo)
 
     @property
     def precios(self):

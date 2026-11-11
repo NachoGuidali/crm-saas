@@ -72,13 +72,15 @@ def atender_modo(self, conv_pk, modo, motivo=''):
 
 
 def _reintentable(exc):
-    try:
-        import anthropic
-    except ImportError:  # pragma: no cover
-        return False
-    if isinstance(exc, (anthropic.RateLimitError, anthropic.APIConnectionError)):
-        return True
-    return isinstance(exc, anthropic.APIStatusError) and exc.status_code >= 500
+    """Errores pasajeros (límite de uso, red, 5xx) de Anthropic u OpenAI: se reintenta la tarea."""
+    import anthropic
+    import openai
+    for sdk in (anthropic, openai):
+        if isinstance(exc, (sdk.RateLimitError, sdk.APIConnectionError)):
+            return True
+        if isinstance(exc, sdk.APIStatusError) and exc.status_code >= 500:
+            return True
+    return False
 
 
 def _avisar_error(texto):

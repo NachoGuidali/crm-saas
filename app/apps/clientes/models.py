@@ -32,6 +32,14 @@ FUNCIONES_EXTRA = [
 ]
 
 
+# Agente IA: quién pone la API key de Anthropic/OpenAI.
+IA_KEYS_CHOICES = [
+    ('ambas', 'La del cliente si la cargó; si no, la de la plataforma'),
+    ('propia', 'Solo la del cliente (le paga directo al proveedor)'),
+    ('plataforma', 'Solo la de la plataforma (le cobrás el consumo)'),
+]
+
+
 class Plan(models.Model):
     nombre = models.CharField(max_length=60, unique=True)
     precio_mensual = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -41,6 +49,8 @@ class Plan(models.Model):
                                              help_text='Mensajes de WhatsApp automáticos y difusiones por día. 0 = sin límite. Las respuestas 1 a 1 de los agentes no cuentan.')
     funciones_extra = models.JSONField(default=list, blank=True,
                                        help_text='Funciones opcionales incluidas en este plan.')
+    ia_keys = models.CharField(max_length=12, choices=IA_KEYS_CHOICES, default='ambas',
+                               verbose_name='API key del agente IA')
     activo = models.BooleanField(default=True, help_text='Si se puede elegir para clientes nuevos.')
 
     class Meta:
@@ -81,6 +91,8 @@ class Cliente(TenantMixin):
                                                       help_text='Vacío = el del plan. 0 = sin límite.')
     max_wa_dia = models.PositiveIntegerField(null=True, blank=True, verbose_name='WhatsApp por día',
                                              help_text='Vacío = el del plan. 0 = sin límite.')
+    ia_keys = models.CharField(max_length=12, choices=IA_KEYS_CHOICES, blank=True, verbose_name='API key del agente IA',
+                               help_text='Vacío = lo que diga el plan.')
     # Funciones extra habilitadas solo a este cliente: se SUMAN a las del plan (no lo pisan).
     funciones_extra = models.JSONField(default=list, blank=True,
                                        help_text='Funciones extra para este cliente (además de las del plan).')
@@ -194,6 +206,10 @@ class Cliente(TenantMixin):
     def limite_wa_dia(self):
         """Mensajes de WhatsApp automáticos/difusiones por día. 0 = sin límite."""
         return self._limite('max_wa_dia')
+
+    @property
+    def politica_ia_keys(self):
+        return self.ia_keys or (self.plan.ia_keys if self.plan_id else 'ambas')
 
     # ── Funciones extra ──
     @property

@@ -13,7 +13,6 @@ import time
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from django.conf import settings
 from django.utils import timezone
 
 from . import herramientas
@@ -192,13 +191,18 @@ def armar_mensajes(historial, contexto):
     return msgs
 
 
-# ── Llamada a Claude ───────────────────────────────────────────────────────
+# ── Llamada al modelo (Claude u OpenAI, según el modelo elegido) ──────────
 
-def _cliente():
+def _cliente(config):
+    from .claves import SinClave, clave
+    try:
+        key, _ = clave(config.proveedor, config)
+    except SinClave as e:
+        raise ErrorAgente(str(e))
+    if config.proveedor == 'openai':
+        import openai
+        return openai.OpenAI(api_key=key, timeout=120.0, max_retries=2)
     import anthropic
-    key = getattr(settings, 'ANTHROPIC_API_KEY', '')
-    if not key:
-        raise ErrorAgente('Falta ANTHROPIC_API_KEY en el .env del servidor.')
     return anthropic.Anthropic(api_key=key, timeout=120.0, max_retries=2)
 
 
@@ -226,8 +230,10 @@ def pensar(ctx, mensajes, cliente=None):
         from apps.firmas.models import FormularioFirma
         formularios = list(FormularioFirma.objects.filter(activo=True).order_by('nombre'))
     tools = herramientas.definiciones(cfg, enviables, formularios)
+    cliente = cliente or _cliente(cfg)
+    if cfg.proveedor == 'openai':
+        return _pensar_openai(ctx, cliente, instrucciones(cfg), tools, mensajes)
     system = [{'type': 'text', 'text': instrucciones(cfg), 'cache_control': {'type': 'ephemeral'}}]
-    cliente = cliente or _cliente()
     usage = {'entrada': 0, 'salida': 0, 'cache_lectura': 0, 'cache_escritura': 0}
     textos, usadas, request_id, rechazo = [], [], '', False
     for _ in range(MAX_VUELTAS):
@@ -252,6 +258,78 @@ def pensar(ctx, mensajes, cliente=None):
             usadas.append({'nombre': b.name, 'entrada': b.input, 'resultado': salida[:500], 'error': es_error})
             resultados.append({'type': 'tool_result', 'tool_use_id': b.id, 'content': salida, 'is_error': es_error})
         mensajes.append({'role': 'user', 'content': resultados})
+    return Resultado(textos=textos, herramientas=usadas, usage=usage, costo=_costo(cfg, usage),
+                     request_id=request_id, rechazo=rechazo)
+
+
+# ── OpenAI (Responses API) ─────────────────────────────────────────────────
+# Mismas herramientas e historial: se traducen del formato de Claude al de OpenAI.
+
+def _tools_openai(tools):
+    return [{'type': 'function', 'name': t['name'], 'description': t['description'], 'strict': True,
+             'parameters': t['input_schema']} for t in tools]
+
+
+def _input_openai(mensajes):
+    salida = []
+    for m in mensajes:
+        if m['role'] == 'system':
+            salida.append({'role': 'developer', 'content': m['content']})
+            continue
+        bloques = m['content'] if isinstance(m['content'], list) else [{'type': 'text', 'text': m['content']}]
+        if m['role'] == 'assistant':
+            salida.append({'role': 'assistant', 'content': '\n'.join(b['text'] for b in bloques if b.get('type') == 'text')})
+            continue
+        partes = []
+        for b in bloques:
+            if b.get('type') == 'image':
+                src = b['source']
+                partes.append({'type': 'input_image', 'image_url': f"data:{src['media_type']};base64,{src['data']}"})
+            elif b.get('type') == 'text':
+                partes.append({'type': 'input_text', 'text': b['text']})
+        salida.append({'role': 'user', 'content': partes})
+    return salida
+
+
+def _pensar_openai(ctx, cliente, instr, tools, mensajes):
+    import json
+    cfg = ctx.config
+    entrada = _input_openai(mensajes)
+    tools_oa = _tools_openai(tools)
+    usage = {'entrada': 0, 'salida': 0, 'cache_lectura': 0, 'cache_escritura': 0}
+    textos, usadas, request_id, rechazo = [], [], '', False
+    for _ in range(MAX_VUELTAS):
+        # store=False: OpenAI no guarda la conversación; el razonamiento vuelve cifrado para reenviarlo en el ciclo.
+        resp = cliente.responses.create(model=cfg.modelo, instructions=instr, input=entrada, tools=tools_oa,
+                                        reasoning={'effort': cfg.esfuerzo}, max_output_tokens=16000, store=False,
+                                        include=['reasoning.encrypted_content'])
+        request_id = getattr(resp, '_request_id', '') or request_id
+        u = resp.usage
+        cacheados = getattr(getattr(u, 'input_tokens_details', None), 'cached_tokens', 0) or 0
+        usage['entrada'] += max((u.input_tokens or 0) - cacheados, 0)
+        usage['cache_lectura'] += cacheados
+        usage['salida'] += u.output_tokens or 0
+        llamadas = []
+        for item in resp.output:
+            if item.type == 'message':
+                for parte in item.content:
+                    if parte.type == 'output_text' and parte.text.strip():
+                        textos.append(parte.text)
+                    elif parte.type == 'refusal':
+                        rechazo = True
+            elif item.type == 'function_call':
+                llamadas.append(item)
+        if rechazo or not llamadas:
+            break
+        entrada += list(resp.output)
+        for item in llamadas:
+            try:
+                args = json.loads(item.arguments or '{}')
+            except ValueError:
+                args = {}
+            salida, es_error = herramientas.ejecutar(ctx, item.name, args)
+            usadas.append({'nombre': item.name, 'entrada': args, 'resultado': salida[:500], 'error': es_error})
+            entrada.append({'type': 'function_call_output', 'call_id': item.call_id, 'output': salida})
     return Resultado(textos=textos, herramientas=usadas, usage=usage, costo=_costo(cfg, usage),
                      request_id=request_id, rechazo=rechazo)
 

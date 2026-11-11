@@ -2,8 +2,8 @@
 {% block title %}Agente IA{% endblock %}
 {% block content %}
 {% include "agente/_tabs.html" %}
-{% if falta_key %}<div class="alert alert-danger py-2 small"><b>Falta la API key de Anthropic.</b> Cargá <code>ANTHROPIC_API_KEY</code> en el <code>.env</code> del servidor y reiniciá (<code>docker compose up -d</code>). Sin eso el agente no puede responder.</div>{% endif %}
-{% if falta_openai %}<div class="alert alert-warning py-2 small">Sin <code>OPENAI_API_KEY</code> las notas de voz no se transcriben: el agente le va a pedir al lead que escriba.</div>{% endif %}
+{% if falta_key %}<div class="alert alert-danger py-2 small"><b>Falta la API key de {{ proveedor_nombre }}</b> para el modelo elegido: cargala abajo en <b>API keys</b>{% if politica != 'propia' %} o en el <code>.env</code> del servidor{% endif %}. Sin eso el agente no puede responder.</div>{% endif %}
+{% if falta_openai %}<div class="alert alert-warning py-2 small">Sin API key de OpenAI las notas de voz no se transcriben: el agente le va a pedir al lead que escriba.</div>{% endif %}
 <form method="post">{% csrf_token %}
 {% if form.errors %}<div class="alert alert-danger py-2 small">Revisá los campos marcados.</div>{% endif %}
 <div class="row g-3">
@@ -31,6 +31,15 @@
       <div class="col-6"><label class="form-label">{{ form.max_turnos.label }}</label>{{ form.max_turnos }}</div>
       <div class="col-12"><label class="form-label">{{ form.presupuesto_diario.label }}</label>{{ form.presupuesto_diario }}<div class="form-text">{{ form.presupuesto_diario.help_text }}</div></div>
     </div></div></div>
+    <div class="card mb-3"><div class="card-header">API keys</div><div class="card-body small">
+      <div class="muted mb-2">{% if politica == 'propia' %}Tu plan usa <b>keys propias</b>: el consumo lo pagás directo a Anthropic / OpenAI.{% elif politica == 'plataforma' %}Tu plan usa las keys <b>de la plataforma</b>: no hace falta cargar nada.{% else %}Si cargás una key propia se usa esa; si no, la de la plataforma.{% endif %}</div>
+      {% for k in keys %}<div class="mb-2"><div class="d-flex justify-content-between align-items-center"><b>{{ k.nombre }}</b>
+          <span class="chip {% if k.disponible %}ok{% else %}danger{% endif %}">{% if k.propia and puede_propia %}propia {{ k.propia }}{% elif k.disponible %}de la plataforma{% else %}sin key{% endif %}</span></div>
+        {% if puede_propia %}<div class="d-flex gap-1 mt-1">{{ k.campo }}<button class="btn btn-sm btn-outline-secondary text-nowrap" name="probar" value="{{ k.prov }}" formnovalidate>Probar</button></div>{% elif k.disponible %}<button class="btn btn-sm btn-outline-secondary mt-1" name="probar" value="{{ k.prov }}" formnovalidate>Probar</button>{% endif %}
+      </div>{% endfor %}
+      {% if puede_propia %}<div class="d-flex gap-3 mt-1">{% for c in form.borrar_keys %}<label class="d-flex gap-1">{{ c.tag }} Borrar key de {{ c.choice_label }}</label>{% endfor %}</div>
+      <div class="form-text">Se guardan cifradas y no se vuelven a mostrar (solo los últimos 4 caracteres). "Probar" verifica la key sin gastar.</div>{% endif %}
+    </div></div>
     <div class="card mb-3"><div class="card-header">Etapas en este CRM</div><div class="card-body"><div class="row g-2">
       <div class="col-12"><label class="form-label">Embudo</label>{{ form.embudo }}{{ form.embudo.errors }}</div>
       <div class="col-12"><label class="form-label">{{ form.etapa_calificando.label }}</label>{{ form.etapa_calificando }}{{ form.etapa_calificando.errors }}</div>

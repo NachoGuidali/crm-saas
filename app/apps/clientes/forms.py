@@ -56,7 +56,7 @@ class ClienteForm(_Bootstrap, forms.ModelForm):
         model = Cliente
         fields = ['nombre', 'estado', 'plan', 'max_usuarios', 'max_lineas_whatsapp', 'max_wa_dia', 'prueba_hasta',
                   'cobro', 'precio_acordado', 'pagado_hasta', 'suspension_automatica',
-                  'contacto_nombre', 'contacto_email', 'contacto_telefono', 'funciones_extra', 'notas']
+                  'contacto_nombre', 'contacto_email', 'contacto_telefono', 'funciones_extra', 'ia_keys', 'notas']
         widgets = {'prueba_hasta': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
                    'pagado_hasta': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
                    'notas': forms.Textarea(attrs={'rows': 3})}
@@ -91,7 +91,7 @@ class PlanForm(_Bootstrap, forms.ModelForm):
     class Meta:
         model = Plan
         fields = ['nombre', 'precio_mensual', 'max_usuarios', 'max_lineas_whatsapp', 'max_wa_dia',
-                  'funciones_extra', 'activo']
+                  'funciones_extra', 'ia_keys', 'activo']
 
 
 class IngresarForm(_Bootstrap, forms.Form):
