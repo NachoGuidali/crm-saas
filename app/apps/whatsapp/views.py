@@ -71,6 +71,8 @@ class WebhookView(View):
             services.marcar_cambio_inbox()
         if res.conexion:
             LineaWhatsApp.objects.filter(pk=linea.pk).update(estado=res.conexion, estado_actualizado_at=timezone.now())
+            from apps.agente.services import linea_cambio_estado
+            linea_cambio_estado(linea, linea.estado, res.conexion)
         if linea.proveedor == LineaWhatsApp.PROV_TWILIO:
             return HttpResponse('<Response></Response>', content_type='text/xml')
         return HttpResponse('OK')

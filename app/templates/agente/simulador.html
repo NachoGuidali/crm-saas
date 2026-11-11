@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Agente IA · Simulador{% endblock %}
+{% block extra_css %}<style>
+  .sim { height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 12px; background: var(--bg2, #0b1220); border-radius: 10px; }
+  .sim .b { max-width: 75%; padding: 7px 10px; border-radius: 10px; font-size: 13.5px; white-space: pre-wrap; }
+  .sim .lead { align-self: flex-end; background: #11432f; }
+  .sim .agente { align-self: flex-start; background: var(--bg3); }
+  .sim .nota { align-self: center; font-size: 11px; color: var(--text3); }
+</style>{% endblock %}
+{% block content %}
+{% include "agente/_tabs.html" %}
+{% if falta_key %}<div class="alert alert-danger py-2 small">Falta <code>ANTHROPIC_API_KEY</code> en el <code>.env</code>: el simulador no puede responder.</div>{% endif %}
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="sim" id="sim"><div class="nota">Escribí como si fueras un lead. Usa la configuración guardada; no manda WhatsApp ni toca leads reales.</div></div>
+    <form id="simForm" class="d-flex gap-2 mt-2"><input id="simTexto" class="form-control" placeholder="Hola, quiero info de los planes…" autocomplete="off">
+      <button class="btn btn-primary" id="simBtn">Enviar</button>
+      <button type="button" class="btn btn-outline-secondary text-nowrap" id="simInicio" title="Que el agente escriba primero (prospección)">Que escriba él</button>
+      <button type="button" class="btn btn-outline-secondary" id="simReset" title="Empezar de nuevo"><i class="bi bi-arrow-counterclockwise"></i></button></form>
+  </div>
+  <div class="col-lg-4">
+    <div class="card mb-3"><div class="card-header">Datos que guardó</div><div class="card-body small" id="simDatos"><span class="muted">Nada todavía.</span></div></div>
+    <div class="card mb-3"><div class="card-header">Acciones</div><div class="card-body small" id="simAcciones"><span class="muted">Ninguna.</span></div></div>
+    <div class="small muted" id="simCosto"></div>
+  </div>
+</div>
+<script>
+(function () {
+  const sim = document.getElementById('sim'), txt = document.getElementById('simTexto'), btn = document.getElementById('simBtn');
+  let historial = [], datos = {}, acciones = [], costo = 0;
+  const burbuja = (cls, t) => { const d = document.createElement('div'); d.className = 'b ' + cls; d.textContent = t; sim.appendChild(d); sim.scrollTop = sim.scrollHeight; return d; };
+  const nota = t => { const d = document.createElement('div'); d.className = 'nota'; d.textContent = t; sim.appendChild(d); sim.scrollTop = sim.scrollHeight; };
+  function pintarPanel() {
+    const kv = Object.entries(datos);
+    document.getElementById('simDatos').innerHTML = kv.length ? kv.map(([k, v]) => `<div><b>${CRM.esc(k)}</b>: ${CRM.esc(String(v))}</div>`).join('') : '<span class="muted">Nada todavía.</span>';
+    document.getElementById('simAcciones').innerHTML = acciones.length ? acciones.map(a => `<div>• ${CRM.esc(a)}</div>`).join('') : '<span class="muted">Ninguna.</span>';
+    document.getElementById('simCosto').textContent = costo ? `Costo de esta prueba: US$ ${costo.toFixed(4)}` : '';
+  }
+  async function turno(modo) {
+    btn.disabled = true;
+    const pensando = nota('El agente está escribiendo…');
+    try {
+      const d = await CRM.api('/agente/simulador/', {data: {historial, datos, modo}});
+      pensando.remove();
+      d.mensajes.forEach(m => { burbuja('agente', m); historial.push({de: 'agente', texto: m}); });
+      d.herramientas.forEach(h => nota(`🔧 ${h.nombre}${h.error ? ' (error)' : ''}`));
+      if (d.rechazo) nota('⚠ El modelo no quiso responder: en un chat real pasaría a una persona.');
+      datos = d.datos || datos; acciones = acciones.concat(d.acciones || []); costo += parseFloat(d.costo || 0);
+      if (d.resultado) nota({derivado: '✅ Derivado al asesor', descartado: '⛔ Lead descartado', humano: '🙋 Pasado a una persona'}[d.resultado] || d.resultado);
+      pintarPanel();
+    } catch (e) { pensando.remove(); } finally { btn.disabled = false; txt.focus(); }
+  }
+  document.getElementById('simForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const t = txt.value.trim(); if (!t) return;
+    burbuja('lead', t); historial.push({de: 'lead', texto: t}); txt.value = '';
+    turno('respuesta');
+  });
+  document.getElementById('simInicio').addEventListener('click', () => turno('inicio'));
+  document.getElementById('simReset').addEventListener('click', () => { historial = []; datos = {}; acciones = []; costo = 0; sim.innerHTML = ''; nota('Conversación nueva.'); pintarPanel(); });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Agente IA · {{ doc|default:"Nuevo documento" }}{% endblock %}
+{% block content %}
+{% include "agente/_tabs.html" %}
+<form method="post" enctype="multipart/form-data" class="card"><div class="card-body">{% csrf_token %}
+  <div class="row g-2">
+    <div class="col-md-8"><label class="form-label">Título</label>{{ form.titulo }}{{ form.titulo.errors }}</div>
+    <div class="col-md-2"><label class="form-label">Orden</label>{{ form.orden }}</div>
+    <div class="col-md-2 d-flex align-items-end"><label class="d-flex gap-2 small">{{ form.activo }} Activo</label></div>
+    <div class="col-12"><label class="form-label">Archivo (PDF, Word o TXT)</label>{{ form.archivo }}{{ form.archivo.errors }}
+      <div class="form-text">Si dejás el texto vacío, se completa con el contenido del archivo. Revisalo: los PDF escaneados (fotos) no tienen texto.</div></div>
+    <div class="col-12"><label class="d-flex gap-2 small">{{ form.enviable }} {{ form.enviable.label }} <span class="muted">({{ form.enviable.help_text }})</span></label></div>
+    <div class="col-12"><label class="form-label">Texto que lee el agente</label>{{ form.texto }}{{ form.texto.errors }}</div>
+  </div>
+  <div class="mt-3 d-flex gap-2"><button class="btn btn-primary">Guardar</button><a href="{% url 'agente:conocimiento' %}" class="btn btn-outline-secondary">Volver</a></div>
+</div></form>
+{% endblock %}

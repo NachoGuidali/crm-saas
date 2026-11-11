@@ -400,6 +400,12 @@ def _correr(accion, op, ejec_desde=None, etapa_ref=None):
         return E.ESTADO_OMITIDA, 'El prospecto está pausado.'
 
     contacto = op.contacto
+    if accion.tipo == AccionEtapa.TIPO_AGENTE_IA:
+        from apps.agente.services import iniciar_chat
+        if not op.activa:
+            return E.ESTADO_OMITIDA, 'La oportunidad está cerrada.'
+        ok, detalle = iniciar_chat(op, objetivo=accion.texto)
+        return (E.ESTADO_EJECUTADA if ok else E.ESTADO_OMITIDA), detalle
     if accion.tipo == AccionEtapa.TIPO_FIRMA:
         from apps.firmas import services as firmas
         if not firmas.habilitado():

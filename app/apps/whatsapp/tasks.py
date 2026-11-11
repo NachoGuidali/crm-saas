@@ -73,6 +73,8 @@ def actualizar_estado_lineas():
             estado, detalle = LineaWhatsApp.ESTADO_ERROR, str(e)[:300]
         LineaWhatsApp.objects.filter(pk=linea.pk).update(estado=estado, estado_detalle=detalle,
                                                          estado_actualizado_at=timezone.now())
+        from apps.agente.services import linea_cambio_estado
+        linea_cambio_estado(linea, linea.estado, estado)
 
 
 @shared_task(name='whatsapp.sincronizar_plantillas')

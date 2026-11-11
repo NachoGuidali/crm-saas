@@ -26,6 +26,7 @@ SUBDOMINIOS_RESERVADOS = frozenset({
 FUNCIONES_EXTRA = [
     ('postventa', 'Clientes / Postventa (cuentas, proyectos y tareas)'),
     ('firmas', 'Firmas electrónicas (formularios para completar y firmar desde un link)'),
+    ('agente_ia', 'Agente IA de ventas (atiende WhatsApp, califica y deriva)'),
     # ('reportes_avanzados', 'Reportes avanzados'),
     # ('marca_blanca', 'Marca blanca (logo propio en el CRM)'),
 ]

@@ -109,6 +109,8 @@
 .burbuja.in { align-self: flex-start; background: var(--bg3); border-top-left-radius: 3px; }
 .burbuja.out { align-self: flex-end; background: #11432f; border-top-right-radius: 3px; }
 .burbuja.out.auto { background: #1b2f55; }
+.burbuja .transcripcion { font-size: 12px; font-style: italic; color: rgba(255,255,255,.7); margin-top: 3px; max-width: 320px; }
+.burbuja .pie .ia { color: #a5b4fc; font-weight: 600; }
 .burbuja.eliminado { text-decoration: line-through; color: rgba(255,255,255,.5); background: var(--bg3); border: 1px dashed rgba(255,255,255,.2); }
 .burbuja.eliminado .elim-aviso, .burbuja.eliminado .elim-quien, .burbuja.eliminado .pie { text-decoration: none; }
 .burbuja .elim-aviso { font-style: italic; color: rgba(255,255,255,.75); }

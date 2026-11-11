@@ -82,6 +82,20 @@ class LineaWhatsApp(models.Model):
         max_length=500, blank=True, verbose_name='Webhook de n8n para reiniciar',
         help_text='Opcional: se avisa a esta URL cuando un agente reactiva el bot, para que retome la charla de cero.')
 
+    # ── Agente IA (módulo extra) ──
+    agente_ia_activo = models.BooleanField(
+        default=False, verbose_name='Agente IA en esta línea',
+        help_text='Las conversaciones nuevas de este número las atiende el agente IA de ventas.')
+    reserva = models.BooleanField(
+        default=False, verbose_name='Línea de reserva',
+        help_text='Conectada pero sin usar: entra en servicio sola si se desconecta (o bloquean) otra línea del agente.')
+    calentamiento_inicio = models.DateField(
+        null=True, blank=True, verbose_name='Calentamiento desde',
+        help_text='Línea nueva: el tope de mensajes que inicia el agente arranca bajo y sube cada día.')
+    max_salientes_dia = models.PositiveIntegerField(
+        default=0, verbose_name='Máx. chats nuevos por día (agente)',
+        help_text='Cuántas conversaciones puede iniciar el agente por día desde este número. 0 = sin tope.')
+
     # Conexión por QR
     evolution_instancia = models.SlugField(max_length=100, blank=True, verbose_name='Nombre de instancia')
     evolution_api_url = models.CharField(max_length=300, blank=True, help_text='Vacío = valor global del .env')
@@ -265,6 +279,8 @@ class Mensaje(models.Model):
     eliminado_at = models.DateTimeField(null=True, blank=True,
                                         help_text='Eliminado "para todos" en WhatsApp (en el CRM queda tachado).')
     eliminado_por = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    transcripcion = models.TextField(blank=True, help_text='Texto de la nota de voz (transcripción automática).')
+    por_ia = models.BooleanField(default=False, help_text='Lo escribió el agente IA.')
 
     # WhatsApp deja eliminar para todos durante unos 2 días; se usa un margen un poco menor.
     LIMITE_ELIMINAR = timedelta(hours=48)

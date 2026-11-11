@@ -47,6 +47,11 @@ class AccionForm(forms.ModelForm):
                                            if c[0] != AccionEtapa.TIPO_FIRMA or c[0] == actual_tipo]
             self.fields['disparador'].choices = [c for c in self.fields['disparador'].choices
                                                  if c[0] != AccionEtapa.DISP_FIRMA or c[0] == actual_disp]
+        from apps.agente.services import habilitado as agente_habilitado
+        if not agente_habilitado():
+            actual_tipo = self.instance.tipo if self.instance.pk else None
+            self.fields['tipo'].choices = [c for c in self.fields['tipo'].choices
+                                           if c[0] != AccionEtapa.TIPO_AGENTE_IA or c[0] == actual_tipo]
         if embudo is not None:
             self.fields['etapa'].queryset = embudo.etapas.order_by('orden')
             self.fields['mover_a'].queryset = embudo.etapas.order_by('orden')

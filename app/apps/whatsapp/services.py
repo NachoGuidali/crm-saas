@@ -59,7 +59,7 @@ def obtener_conversacion(linea, telefono, nombre_perfil=''):
         with transaction.atomic():
             # Si la línea tiene bot n8n, la conversación nueva arranca con el bot atendiendo.
             return Conversacion.objects.create(linea=linea, telefono=telefono, nombre_perfil=nombre_perfil[:200],
-                                               bot_activo=linea.bot_n8n_activo), True
+                                               bot_activo=linea.bot_n8n_activo or linea.agente_ia_activo), True
     except IntegrityError:
         return Conversacion.objects.get(linea=linea, telefono=telefono), False
 
@@ -173,6 +173,12 @@ def procesar_mensaje_entrante(linea, msg):
     invalidar_no_leidos([agente_id] + _ids_supervisores())
     marcar_cambio_inbox()
 
+    # Agente IA (módulo extra): si la línea lo tiene y está atendiendo el chat, responde él (y no n8n).
+    from apps.agente.services import al_recibir
+    conv.refresh_from_db(fields=['bot_activo'])
+    if al_recibir(conv, mensaje):
+        return mensaje
+
     # Bot n8n: si esta línea tiene bot y está atendiendo esta conversación, reenviar el entrante al flujo de n8n.
     if linea.bot_n8n_activo and linea.bot_n8n_url and \
             Conversacion.objects.filter(pk=conv.pk, bot_activo=True).exists():
@@ -208,7 +214,7 @@ def actualizar_estados(estados):
 # ── Salientes ──────────────────────────────────────────────────────────────
 
 def enviar_mensaje(conv, usuario=None, texto='', plantilla=None, valores=None, archivo_url='', archivo_mime='',
-                   archivo_nombre='', automatico=False, demora_segundos=0):
+                   archivo_nombre='', automatico=False, demora_segundos=0, por_ia=False):
     """
     Encola un mensaje saliente. Valida la ventana de 24 h de las líneas oficiales.
     Devuelve el Mensaje creado (en estado pendiente); el envío real lo hace Celery.
@@ -242,12 +248,14 @@ def enviar_mensaje(conv, usuario=None, texto='', plantilla=None, valores=None, a
         conversacion=conv, direccion=Mensaje.DIR_SALIENTE, tipo=tipo, contenido=contenido, plantilla=plantilla,
         plantilla_valores=[str(v) for v in (valores or [])] if plantilla is not None else [],
         media_url=archivo_url, media_mime=archivo_mime, media_filename=archivo_nombre, enviado_por=usuario,
-        automatico=automatico, timestamp=ahora, status=Mensaje.STATUS_PENDIENTE,
+        automatico=automatico, timestamp=ahora, status=Mensaje.STATUS_PENDIENTE, por_ia=por_ia,
     )
     cambios = {'ultimo_mensaje_at': ahora, 'ultimo_mensaje_texto': (contenido or f'[{tipo}]')[:200], 'archivada': False}
     if usuario and not automatico:
         cambios['estado'] = Conversacion.ESTADO_ABIERTA
         cambios['no_leidos'] = 0
+        if conv.linea.agente_ia_activo and conv.bot_activo:
+            cambios['bot_activo'] = False  # una persona tomó el chat: el agente IA se calla
     Conversacion.objects.filter(pk=conv.pk).update(**cambios)
 
     from .tasks import enviar_mensaje_task

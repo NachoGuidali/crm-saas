@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Agente IA · Conocimiento{% endblock %}
+{% block content %}
+{% include "agente/_tabs.html" %}
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card mb-3"><div class="card-header d-flex justify-content-between align-items-center">Información del producto
+      <a href="{% url 'agente:documento_nuevo' %}" class="btn btn-xs btn-primary"><i class="bi bi-plus"></i> Agregar</a></div>
+      <div class="table-responsive"><table class="table table-sm mb-0 small"><tbody>
+      {% for d in docs %}<tr class="{% if not d.activo %}text-secondary{% endif %}">
+        <td><a href="{% url 'agente:documento' d.pk %}">{{ d.titulo }}</a>{% if d.enviable %} <span class="chip info" title="El agente puede mandarle este archivo al lead"><i class="bi bi-paperclip"></i> se envía</span>{% endif %}{% if not d.activo %} <span class="chip">inactivo</span>{% endif %}
+          <div class="muted">{{ d.texto|length }} caracteres · {{ d.updated_at|date:"d/m H:i" }}</div></td>
+        <td class="text-end"><form method="post" onsubmit="return confirm('¿Borrar «{{ d.titulo|escapejs }}»?')">{% csrf_token %}<input type="hidden" name="accion" value="doc_borrar"><input type="hidden" name="doc" value="{{ d.pk }}"><button class="btn btn-link btn-sm text-danger p-0"><i class="bi bi-trash3"></i></button></form></td>
+      </tr>{% empty %}<tr><td class="muted text-center py-4">Cargá planes, coberturas, requisitos, preguntas frecuentes y cómo responder objeciones. Texto o archivo (PDF, Word, TXT).</td></tr>{% endfor %}
+      </tbody></table></div>
+      <div class="card-footer small muted">Total: {{ total_chars }} caracteres (~{{ tokens_aprox }} tokens). El agente lo lee entero en cada respuesta, con caché: hasta ~150.000 tokens funciona bien.</div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card mb-3"><div class="card-header">Tabla de precios</div><div class="card-body small">
+      <p class="muted mb-2">Una planilla con una fila de títulos (ej. <i>Plan · Zona · Edad desde · Edad hasta · Grupo · Precio</i>). El agente cotiza <b>solo</b> con esta tabla.</p>
+      {% if cfg.precios_filas %}<div class="mb-2"><b>{{ cfg.precios_filas|length }} filas</b> · actualizada {{ cfg.precios_actualizado_at|date:"d/m H:i" }}{% if cfg.precios_url %} · <span class="chip info"><i class="bi bi-arrow-repeat"></i> Google Sheets cada 30 min</span>{% endif %}</div>{% endif %}
+      {% if cfg.precios_error %}<div class="alert alert-danger py-1 px-2 small">{{ cfg.precios_error }}</div>{% endif %}
+      <form method="post" enctype="multipart/form-data" class="d-flex gap-2 mb-2">{% csrf_token %}<input type="hidden" name="accion" value="precios_archivo">
+        <input type="file" name="planilla" accept=".xlsx,.csv" class="form-control form-control-sm" required><button class="btn btn-sm btn-outline-primary text-nowrap">Subir Excel/CSV</button></form>
+      <form method="post" class="d-flex gap-2 mb-2">{% csrf_token %}<input type="hidden" name="accion" value="precios_google">
+        <input name="precios_url" value="{{ cfg.precios_url }}" placeholder="Link de Google Sheets (compartido: cualquiera con el link)" class="form-control form-control-sm" required><button class="btn btn-sm btn-outline-primary text-nowrap">Enlazar</button></form>
+      {% if cfg.precios_filas %}<form method="post" onsubmit="return confirm('¿Borrar la tabla de precios?')">{% csrf_token %}<input type="hidden" name="accion" value="precios_borrar"><button class="btn btn-link btn-sm text-danger p-0">Borrar tabla</button></form>{% endif %}
+    </div>
+    {% if muestra %}<div class="table-responsive" style="max-height:340px"><table class="table table-sm mb-0 small"><thead><tr>{% for c in cfg.precios_columnas %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+      <tbody>{% for f in muestra %}<tr>{% for v in f %}<td>{{ v }}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>
+      {% if cfg.precios_filas|length > 15 %}<div class="card-footer small muted">Mostrando 15 de {{ cfg.precios_filas|length }}.</div>{% endif %}{% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

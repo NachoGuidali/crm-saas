@@ -73,6 +73,7 @@ TENANT_APPS = [
     'apps.reportes',
     'apps.cuentas',
     'apps.firmas',
+    'apps.agente',
 ]
 INSTALLED_APPS = SHARED_APPS + [a for a in TENANT_APPS if a not in SHARED_APPS]
 
@@ -224,6 +225,9 @@ CELERY_TASK_ROUTES = {
     'whatsapp.enviar_mensaje': {'queue': 'salientes'},
     'automatizaciones.ejecutar_accion': {'queue': 'salientes'},
     'automatizaciones.difusiones_tick': {'queue': 'masivos'},
+    'agente.atender': {'queue': 'agente'},
+    'agente.atender_modo': {'queue': 'agente'},
+    'agente.transcribir': {'queue': 'agente'},
 }
 CELERY_TASK_DEFAULT_QUEUE = 'default'
 # El worker cachea el cliente de cada schema (evita una consulta al schema público por tarea).
@@ -246,6 +250,8 @@ CELERY_BEAT_SCHEDULE = {
     'whatsapp-sync-plantillas': {'task': 'whatsapp.sincronizar_plantillas', 'schedule': crontab(minute=0)},
     'avisos-recurrentes': {'task': 'cuentas.enviar_avisos_recurrentes', 'schedule': crontab(hour=10, minute=0)},
     'recordatorios-personales': {'task': 'cuentas.enviar_recordatorios', 'schedule': crontab(hour=8, minute=0)},
+    'agente-seguimientos': {'task': 'agente.seguimientos', 'schedule': 300},
+    'agente-precios': {'task': 'agente.sincronizar_precios', 'schedule': 1800},
     'purgar-logs': {'task': 'core.purgar_logs', 'schedule': crontab(hour=3, minute=30)},
     # Solo en el schema público (plataforma): avisos de vencimiento y suspensión por falta de pago.
     'clientes-cobros': {'task': 'clientes.revisar_cobros', 'schedule': crontab(hour=9, minute=0),
@@ -263,6 +269,12 @@ DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', 'CRM Ventas <no-responder@localho
 
 # ── WhatsApp: valores default para líneas Evolution (cada línea puede pisarlos) ─
 EVOLUTION_API_URL = env('EVOLUTION_API_URL', 'http://evolution-api:8080')
+
+# ── Agente IA de ventas (función extra 'agente_ia') ───────────────────────
+ANTHROPIC_API_KEY = env('ANTHROPIC_API_KEY', '')
+# Transcripción de notas de voz (OpenAI). Vacío = los audios no se transcriben.
+OPENAI_API_KEY = env('OPENAI_API_KEY', '')
+OPENAI_TRANSCRIBE_MODEL = env('OPENAI_TRANSCRIBE_MODEL', 'gpt-transcribe')
 EVOLUTION_API_KEY = env('EVOLUTION_API_KEY', '')
 
 LOG_RETENTION_DAYS = int(env('LOG_RETENTION_DAYS', '90'))

@@ -110,6 +110,11 @@
         <span class="nav-icon"><i class="bi bi-funnel"></i></span> Embudos y tipificaciones
       </a>
       {% endif %}
+      {% if 'agente_ia' in funciones_cliente and 'agente_ia' in perms_crm %}
+      <a href="{% url 'agente:config' %}" class="nav-item {% if seccion == 'agente' %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-robot"></i></span> Agente IA
+      </a>
+      {% endif %}
       {% if 'firmas' in funciones_cliente and 'firmas' in perms_crm %}
       <a href="{% url 'firmas:lista' %}" class="nav-item {% if seccion == 'firmas' %}active{% endif %}">
         <span class="nav-icon"><i class="bi bi-pen"></i></span> Formularios de firma

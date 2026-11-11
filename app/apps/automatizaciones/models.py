@@ -20,6 +20,7 @@ class AccionEtapa(models.Model):
     TIPO_PRIORIDAD = 'prioridad'
     TIPO_ETIQUETA = 'etiqueta'
     TIPO_FIRMA = 'firma'
+    TIPO_AGENTE_IA = 'agente_ia'
     DISP_ENTRADA = 'entrada'
     DISP_SIN_RESPUESTA = 'sin_respuesta'
     DISP_RESPUESTA = 'respuesta'
@@ -53,6 +54,7 @@ class AccionEtapa(models.Model):
         (TIPO_PRIORIDAD, 'Marcar como prioridad'),
         (TIPO_ETIQUETA, 'Poner una etiqueta al contacto'),
         (TIPO_FIRMA, 'Enviar un formulario para firmar'),
+        (TIPO_AGENTE_IA, 'El agente IA le escribe (prospección / seguimiento)'),
     ]
     REPARTO_EMBUDO = 'embudo'
     REPARTO_MENOR_CARGA = 'menor_carga'
@@ -73,7 +75,8 @@ class AccionEtapa(models.Model):
                        ('usuario', 'A un usuario fijo')]
     ICONOS = {TIPO_WHATSAPP: 'whatsapp', TIPO_EMAIL: 'envelope', TIPO_TAREA: 'calendar-plus',
               TIPO_NOTIF_AGENTE: 'bell', TIPO_NOTIF_SUPERVISORES: 'megaphone', TIPO_EMBUDO: 'signpost-split', TIPO_ETAPA: 'arrow-right-circle', TIPO_SMS: 'phone',
-              TIPO_REASIGNAR: 'arrow-left-right', TIPO_PRIORIDAD: 'fire', TIPO_ETIQUETA: 'tag', TIPO_FIRMA: 'pen'}
+              TIPO_REASIGNAR: 'arrow-left-right', TIPO_PRIORIDAD: 'fire', TIPO_ETIQUETA: 'tag', TIPO_FIRMA: 'pen',
+              TIPO_AGENTE_IA: 'robot'}
 
     embudo = models.ForeignKey('crm.Embudo', on_delete=models.CASCADE, related_name='acciones')
     etapa = models.ForeignKey('crm.Etapa', on_delete=models.CASCADE, related_name='acciones',
@@ -232,6 +235,8 @@ class AccionEtapa(models.Model):
             return f'Etiqueta «{self.etiqueta}»'
         if self.tipo == self.TIPO_FIRMA:
             return f'Envía «{self.formulario_firma}» ({self.get_canal_firma_display().lower()})'
+        if self.tipo == self.TIPO_AGENTE_IA:
+            return 'El agente IA escribe' + (f': {self.texto[:60]}' if self.texto else '')
         if self.tipo == self.TIPO_ETAPA:
             return f'Pasa a {self.mover_a}' + (f' ({self.tipificacion})' if self.tipificacion_id else '')
         if self.tipo != self.TIPO_EMBUDO:

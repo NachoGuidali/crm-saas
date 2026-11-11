@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Agente IA · Líneas{% endblock %}
+{% block content %}
+{% include "agente/_tabs.html" %}
+<div class="card mb-3"><div class="card-header">Líneas de WhatsApp</div>
+  <div class="table-responsive"><table class="table table-sm align-middle mb-0 small">
+    <thead><tr><th>Línea</th><th>Estado</th><th>Agente</th><th>Reserva</th><th>Calentamiento</th><th>Tope chats nuevos/día</th><th>Hoy</th><th></th></tr></thead>
+    <tbody>{% for l in lineas %}<tr><form method="post">{% csrf_token %}<input type="hidden" name="accion" value="linea"><input type="hidden" name="linea" value="{{ l.pk }}">
+      <td><b>{{ l.nombre }}</b><div class="muted">{{ l.telefono|default:"⚠ sin número cargado (no entra en los links)" }} · {{ l.get_proveedor_display }}</div></td>
+      <td><span class="chip {% if l.estado == 'conectada' %}ok{% elif l.estado == 'conectando' %}info{% else %}danger{% endif %}">{{ l.get_estado_display }}</span></td>
+      <td><div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="agente_ia_activo" {% if l.agente_ia_activo %}checked{% endif %}></div></td>
+      <td><div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="reserva" {% if l.reserva %}checked{% endif %}></div></td>
+      <td><div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="calentamiento" {% if l.calentamiento_inicio %}checked{% endif %}></div>{% if l.calentamiento_inicio %}<div class="muted">desde {{ l.calentamiento_inicio|date:"d/m" }}</div>{% endif %}</td>
+      <td style="width:120px"><input type="number" min="0" name="max_salientes_dia" value="{{ l.max_salientes_dia }}" class="form-control form-control-sm"></td>
+      <td class="text-nowrap">{{ l.iniciados }} / {% if l.cupo_hoy is None %}∞{% else %}{{ l.cupo_hoy }}{% endif %}</td>
+      <td><button class="btn btn-xs btn-outline-primary">Guardar</button></td>
+    </form></tr>{% empty %}<tr><td colspan="8" class="muted text-center py-3">No hay líneas. Creá y conectá líneas en WhatsApp → Líneas.</td></tr>{% endfor %}</tbody>
+  </table></div>
+  <div class="card-footer small muted">
+    <b>Agente</b>: las conversaciones nuevas de esa línea las atiende el agente. <b>Reserva</b>: conectada pero sin usar; si se cae (o bloquean) una línea del agente, entra sola y te avisa.
+    <b>Calentamiento</b>: el tope de chats que inicia el agente arranca en 15/día y sube 10 por día hasta el tope de la línea (0 = sin tope; con calentamiento llega hasta 200). Solo cuenta los chats que <i>inicia</i> el agente: responder no tiene tope.
+  </div>
+</div>
+
+<div class="card"><div class="card-header">Links rotativos para anuncios</div><div class="card-body small">
+  <p class="muted">En vez de poner un número fijo en el anuncio, poné el link: reparte los leads entre las líneas conectadas y, si bloquean una, sigue con las demás.</p>
+  {% for e in enlaces %}<form method="post" class="border rounded p-2 mb-2">{% csrf_token %}<input type="hidden" name="accion" value="enlace"><input type="hidden" name="enlace" value="{{ e.pk }}">
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-1"><b>{{ e.nombre }}</b>
+      <input class="form-control form-control-sm" style="max-width:340px" readonly value="{{ base }}/w/{{ e.slug }}/" onclick="this.select();navigator.clipboard&&navigator.clipboard.writeText(this.value)">
+      <span class="chip">{{ e.clics }} clics</span>{% if not e.activo %}<span class="chip danger">pausado</span>{% endif %}</div>
+    <div class="row g-2"><div class="col-md-3"><input name="nombre" value="{{ e.nombre }}" class="form-control form-control-sm"></div>
+      <div class="col-md-5"><input name="mensaje" value="{{ e.mensaje }}" placeholder="Mensaje precargado" class="form-control form-control-sm"></div>
+      <div class="col-md-4 d-flex flex-wrap gap-2">{% for l in lineas %}<label class="d-flex gap-1"><input type="checkbox" class="form-check-input" name="lineas" value="{{ l.pk }}" {% if l in e.lineas.all %}checked{% endif %}> {{ l.nombre }}</label>{% endfor %}</div></div>
+    <div class="mt-1 d-flex gap-2"><button class="btn btn-xs btn-outline-primary">Guardar</button>
+      <button name="accion" value="enlace_borrar" class="btn btn-xs btn-outline-danger" onclick="return confirm('¿Borrar el link? Los anuncios que lo usen dejan de funcionar.')">Borrar</button></div>
+  </form>{% endfor %}
+  <form method="post" class="row g-2 mt-2">{% csrf_token %}<input type="hidden" name="accion" value="enlace">
+    <div class="col-md-3"><input name="nombre" placeholder="Nombre (ej. Meta noviembre)" class="form-control form-control-sm" required></div>
+    <div class="col-md-6"><input name="mensaje" placeholder="Mensaje precargado (ej. Hola, quiero info de los planes)" class="form-control form-control-sm"></div>
+    <div class="col-md-3"><button class="btn btn-sm btn-primary w-100"><i class="bi bi-plus"></i> Crear link</button></div>
+    <div class="col-12 form-text">Sin líneas marcadas, usa todas las que tienen el agente prendido.</div>
+  </form>
+</div></div>
+{% endblock %}

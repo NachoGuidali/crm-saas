@@ -54,6 +54,11 @@ services:
     <<: *app
     command: celery -A config worker -Q salientes,masivos -c ${WORKER_MASIVOS_CONCURRENCY:-3} -l info
 
+  # Agente IA de ventas: su propia cola, así un pico de respuestas no frena envíos ni automatizaciones.
+  worker-agente:
+    <<: *app
+    command: celery -A config worker -Q agente -c ${WORKER_AGENTE_CONCURRENCY:-4} -l info
+
   beat:
     <<: *app
     command: celery -A config beat -l info -s /tmp/celerybeat-schedule

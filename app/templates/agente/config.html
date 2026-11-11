@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Agente IA{% endblock %}
+{% block content %}
+{% include "agente/_tabs.html" %}
+{% if falta_key %}<div class="alert alert-danger py-2 small"><b>Falta la API key de Anthropic.</b> Cargá <code>ANTHROPIC_API_KEY</code> en el <code>.env</code> del servidor y reiniciá (<code>docker compose up -d</code>). Sin eso el agente no puede responder.</div>{% endif %}
+{% if falta_openai %}<div class="alert alert-warning py-2 small">Sin <code>OPENAI_API_KEY</code> las notas de voz no se transcriben: el agente le va a pedir al lead que escriba.</div>{% endif %}
+<form method="post">{% csrf_token %}
+{% if form.errors %}<div class="alert alert-danger py-2 small">Revisá los campos marcados.</div>{% endif %}
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card mb-3"><div class="card-header d-flex justify-content-between align-items-center">Identidad y guion
+      <label class="d-flex gap-2 align-items-center small mb-0 fw-semibold">{{ form.activo }} Agente prendido</label></div>
+      <div class="card-body"><div class="row g-2">
+        <div class="col-md-4"><label class="form-label">Nombre</label>{{ form.nombre }}</div>
+        <div class="col-md-8"><label class="form-label">{{ form.empresa.label }}</label>{{ form.empresa }}</div>
+        <div class="col-12"><label class="form-label">{{ form.instrucciones.label }}</label>{{ form.instrucciones }}
+          <div class="form-text">{{ form.instrucciones.help_text }} Lo básico (presentarse como asistente virtual, no inventar precios, no dar consejos médicos, derivar cuando califica) ya viene incluido.</div></div>
+        <div class="col-12"><label class="form-label">{{ form.criterios.label }}</label>{{ form.criterios }}<div class="form-text">{{ form.criterios.help_text }}</div></div>
+      </div></div></div>
+    <div class="card mb-3"><div class="card-header">Datos que tiene que juntar</div><div class="card-body small">
+      <div class="mb-2 muted">Siempre guarda el nombre. Elegí qué más tiene que conseguir; lo guarda en la ficha del lead a medida que se lo dicen.</div>
+      <div class="row"><div class="col-md-5"><div class="fw-semibold mb-1">Del contacto</div>{% for c in form.campos_base %}<div class="form-check">{{ c.tag }} <label class="form-check-label" for="{{ c.id_for_label }}">{{ c.choice_label }}</label></div>{% endfor %}</div>
+        <div class="col-md-7"><div class="fw-semibold mb-1">Campos personalizados</div>{% for c in form.campos %}<div class="form-check">{{ c.tag }} <label class="form-check-label" for="{{ c.id_for_label }}">{{ c.choice_label }}</label></div>{% empty %}<div class="muted">No hay campos personalizados. Crealos en Configuración → Campos (ej. "¿Tiene recibo de sueldo?", "Grupo familiar").</div>{% endfor %}</div></div>
+    </div></div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card mb-3"><div class="card-header">Motor</div><div class="card-body"><div class="row g-2">
+      <div class="col-12"><label class="form-label">Modelo</label>{{ form.modelo }}</div>
+      <div class="col-12"><label class="form-label">Esfuerzo</label>{{ form.esfuerzo }}<div class="form-text">{{ form.esfuerzo.help_text }}</div></div>
+      <div class="col-6"><label class="form-label">{{ form.demora_segundos.label }}</label>{{ form.demora_segundos }}</div>
+      <div class="col-6"><label class="form-label">{{ form.max_turnos.label }}</label>{{ form.max_turnos }}</div>
+      <div class="col-12"><label class="form-label">{{ form.presupuesto_diario.label }}</label>{{ form.presupuesto_diario }}<div class="form-text">{{ form.presupuesto_diario.help_text }}</div></div>
+    </div></div></div>
+    <div class="card mb-3"><div class="card-header">Etapas en este CRM</div><div class="card-body"><div class="row g-2">
+      <div class="col-12"><label class="form-label">Embudo</label>{{ form.embudo }}{{ form.embudo.errors }}</div>
+      <div class="col-12"><label class="form-label">{{ form.etapa_calificando.label }}</label>{{ form.etapa_calificando }}{{ form.etapa_calificando.errors }}</div>
+      <div class="col-12"><label class="form-label">{{ form.etapa_derivado.label }}</label>{{ form.etapa_derivado }}{{ form.etapa_derivado.errors }}</div>
+      <div class="col-md-6"><label class="form-label">{{ form.etapa_descartado.label }}</label>{{ form.etapa_descartado }}{{ form.etapa_descartado.errors }}</div>
+      <div class="col-md-6"><label class="form-label">Motivo de cierre</label>{{ form.tipificacion_descartado }}</div>
+    </div></div></div>
+    <div class="card mb-3"><div class="card-header">Derivación al cerrador</div><div class="card-body"><div class="row g-2">
+      <div class="col-12"><label class="form-label">{{ form.derivar_url.label }}</label>{{ form.derivar_url }}<div class="form-text">{{ form.derivar_url.help_text }} Se manda: datos del lead, campos, resumen de la charla, motivo y link al chat.</div></div>
+      <div class="col-12"><label class="form-label">{{ form.derivar_token.label }}</label>{{ form.derivar_token }}</div>
+      <div class="col-12"><label class="form-label">{{ form.mensaje_derivacion.label }}</label>{{ form.mensaje_derivacion }}</div>
+    </div></div></div>
+    <button class="btn btn-primary">Guardar</button>
+    <a href="{% url 'agente:simulador' %}" class="btn btn-outline-secondary"><i class="bi bi-chat-dots"></i> Probar en el simulador</a>
+  </div>
+</div>
+</form>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Agente IA · Resultados{% endblock %}
+{% block content %}
+{% include "agente/_tabs.html" %}
+<div class="d-flex gap-2 mb-3 small">
+  <a href="?dias=1" class="btn btn-sm {% if dias == 1 %}btn-primary{% else %}btn-outline-secondary{% endif %}">Hoy</a>
+  <a href="?dias=7" class="btn btn-sm {% if dias == 7 %}btn-primary{% else %}btn-outline-secondary{% endif %}">7 días</a>
+  <a href="?dias=30" class="btn btn-sm {% if dias == 30 %}btn-primary{% else %}btn-outline-secondary{% endif %}">30 días</a>
+  <span class="ms-auto muted">Gasto de hoy: US$ {{ gasto_hoy|floatformat:2 }} de {{ cfg.presupuesto_diario }}</span></div>
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-2"><div class="card card-body"><div class="muted small">Chats atendidos</div><div class="fs-4 fw-bold">{{ resumen.chats }}</div></div></div>
+  <div class="col-6 col-md-2"><div class="card card-body"><div class="muted small">Respuestas</div><div class="fs-4 fw-bold">{{ resumen.turnos }}</div></div></div>
+  <div class="col-6 col-md-2"><div class="card card-body"><div class="muted small">Derivados</div><div class="fs-4 fw-bold text-success">{{ derivados }}</div></div></div>
+  <div class="col-6 col-md-2"><div class="card card-body"><div class="muted small">Descartados</div><div class="fs-4 fw-bold">{{ descartados }}</div></div></div>
+  <div class="col-6 col-md-2"><div class="card card-body"><div class="muted small">A una persona</div><div class="fs-4 fw-bold">{{ humano }}</div></div></div>
+  <div class="col-6 col-md-2"><div class="card card-body"><div class="muted small">Costo</div><div class="fs-4 fw-bold">US$ {{ costo|floatformat:2 }}</div>{% if costo_derivado %}<div class="small muted">US$ {{ costo_derivado|floatformat:2 }} por derivado</div>{% endif %}</div></div>
+</div>
+<div class="card"><div class="card-header d-flex justify-content-between">Últimas respuestas{% if resumen.errores %} <span class="chip danger">{{ resumen.errores }} con error</span>{% endif %}
+  <a href="?dias={{ dias }}{% if not sim %}&sim=1{% endif %}" class="small">{% if sim %}Ver chats reales{% else %}Ver pruebas del simulador{% endif %}</a></div>
+  <div class="table-responsive"><table class="table table-sm mb-0 small align-top">
+    <thead><tr><th>Cuándo</th><th>Lead</th><th>Respuesta</th><th>Acciones</th><th class="text-end">Costo</th></tr></thead>
+    <tbody>{% for t in turnos %}<tr class="{% if t.error %}table-danger{% endif %}">
+      <td class="text-nowrap">{{ t.created_at|date:"d/m H:i" }}<div class="muted">{{ t.get_modo_display }}</div></td>
+      <td>{% if t.conversacion %}<a href="/whatsapp/?conv={{ t.conversacion_id }}">{{ t.conversacion.nombre_mostrar }}</a>{% else %}<span class="muted">simulador</span>{% endif %}</td>
+      <td style="white-space:pre-wrap;max-width:420px">{{ t.respuesta|truncatechars:400 }}{% if t.error %}<div class="text-danger">{{ t.error|truncatechars:200 }}</div>{% endif %}</td>
+      <td>{% for h in t.herramientas %}<div title="{{ h.resultado }}"><code>{{ h.nombre }}</code>{% if h.error %} ⚠{% endif %}</div>{% endfor %}</td>
+      <td class="text-end text-nowrap">US$ {{ t.costo|floatformat:4 }}<div class="muted">{{ t.duracion_ms }} ms</div></td>
+    </tr>{% empty %}<tr><td colspan="5" class="muted text-center py-4">Sin actividad en este período.</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+{% endblock %}

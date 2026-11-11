@@ -1,0 +1,9 @@
+<div class="page-head"><h1><i class="bi bi-robot"></i> Agente IA <span class="sub">vendedor virtual por WhatsApp</span></h1>
+  <div class="toolbar">{% if cfg %}<span class="chip {% if cfg.activo %}ok{% else %}danger{% endif %}">{% if cfg.activo %}Prendido{% else %}Apagado{% endif %}</span>{% endif %}</div></div>
+<ul class="nav nav-tabs mb-3 small">
+  <li class="nav-item"><a class="nav-link {% if tab == 'config' %}active{% endif %}" href="{% url 'agente:config' %}"><i class="bi bi-sliders"></i> Configuración</a></li>
+  <li class="nav-item"><a class="nav-link {% if tab == 'conocimiento' %}active{% endif %}" href="{% url 'agente:conocimiento' %}"><i class="bi bi-journal-text"></i> Conocimiento y precios</a></li>
+  <li class="nav-item"><a class="nav-link {% if tab == 'lineas' %}active{% endif %}" href="{% url 'agente:lineas' %}"><i class="bi bi-whatsapp"></i> Líneas y links</a></li>
+  <li class="nav-item"><a class="nav-link {% if tab == 'simulador' %}active{% endif %}" href="{% url 'agente:simulador' %}"><i class="bi bi-chat-dots"></i> Simulador</a></li>
+  <li class="nav-item"><a class="nav-link {% if tab == 'registro' %}active{% endif %}" href="{% url 'agente:registro' %}"><i class="bi bi-graph-up"></i> Resultados</a></li>
+</ul>
