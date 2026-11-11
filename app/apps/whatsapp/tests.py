@@ -429,3 +429,31 @@ class EliminarParaTodosTests(WhatsAppBase):
         html = self.cl.get(f'/whatsapp/conversacion/{self.conv.pk}/mensajes/').json()['html']
         self.assertIn(f'data-msg="{self.msg.pk}"', html)
         self.assertIn('eliminar-msg', html)
+
+
+class ReactivarBotSoloTests(WhatsAppBase):
+    def test_vuelve_al_bot_tras_n_dias_sin_mensajes(self):
+        from apps.crm.services import ingresar_prospecto
+        from .services import reactivar_bots_inactivos
+        linea = LineaWhatsApp.objects.create(nombre='Bot', proveedor='demo', bot_n8n_activo=True, bot_reactivar_dias=3,
+                                             bot_n8n_liberar_url='https://n8n.test/webhook/multi-reiniciar')
+        hace = timezone.now() - timedelta(days=4)
+        def chat(tel, **kw):
+            op = ingresar_prospecto({'telefono': tel, 'nombre': tel}, self.embudo, 'manual').oportunidad
+            c = Conversacion.objects.create(linea=linea, telefono='549' + tel, contacto=op.contacto, bot_activo=False,
+                                            bot_derivada=True, ultimo_mensaje_at=kw.get('ultimo', hace))
+            return c, op
+        viejo, op = chat('1150000001')
+        reciente, _ = chat('1150000002', ultimo=timezone.now() - timedelta(days=1))
+        baja, op_baja = chat('1150000003')
+        op_baja.contacto.no_contactar = True
+        op_baja.contacto.save()
+        with mock.patch('requests.post') as post, self.captureOnCommitCallbacks(execute=True):
+            self.assertEqual(reactivar_bots_inactivos(), 1)
+        viejo.refresh_from_db()
+        self.assertTrue(viejo.bot_activo and not viejo.bot_derivada)
+        self.assertEqual(post.call_args.kwargs['json']['phone'], '5491150000001')
+        self.assertTrue(op.actividades.filter(texto__startswith='Bot reactivado solo').exists())
+        for c in (reciente, baja):
+            c.refresh_from_db()
+            self.assertFalse(c.bot_activo)

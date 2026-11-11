@@ -350,14 +350,12 @@ class ConversacionAccionView(LoginRequiredMixin, View):
         elif accion == 'bot_off':
             cambios = {'bot_activo': False}
         elif accion == 'bot_on':
-            cambios = {'bot_activo': True, 'bot_derivada': False}
+            services.reactivar_bot(conv)  # y avisa a n8n para que retome la charla de cero
+            cambios = {}
         else:
             return error('Acción desconocida', 404)
-        Conversacion.objects.filter(pk=conv.pk).update(**cambios)
-        if accion == 'bot_on':
-            # Avisar a n8n para que retome la conversación de cero.
-            from .tasks import liberar_bot_n8n
-            liberar_bot_n8n.delay(conv.pk)
+        if cambios:
+            Conversacion.objects.filter(pk=conv.pk).update(**cambios)
         services.invalidar_no_leidos([request.user.pk, conv.agente_id, getattr(cambios.get('agente'), 'pk', None)])
         services.marcar_cambio_inbox()
         mensajes = {'bot_off': 'Bot pausado: tomás vos la conversación.', 'bot_on': 'Bot reactivado.'}
@@ -373,7 +371,7 @@ class LineaForm(forms.ModelForm):
         model = LineaWhatsApp
         fields = ['nombre', 'proveedor', 'telefono', 'activa', 'orden', 'embudo', 'agentes',
                   'min_segundos_entre_envios', 'max_segundos_entre_envios',
-                  'bot_n8n_activo', 'bot_n8n_url', 'bot_n8n_liberar_url',
+                  'bot_n8n_activo', 'bot_n8n_url', 'bot_n8n_liberar_url', 'bot_reactivar_dias',
                   'evolution_instancia', 'evolution_api_url', 'evolution_api_key',
                   'meta_phone_number_id', 'meta_waba_id', 'meta_access_token', 'meta_app_secret', 'meta_verify_token',
                   'meta_api_version', 'twilio_account_sid', 'twilio_auth_token', 'twilio_from']

@@ -249,6 +249,7 @@ CELERY_BEAT_SCHEDULE = {
     'discador-tick': {'task': 'telefonia.discador_tick', 'schedule': 10},
     'anura-polling-cdrs': {'task': 'telefonia.polling_cdrs', 'schedule': 300},
     'anura-limpiar-llamadas-colgadas': {'task': 'telefonia.cerrar_llamadas_colgadas', 'schedule': 120},
+    'whatsapp-reactivar-bots': {'task': 'whatsapp.reactivar_bots', 'schedule': 1800},
     'whatsapp-estado-lineas': {'task': 'whatsapp.actualizar_estado_lineas', 'schedule': 300},
     'whatsapp-sync-plantillas': {'task': 'whatsapp.sincronizar_plantillas', 'schedule': crontab(minute=0)},
     'avisos-recurrentes': {'task': 'cuentas.enviar_avisos_recurrentes', 'schedule': crontab(hour=10, minute=0)},

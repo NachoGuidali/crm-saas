@@ -276,6 +276,45 @@ def enviar_mensaje(conv, usuario=None, texto='', plantilla=None, valores=None, a
     return mensaje
 
 
+def reactivar_bot(conv):
+    """El chat vuelve a quedar a cargo del bot (n8n o agente IA) y n8n reinicia su memoria de ese número."""
+    Conversacion.objects.filter(pk=conv.pk).update(bot_activo=True, bot_derivada=False)
+    if conv.linea.bot_n8n_liberar_url:
+        from .tasks import liberar_bot_n8n
+        liberar_bot_n8n.delay(conv.pk)  # solo usa el teléfono y la URL de la línea: no depende de este commit
+
+
+def reactivar_bots_inactivos(ahora=None):
+    """
+    Líneas con "Reactivar el bot solo después de N días": los chats que tomó una persona y llevan N días sin
+    mensajes vuelven al bot. Nunca: contactos 'no contactar' / teléfono inválido, ni clientes (venta ganada).
+    Devuelve cuántos reactivó.
+    """
+    from datetime import timedelta
+    from django.db.models import Q
+    from apps.crm.models import Actividad, Oportunidad
+    ahora = ahora or timezone.now()
+    total = 0
+    lineas = LineaWhatsApp.objects.filter(activa=True, bot_reactivar_dias__gt=0).filter(
+        Q(bot_n8n_activo=True) | Q(agente_ia_activo=True))
+    for linea in lineas:
+        limite = ahora - timedelta(days=linea.bot_reactivar_dias)
+        convs = (Conversacion.objects.filter(linea=linea, bot_activo=False, ultimo_mensaje_at__lt=limite)
+                 .exclude(contacto__no_contactar=True).exclude(contacto__telefono_invalido=True)
+                 .exclude(contacto__oportunidades__estado=Oportunidad.ESTADO_GANADA)
+                 .select_related('linea', 'contacto')[:200])
+        for conv in convs:
+            reactivar_bot(conv)
+            if conv.contacto_id:
+                Actividad.objects.create(contacto=conv.contacto, oportunidad=_oportunidad_de(conv.contacto),
+                                         tipo=Actividad.TIPO_SISTEMA,
+                                         texto=f'Bot reactivado solo: {linea.bot_reactivar_dias} días sin mensajes en el chat.')
+            total += 1
+    if total:
+        marcar_cambio_inbox()
+    return total
+
+
 def eliminar_para_todos(msg, usuario=None):
     """Borra un mensaje enviado del WhatsApp del contacto. En el CRM queda tachado (no se pierde el registro)."""
     from .proveedores import ErrorProveedor, get_proveedor

@@ -144,3 +144,10 @@ def liberar_bot_n8n(conv_pk):
         logger.info('Avisado liberar-bot a n8n (conv %s)', conv_pk)
     except Exception as e:
         logger.warning('Error avisando liberar-bot a n8n conv %s: %s', conv_pk, e)
+
+
+@shared_task(name='whatsapp.reactivar_bots')
+def reactivar_bots():
+    """Cada 30 min (en cada cliente): chats tomados por una persona que llevan N días sin mensajes vuelven al bot."""
+    from .services import reactivar_bots_inactivos
+    return reactivar_bots_inactivos()

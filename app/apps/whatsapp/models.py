@@ -81,6 +81,10 @@ class LineaWhatsApp(models.Model):
     bot_n8n_liberar_url = models.CharField(
         max_length=500, blank=True, verbose_name='Webhook de n8n para reiniciar',
         help_text='Opcional: se avisa a esta URL cuando un agente reactiva el bot, para que retome la charla de cero.')
+    bot_reactivar_dias = models.PositiveSmallIntegerField(
+        default=0, verbose_name='Reactivar el bot solo después de (días)',
+        help_text='Si una persona tomó el chat y pasan estos días sin mensajes (ni del lead ni del equipo), el chat vuelve '
+                  'al bot (n8n o agente IA) y la charla arranca de cero. No le escribe nada al lead. 0 = nunca.')
 
     # ── Agente IA (módulo extra) ──
     agente_ia_activo = models.BooleanField(
