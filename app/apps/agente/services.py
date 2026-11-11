@@ -45,26 +45,27 @@ def linea_cambio_estado(linea, anterior, nuevo):
 def iniciar_chat(oportunidad, objetivo=''):
     """
     El agente le escribe primero a un lead (automatización o prospección). Elige la línea con cupo, abre el chat
-    con el bot activo y encola el turno. Devuelve (ok, detalle).
+    con el bot activo y encola el turno. Devuelve (ok, detalle, reintentar): reintentar=True si hoy no hay cupo
+    en ninguna línea (se prueba mañana).
     """
     from apps.whatsapp import services as wa
     from apps.whatsapp.models import Conversacion
     from . import lineas, tasks
     from .models import ConfigAgente
     if not habilitado():
-        return False, 'El módulo Agente IA no está habilitado.'
+        return False, 'El módulo Agente IA no está habilitado.', False
     if not ConfigAgente.get().activo:
-        return False, 'El agente está apagado.'
+        return False, 'El agente está apagado.', False
     contacto = oportunidad.contacto
     if not contacto.puede_recibir_mensajes:
-        return False, 'El contacto no acepta mensajes.'
+        return False, 'El contacto no acepta mensajes.', False
     linea = lineas.elegir_para_iniciar(contacto)
     if linea is None:
-        return False, 'No hay líneas del agente conectadas con cupo libre hoy.'
+        return False, 'Sin cupo hoy en las líneas del agente: se reintenta mañana.', True
     conv = wa.conversacion_para_contacto(contacto, linea)
     if not conv.bot_activo and conv.mensajes.exists():
-        return False, 'Ese chat ya lo atiende una persona.'
+        return False, 'Ese chat ya lo atiende una persona.', False
     Conversacion.objects.filter(pk=conv.pk).update(bot_activo=True, bot_derivada=False)
     conv_pk = conv.pk
     transaction.on_commit(lambda: tasks.atender_modo.delay(conv_pk, 'inicio', objetivo))
-    return True, f'El agente le escribe desde {linea}.'
+    return True, f'El agente le escribe desde {linea}.', False

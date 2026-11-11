@@ -333,7 +333,9 @@ def atender(conv, modo=TurnoAgente.MODO_RESPUESTA, motivo=''):
     turno.duracion_ms = int((time.monotonic() - inicio) * 1000)
     turno.save()
 
-    demora = 0
+    # Primer contacto / seguimiento: respetan el espaciado de la línea (como las difusiones), así 100 leads
+    # que entran juntos no salen todos en el mismo minuto. Las respuestas a un lead que escribe no esperan turno.
+    demora = wa.demora_para(conv.linea) if modo != TurnoAgente.MODO_RESPUESTA else 0
     for i, texto in enumerate(partes):
         demora += min(max(len(texto) / 18, 2), 10) if i else 1  # "escribiendo…": proporcional al largo
         try:

@@ -238,7 +238,10 @@ class ProspeccionYLineasTests(AgenteBase):
                 ej = EjecucionAccion.objects.create(accion=acc, oportunidad=op, programada_para=timezone.now())
                 with self.captureOnCommitCallbacks(execute=True):
                     estados.append(ejecutar(ej.pk))
-        self.assertEqual(estados, ['ejecutada', 'omitida'])  # tope 1 por día (min(calentamiento 15, tope 1))
+        self.assertEqual(estados, ['ejecutada', 'programada'])  # tope 1 por día: el segundo pasa a mañana
+        ej2 = EjecucionAccion.objects.get(oportunidad=ops[1])
+        self.assertEqual(timezone.localtime(ej2.programada_para).date(), timezone.localdate() + timedelta(days=1))
+        self.assertIn('reintenta mañana', ej2.detalle)
         self.assertIn('Presentate y preguntá', claude.llamadas[0]['messages'][-1]['content'])
         self.assertEqual(TurnoAgente.objects.get().modo, 'inicio')
         conv = Conversacion.objects.get(contacto=ops[0].contacto)

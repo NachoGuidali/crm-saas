@@ -320,6 +320,9 @@ def _encolar(ejec, cuando, ahora):
         logger.error('No se pudo encolar la ejecución %s: %s', ejec.pk, e)
 
 
+REPROGRAMAR_MANANA = 'reprogramar'
+
+
 def ejecutar(ejecucion_id):
     with transaction.atomic():
         ejec = (EjecucionAccion.objects.select_for_update(of=('self',))
@@ -345,6 +348,16 @@ def ejecutar(ejecucion_id):
     except Exception as e:
         logger.exception('Error ejecutando automatización %s sobre oportunidad #%s', accion, op.pk)
         estado, detalle = EjecucionAccion.ESTADO_ERROR, str(e)[:500]
+    if estado == REPROGRAMAR_MANANA:
+        # El agente IA no tiene cupo hoy: vuelve a la cola mañana, repartido en la mañana (no todos a las 9 en punto).
+        import random
+        manana = timezone.localtime() + timedelta(days=1)
+        cuando = manana.replace(hour=9, minute=0, second=0, microsecond=0) + timedelta(minutes=random.randint(0, 180))
+        if accion.solo_en_horario:
+            cuando = proxima_apertura(op.embudo, cuando)
+        EjecucionAccion.objects.filter(pk=ejec.pk).update(estado=EjecucionAccion.ESTADO_PROGRAMADA, programada_para=cuando,
+                                                          ejecutada_at=None, detalle=detalle[:500])
+        return EjecucionAccion.ESTADO_PROGRAMADA
     EjecucionAccion.objects.filter(pk=ejec.pk).update(estado=estado, detalle=detalle[:500])
     if estado == EjecucionAccion.ESTADO_EJECUTADA:
         _programar_siguientes(accion, ejec)
@@ -404,7 +417,9 @@ def _correr(accion, op, ejec_desde=None, etapa_ref=None):
         from apps.agente.services import iniciar_chat
         if not op.activa:
             return E.ESTADO_OMITIDA, 'La oportunidad está cerrada.'
-        ok, detalle = iniciar_chat(op, objetivo=accion.texto)
+        ok, detalle, reintentar = iniciar_chat(op, objetivo=accion.texto)
+        if reintentar:
+            return REPROGRAMAR_MANANA, detalle
         return (E.ESTADO_EJECUTADA if ok else E.ESTADO_OMITIDA), detalle
     if accion.tipo == AccionEtapa.TIPO_FIRMA:
         from apps.firmas import services as firmas
