@@ -21,8 +21,9 @@ class AccionForm(forms.ModelForm):
                   'tipificacion', 'plantilla_email', 'activa', 'solo_si_sigue_en_etapa', 'solo_si_bot_activo', 'solo_en_horario', 'plantilla',
                   'texto', 'linea', 'email_asunto', 'tarea_titulo', 'tarea_vence_horas', 'modo_embudo', 'embudo_destino',
                   'etapa_destino', 'volver_a', 'asignar_destino', 'usuario_destino', 'reparto', 'volver_a_etapa',
-                  'etiqueta', 'formulario_firma', 'canal_firma', 'solo_pautas', 'solo_etiquetas', 'excluir_etiquetas']
-        widgets = {'texto': forms.Textarea(attrs={'rows': 4}), 'otras_etapas': forms.CheckboxSelectMultiple,
+                  'etiqueta', 'formulario_firma', 'canal_firma', 'webhook_destino', 'webhook_plantilla', 'evento_nombre',
+                  'solo_pautas', 'solo_etiquetas', 'excluir_etiquetas']
+        widgets = {'texto': forms.Textarea(attrs={'rows': 4}), 'webhook_plantilla': forms.Textarea(attrs={'rows': 5}), 'otras_etapas': forms.CheckboxSelectMultiple,
                    'solo_pautas': forms.CheckboxSelectMultiple, 'solo_etiquetas': forms.CheckboxSelectMultiple,
                    'excluir_etiquetas': forms.CheckboxSelectMultiple}
 
@@ -40,6 +41,9 @@ class AccionForm(forms.ModelForm):
         from apps.firmas.models import FormularioFirma
         from apps.firmas.services import habilitado as firmas_habilitado
         self.fields['formulario_firma'].queryset = FormularioFirma.objects.filter(activo=True)
+        from apps.integraciones.models import WebhookDestino
+        self.fields['webhook_destino'].queryset = WebhookDestino.objects.filter(activo=True)
+        self.fields['webhook_destino'].required = False
         if not firmas_habilitado():  # módulo extra apagado: no se ofrecen la acción ni el disparador
             actual_tipo, actual_disp = self.instance.tipo if self.instance.pk else None, \
                 self.instance.disparador if self.instance.pk else None
@@ -112,6 +116,20 @@ class AccionForm(forms.ModelForm):
             self.add_error('etapa', 'Elegí la etapa.')
         if disp == AccionEtapa.DISP_DESPUES_DE:
             d['todas_las_etapas'], d['otras_etapas'] = False, []
+        if tipo == AccionEtapa.TIPO_WEBHOOK:
+            if not d.get('webhook_destino'):
+                self.add_error('webhook_destino', 'Elegí a qué sistema mandar los datos (se cargan en Integraciones → Webhooks).')
+            if (d.get('webhook_plantilla') or '').strip():
+                from apps.integraciones.webhooks import ErrorPlantilla, render_plantilla
+                try:
+                    render_plantilla(d['webhook_plantilla'], {})
+                except ErrorPlantilla as e:
+                    self.add_error('webhook_plantilla', str(e))
+        if disp == AccionEtapa.DISP_EVENTO:
+            from apps.integraciones.webhooks import slug_evento
+            d['evento_nombre'] = slug_evento(d.get('evento_nombre'))
+            if not d['evento_nombre']:
+                self.add_error('evento_nombre', 'Poné el nombre del evento que manda el sistema externo (ej. validacion_ok).')
         if tipo == AccionEtapa.TIPO_FIRMA and not d.get('formulario_firma'):
             self.add_error('formulario_firma', 'Elegí qué formulario enviar.')
         if tipo == AccionEtapa.TIPO_ETIQUETA and not d.get('etiqueta'):

@@ -78,3 +78,57 @@ class ConfigSMS(models.Model):
     @property
     def operativo(self):
         return self.activo and self.account_sid and self.auth_token and self.numero
+
+
+class WebhookDestino(models.Model):
+    """Sistema externo al que el CRM le manda datos (CRM de cerradores, videollamada de validación, ERP…)."""
+    AUTH_BEARER = 'bearer'
+    AUTH_HEADER = 'header'
+    AUTH_NINGUNA = 'ninguna'
+    AUTH_CHOICES = [(AUTH_BEARER, 'Authorization: Bearer <token>'), (AUTH_HEADER, 'Header propio con el token'),
+                    (AUTH_NINGUNA, 'Sin autenticación')]
+
+    nombre = models.CharField(max_length=100, help_text='Ej: "CRM cerradores", "Videollamada de validación".')
+    url = models.URLField(max_length=500)
+    autenticacion = models.CharField(max_length=10, choices=AUTH_CHOICES, default=AUTH_BEARER)
+    header_nombre = models.CharField(max_length=60, blank=True, default='X-API-Key',
+                                     verbose_name='Nombre del header', help_text='Solo para "Header propio".')
+    token = CampoCifrado(blank=True)
+    activo = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['nombre']
+        verbose_name = 'Webhook saliente'
+        verbose_name_plural = 'Webhooks salientes'
+
+    def __str__(self):
+        return self.nombre
+
+    def headers(self):
+        h = {'Content-Type': 'application/json', 'User-Agent': 'SupregCRM-Webhooks/1.0'}
+        if self.token and self.autenticacion == self.AUTH_BEARER:
+            h['Authorization'] = f'Bearer {self.token}'
+        elif self.token and self.autenticacion == self.AUTH_HEADER and self.header_nombre:
+            h[self.header_nombre] = self.token
+        return h
+
+
+class EnvioWebhook(models.Model):
+    """Cada envío a un destino: qué se mandó, qué respondió, cuántos intentos."""
+    PENDIENTE, OK, ERROR = 'pendiente', 'ok', 'error'
+    ESTADO_CHOICES = [(PENDIENTE, 'Pendiente'), (OK, 'Enviado'), (ERROR, 'Falló')]
+
+    destino = models.ForeignKey(WebhookDestino, on_delete=models.CASCADE, related_name='envios')
+    oportunidad = models.ForeignKey('crm.Oportunidad', null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    origen = models.CharField(max_length=150, blank=True, help_text='Automatización / derivación del agente / prueba.')
+    payload = models.JSONField(default=dict)
+    estado = models.CharField(max_length=10, choices=ESTADO_CHOICES, default=PENDIENTE, db_index=True)
+    intentos = models.PositiveSmallIntegerField(default=0)
+    respuesta_status = models.PositiveSmallIntegerField(null=True, blank=True)
+    respuesta = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    enviado_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']

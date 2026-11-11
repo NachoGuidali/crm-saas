@@ -18,6 +18,8 @@
 
   <div class="paso"><h6><b>1.</b> Cuándo</h6>
     {{ form.disparador }}
+    <div class="mt-2" id="boxEvento" style="display:none"><label class="form-label small">{{ form.evento_nombre.label }}</label>{{ form.evento_nombre }}{{ form.evento_nombre.errors }}
+      <div class="form-text">{{ form.evento_nombre.help_text }} El sistema externo lo manda a la <b>URL de retorno</b> que va en cada envío (<code>callback.url</code>), con <code>{"evento": "validacion_ok"}</code>.</div></div>
     <div class="mt-2" id="boxFormFirma" style="display:none"><label class="form-label small">¿Qué formulario? <span class="muted">(vacío = cualquiera)</span></label><select class="form-select" id="formFirmaDisp"></select></div>
     <div class="row g-2 mt-1">
       <div class="col-md-6" id="boxEtapa"><label class="form-label small">Etapa</label>{{ form.etapa }}{{ form.etapa.errors }}</div>
@@ -45,6 +47,10 @@
       <div class="col-12 t t-whatsapp"><label class="form-label small">Línea</label>{{ form.linea }}<div class="form-text">{{ form.linea.help_text }}</div></div>
       <div class="col-12 t t-email"><label class="form-label small">Plantilla de email</label>{{ form.plantilla_email }}{{ form.plantilla_email.errors }}<div class="form-text"><a href="{% url 'automatizaciones:plantillas_email' %}" target="_blank">Crear o editar plantillas de email</a> · o escribí asunto y texto abajo.</div></div>
       <div class="col-12 t t-email"><label class="form-label small">Asunto <span class="muted">(si no usás plantilla)</span></label>{{ form.email_asunto }}</div>
+      <div class="col-md-6 t t-webhook"><label class="form-label small">{{ form.webhook_destino.label }}</label>{{ form.webhook_destino }}{{ form.webhook_destino.errors }}
+        <div class="form-text"><a href="{% url 'integraciones:webhooks' %}" target="_blank">Cargar o probar sistemas externos</a></div></div>
+      <div class="col-12 t t-webhook"><label class="form-label small">{{ form.webhook_plantilla.label }}</label>{{ form.webhook_plantilla }}{{ form.webhook_plantilla.errors }}
+        <div class="form-text">{{ form.webhook_plantilla.help_text }} Variables: <code>{nombre}</code> <code>{telefono}</code> <code>{email}</code> <code>{dni}</code> <code>{localidad}</code> <code>{etapa}</code> <code>{embudo}</code> <code>{agente}</code> <code>{campana}</code> <code>{oportunidad_id}</code> <code>{link_ficha}</code> <code>{callback_url}</code> <code>{campo:slug-del-campo}</code>. Siempre entre comillas.</div></div>
       <div class="col-12 t t-agente_ia"><div class="alert alert-info py-2 small mb-0"><i class="bi bi-robot"></i> El agente IA le escribe al lead desde una línea con cupo (respeta el calentamiento y los topes) y sigue la charla él. Abajo, en <b>Texto</b>, contale el objetivo: ej. "Presentate y preguntale si sigue buscando cobertura".</div></div>
       <div class="col-12 t t-whatsapp t-email t-sms t-agente_ia"><label class="form-label small">Texto <span class="muted">(si no usás plantilla · para el agente IA: el objetivo del mensaje)</span></label>{{ form.texto }}{{ form.texto.errors }}<div class="form-text">{{ form.texto.help_text }}</div></div>
       <div class="col-md-8 t t-tarea t-notif_agente t-notif_supervisores t-prioridad"><label class="form-label small">Título de la tarea / aviso <span class="muted">(en prioridad: el motivo, ej. "Reingresó")</span></label>{{ form.tarea_titulo }}</div>
@@ -141,6 +147,7 @@
     reingreso: ['Cuánto esperar después de que reingresa', 'Cuando la persona vuelve a entrar (escribe de nuevo, llena otro formulario, se importa de nuevo) y no se duplicó porque ya tenía la tarjeta.'],
     despues_de: ['Cuánto esperar después de esa automatización', 'Cuando la automatización elegida se ejecutó (por ejemplo, se envió el mensaje de bienvenida).'],
     firma: ['Cuánto esperar después de que firma', 'Cuando el lead completa y firma un formulario (el elegido o cualquiera) estando en la etapa. Ej.: pasarlo a "Documentación recibida" y avisarle al vendedor.'],
+    evento: ['Cuánto esperar después del evento', 'Cuando un sistema externo (ej. la videollamada de validación) avisa que terminó algo, con el nombre de evento de abajo. Ej.: mover a "Validado".'],
     silencio: ['Si deja de contestar durante', 'El cliente escribió, se le contestó (bot o agente) y no volvió a escribir en ese tiempo. Una vez por cada silencio; si vuelve a escribir, no se hace. Ideal para un "¿querés retomar?".'],
     campo: ['Cuánto esperar después de cambiar el campo', 'Cuando el agente (o una integración como n8n) completa o cambia un campo del contacto y se cumplen las condiciones de campo de más abajo.'],
   };
@@ -163,13 +170,15 @@
     $('boxPrevia').style.display = disp.value === 'despues_de' ? '' : 'none';
     $('boxTodas').style.display = $('boxOtras').style.display = disp.value === 'despues_de' ? 'none' : '';
     etapa.disabled = $('id_todas_las_etapas').checked;
-    $('ayudaDemora').textContent = ['entrada', 'respuesta', 'despues_de', 'reingreso', 'campo', 'firma'].includes(disp.value) ? '0 = enseguida.' : '';
+    $('ayudaDemora').textContent = ['entrada', 'respuesta', 'despues_de', 'reingreso', 'campo', 'firma', 'evento'].includes(disp.value) ? '0 = enseguida.' : '';
     sincFirma();
+    $('boxEvento').style.display = disp.value === 'evento' ? '' : 'none';
   };
 
   const ACC = {whatsapp: 'enviar un WhatsApp', email: 'enviar un email', sms: 'enviar un SMS', tarea: 'crear una tarea para el vendedor',
     notif_agente: 'avisar al vendedor', notif_supervisores: 'avisar a supervisión', etapa: 'mover la tarjeta', embudo: 'pasarla a otro embudo',
-    reasignar: 'reasignarla a <b>otro vendedor</b>', firma: 'enviarle un formulario para firmar', prioridad: 'marcarla como <b>🔥 prioridad</b>', etiqueta: 'ponerle una etiqueta'};
+    reasignar: 'reasignarla a <b>otro vendedor</b>', firma: 'enviarle un formulario para firmar', prioridad: 'marcarla como <b>🔥 prioridad</b>', etiqueta: 'ponerle una etiqueta',
+    webhook: 'mandar los datos a un sistema externo', agente_ia: 'que el agente IA le escriba'};
   const resumen = () => {
     const n = parseInt(dv.value || '0'), u = sel(du), espera = n ? `${n} ${u}` : '';
     const otras = [...document.querySelectorAll('[name=otras_etapas]:checked')].map(c => esc(c.parentElement.textContent.trim()));
@@ -184,8 +193,9 @@
       campo: `Cuando <b>cambia un campo</b> (según las condiciones) estando en <b>${et}</b>`,
       firma: `Cuando el lead <b>firma ${sel($('id_formulario_firma')) ? '«' + esc(sel($('id_formulario_firma'))) + '»' : 'un formulario'}</b> estando en <b>${et}</b>`,
       silencio: `Si el cliente, estando en <b>${et}</b>, <b>deja de contestar ${espera || '…'}</b> después de su último mensaje`,
+      evento: `Cuando llega el evento externo <b>${esc($('id_evento_nombre').value) || '…'}</b> estando en <b>${et}</b>`,
     }[disp.value];
-    if (espera && ['entrada', 'respuesta', 'despues_de', 'reingreso', 'campo', 'firma'].includes(disp.value)) cuando += `, esperar <b>${espera}</b> y`;
+    if (espera && ['entrada', 'respuesta', 'despues_de', 'reingreso', 'campo', 'firma', 'evento'].includes(disp.value)) cuando += `, esperar <b>${espera}</b> y`;
     let que = ACC[tipo.value] || '';
     if (tipo.value === 'whatsapp' && sel(pl)) que += ` (plantilla «${esc(sel(pl))}»)`;
     if (tipo.value === 'email' && sel(pe)) que += ` (plantilla «${esc(sel(pe))}»)`;

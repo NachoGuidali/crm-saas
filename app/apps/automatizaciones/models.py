@@ -21,6 +21,7 @@ class AccionEtapa(models.Model):
     TIPO_ETIQUETA = 'etiqueta'
     TIPO_FIRMA = 'firma'
     TIPO_AGENTE_IA = 'agente_ia'
+    TIPO_WEBHOOK = 'webhook'
     DISP_ENTRADA = 'entrada'
     DISP_SIN_RESPUESTA = 'sin_respuesta'
     DISP_RESPUESTA = 'respuesta'
@@ -30,6 +31,7 @@ class AccionEtapa(models.Model):
     DISP_CAMPO = 'campo'
     DISP_SILENCIO = 'silencio'
     DISP_FIRMA = 'firma'
+    DISP_EVENTO = 'evento'
     DISPARADORES = [
         (DISP_ENTRADA, 'Al entrar a la etapa'),
         (DISP_SIN_RESPUESTA, 'Si el cliente no responde (en el tiempo de demora desde que entró a la etapa)'),
@@ -40,6 +42,7 @@ class AccionEtapa(models.Model):
         (DISP_CAMPO, 'Cuando se completa o cambia un campo del contacto'),
         (DISP_SILENCIO, 'Si el cliente respondió y después dejó de contestar (tiempo de demora desde su último mensaje)'),
         (DISP_FIRMA, 'Cuando se recibe un formulario firmado'),
+        (DISP_EVENTO, 'Cuando llega un evento de un sistema externo (ej. validación terminada)'),
     ]
     TIPO_CHOICES = [
         (TIPO_WHATSAPP, 'Enviar WhatsApp al prospecto'),
@@ -55,6 +58,7 @@ class AccionEtapa(models.Model):
         (TIPO_ETIQUETA, 'Poner una etiqueta al contacto'),
         (TIPO_FIRMA, 'Enviar un formulario para firmar'),
         (TIPO_AGENTE_IA, 'El agente IA le escribe (prospección / seguimiento)'),
+        (TIPO_WEBHOOK, 'Enviar datos a un sistema externo (webhook)'),
     ]
     REPARTO_EMBUDO = 'embudo'
     REPARTO_MENOR_CARGA = 'menor_carga'
@@ -76,7 +80,7 @@ class AccionEtapa(models.Model):
     ICONOS = {TIPO_WHATSAPP: 'whatsapp', TIPO_EMAIL: 'envelope', TIPO_TAREA: 'calendar-plus',
               TIPO_NOTIF_AGENTE: 'bell', TIPO_NOTIF_SUPERVISORES: 'megaphone', TIPO_EMBUDO: 'signpost-split', TIPO_ETAPA: 'arrow-right-circle', TIPO_SMS: 'phone',
               TIPO_REASIGNAR: 'arrow-left-right', TIPO_PRIORIDAD: 'fire', TIPO_ETIQUETA: 'tag', TIPO_FIRMA: 'pen',
-              TIPO_AGENTE_IA: 'robot'}
+              TIPO_AGENTE_IA: 'robot', TIPO_WEBHOOK: 'box-arrow-up-right'}
 
     embudo = models.ForeignKey('crm.Embudo', on_delete=models.CASCADE, related_name='acciones')
     etapa = models.ForeignKey('crm.Etapa', on_delete=models.CASCADE, related_name='acciones',
@@ -159,6 +163,14 @@ class AccionEtapa(models.Model):
     formulario_firma = models.ForeignKey('firmas.FormularioFirma', null=True, blank=True, on_delete=models.SET_NULL,
                                          related_name='+', verbose_name='Formulario de firma',
                                          help_text='En el disparador "cuando se recibe firmado": vacío = cualquiera.')
+    webhook_destino = models.ForeignKey('integraciones.WebhookDestino', null=True, blank=True, on_delete=models.PROTECT,
+                                        related_name='acciones', verbose_name='Sistema externo')
+    webhook_plantilla = models.TextField(
+        blank=True, verbose_name='Formato propio (opcional)',
+        help_text='Vacío = formato estándar (todos los datos). O un JSON con variables, ej. '
+                  '{"name": "{nombre}", "phone": "{telefono}", "income": "{campo:sueldo}"}.')
+    evento_nombre = models.CharField(max_length=60, blank=True, verbose_name='Nombre del evento',
+                                     help_text='El que manda el sistema externo, ej. "validacion_ok".')
     canal_firma = models.CharField(max_length=10, choices=CANALES_FIRMA, default='email', verbose_name='Enviar')
 
     orden = models.PositiveSmallIntegerField(default=0)
@@ -235,6 +247,8 @@ class AccionEtapa(models.Model):
             return f'Etiqueta «{self.etiqueta}»'
         if self.tipo == self.TIPO_FIRMA:
             return f'Envía «{self.formulario_firma}» ({self.get_canal_firma_display().lower()})'
+        if self.tipo == self.TIPO_WEBHOOK:
+            return f'Envía datos a «{self.webhook_destino}»'
         if self.tipo == self.TIPO_AGENTE_IA:
             return 'El agente IA escribe' + (f': {self.texto[:60]}' if self.texto else '')
         if self.tipo == self.TIPO_ETAPA:

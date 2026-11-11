@@ -179,6 +179,22 @@ def formulario_firmado(sol):
     return n
 
 
+def evento_externo(op, nombre):
+    """Un sistema externo avisó un evento (ej. "validacion_ok"): dispara "Cuando llega un evento externo" con ese nombre."""
+    acciones = list(AccionEtapa.objects.filter(AccionEtapa.q_etapa(op.etapa_id, op.embudo_id), activa=True,
+                                               disparador=AccionEtapa.DISP_EVENTO, evento_nombre=nombre)
+                    .distinct().select_related('embudo').order_by('orden', 'pk'))
+    ahora, n = timezone.now(), 0
+    for accion in acciones:
+        cuando = ahora + timedelta(minutes=accion.demora_minutos)
+        if accion.solo_en_horario:
+            cuando = proxima_apertura(op.embudo, cuando)
+        ejec = EjecucionAccion.objects.create(accion=accion, oportunidad=op, historial=None, programada_para=cuando)
+        _encolar(ejec, cuando, ahora)
+        n += 1
+    return n
+
+
 def lead_reingreso(op):
     """El lead volvió a entrar (formulario, WhatsApp, importación): dispara las automatizaciones "Cuando reingresa".
     Cada automatización corre como máximo una vez por hora por oportunidad (evita ráfagas de formularios)."""
@@ -413,6 +429,18 @@ def _correr(accion, op, ejec_desde=None, etapa_ref=None):
         return E.ESTADO_OMITIDA, 'El prospecto está pausado.'
 
     contacto = op.contacto
+    if accion.tipo == AccionEtapa.TIPO_WEBHOOK:
+        from apps.integraciones import webhooks
+        destino = accion.webhook_destino
+        if destino is None or not destino.activo:
+            return E.ESTADO_OMITIDA, 'El sistema externo no está configurado o está desactivado.'
+        try:
+            payload = webhooks.armar_payload(op, accion.webhook_plantilla, evento=accion.get_disparador_display(),
+                                             origen=f'Automatización «{accion.nombre}»')
+        except webhooks.ErrorPlantilla as e:
+            return E.ESTADO_ERROR, str(e)
+        envio = webhooks.encolar(destino, payload, oportunidad=op, origen=f'Automatización «{accion.nombre}»')
+        return E.ESTADO_EJECUTADA, f'Enviado a «{destino}» (envío #{envio.pk}; reintenta si no responde).'
     if accion.tipo == AccionEtapa.TIPO_AGENTE_IA:
         from apps.agente.services import iniciar_chat
         if not op.activa:

@@ -9,4 +9,5 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.local')
 app = CeleryApp('crm_ventas')
 app.config_from_object('django.conf:settings', namespace='CELERY')
 app.autodiscover_tasks(['core', 'apps.clientes', 'apps.crm', 'apps.whatsapp', 'apps.telefonia',
-                        'apps.automatizaciones', 'apps.cuentas', 'apps.agente'])
+                        'apps.automatizaciones', 'apps.cuentas', 'apps.agente',
+                        'apps.integraciones'])

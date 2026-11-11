@@ -57,7 +57,7 @@ class ConfigForm(forms.ModelForm):
         model = ConfigAgente
         fields = ['activo', 'nombre', 'empresa', 'modelo', 'esfuerzo', 'instrucciones', 'criterios', 'campos_base',
                   'campos', 'embudo', 'etapa_calificando', 'etapa_derivado', 'etapa_descartado',
-                  'tipificacion_descartado', 'derivar_url', 'derivar_token', 'mensaje_derivacion', 'demora_segundos',
+                  'tipificacion_descartado', 'derivar_destino', 'derivar_url', 'derivar_token', 'mensaje_derivacion', 'demora_segundos',
                   'max_turnos', 'presupuesto_diario']
         widgets = {'instrucciones': forms.Textarea(attrs={'rows': 9}), 'criterios': forms.Textarea(attrs={'rows': 5}),
                    'mensaje_derivacion': forms.Textarea(attrs={'rows': 2}), 'campos': forms.CheckboxSelectMultiple,

@@ -228,6 +228,7 @@ CELERY_TASK_ROUTES = {
     'whatsapp.enviar_mensaje': {'queue': 'salientes'},
     'automatizaciones.ejecutar_accion': {'queue': 'salientes'},
     'automatizaciones.difusiones_tick': {'queue': 'masivos'},
+    'integraciones.enviar_webhook': {'queue': 'salientes'},
     'agente.atender': {'queue': 'agente'},
     'agente.atender_modo': {'queue': 'agente'},
     'agente.transcribir': {'queue': 'agente'},

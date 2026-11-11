@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Webhooks salientes{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-box-arrow-up-right"></i> Webhooks <span class="sub">mandar datos a sistemas externos y recibir sus resultados</span></h1>
+  <a href="{% url 'integraciones:lista' %}" class="btn btn-outline-secondary btn-sm">API keys</a></div>
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="card mb-3"><div class="card-header">{% if editar %}Editar «{{ editar.nombre }}»{% else %}Nuevo sistema externo{% endif %}</div><div class="card-body small">
+      <form method="post">{% csrf_token %}<input type="hidden" name="accion" value="guardar">{% if editar %}<input type="hidden" name="destino" value="{{ editar.pk }}">{% endif %}
+        <div class="mb-2"><label class="form-label">Nombre</label><input name="nombre" class="form-control" value="{{ editar.nombre|default:'' }}" placeholder="Videollamada de validación" required></div>
+        <div class="mb-2"><label class="form-label">URL (recibe un POST con JSON)</label><input name="url" type="url" class="form-control" value="{{ editar.url|default:'' }}" placeholder="https://..." required></div>
+        <div class="row g-2 mb-2"><div class="col-7"><label class="form-label">Autenticación</label><select name="autenticacion" class="form-select">{% for v, l in auth_choices %}<option value="{{ v }}" {% if editar.autenticacion == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+          <div class="col-5"><label class="form-label">Header</label><input name="header_nombre" class="form-control" value="{{ editar.header_nombre|default:'X-API-Key' }}"></div></div>
+        <div class="mb-2"><label class="form-label">Token</label><input name="token" type="password" class="form-control" placeholder="{% if editar.token %}(guardado: dejalo vacío para mantenerlo){% endif %}" autocomplete="new-password"></div>
+        <label class="d-flex gap-2 mb-2"><input type="checkbox" class="form-check-input" name="activo" {% if not editar or editar.activo %}checked{% endif %}> Activo</label>
+        <button class="btn btn-primary btn-sm">Guardar</button>{% if editar %} <a href="{% url 'integraciones:webhooks' %}" class="btn btn-link btn-sm">Cancelar</a>{% endif %}
+      </form>
+    </div></div>
+    <div class="card"><div class="card-header">Cómo se usa</div><div class="card-body small">
+      <ol class="ps-3 mb-2">
+        <li>Cargá acá el sistema externo (URL + token).</li>
+        <li>En <b>Automatizaciones</b>, creá una con la acción <b>"Enviar datos a un sistema externo"</b> y el disparador que quieras (ej. al entrar a "Datos completos").</li>
+        <li>Cada envío lleva una <b>URL de retorno</b> (<code>callback.url</code>). Cuando el otro sistema termina, le hace POST con <code>{"evento": "validacion_ok", "datos": {...}}</code>.</li>
+        <li>Otra automatización con el disparador <b>"Cuando llega un evento externo"</b> = <code>validacion_ok</code> mueve a "Validado", avisa, etc.</li>
+      </ol>
+      <div class="muted">También con API key: <code>POST {{ base }}/api/v1/eventos/</code> con <code>{"telefono" u "oportunidad_id", "evento", "datos"}</code>. Si en <code>datos</code> vienen claves iguales a campos personalizados, se guardan en la ficha.</div>
+    </div></div>
+  </div>
+  <div class="col-lg-7">
+    <div class="card mb-3"><div class="table-responsive"><table class="table table-sm align-middle mb-0 small">
+      <thead><tr><th>Sistema</th><th>URL</th><th></th></tr></thead>
+      <tbody>{% for d in destinos %}<tr class="{% if not d.activo %}text-secondary{% endif %}">
+        <td><b>{{ d.nombre }}</b>{% if not d.activo %} <span class="chip">inactivo</span>{% endif %}<div class="muted">{{ d.get_autenticacion_display }}</div></td>
+        <td class="text-break" style="max-width:240px">{{ d.url }}</td>
+        <td class="text-end text-nowrap"><form method="post" class="d-inline">{% csrf_token %}<input type="hidden" name="destino" value="{{ d.pk }}">
+          <button name="accion" value="probar" class="btn btn-xs btn-outline-primary" title="Manda un lead de ejemplo">Probar</button>
+          <a href="?editar={{ d.pk }}" class="btn btn-xs btn-outline-secondary">Editar</a>
+          <button name="accion" value="borrar" class="btn btn-xs btn-outline-danger" onclick="return confirm('¿Borrar «{{ d.nombre|escapejs }}»?')"><i class="bi bi-trash3"></i></button></form></td>
+      </tr>{% empty %}<tr><td colspan="3" class="muted text-center py-3">Todavía no hay sistemas externos.</td></tr>{% endfor %}</tbody>
+    </table></div></div>
+    <div class="card"><div class="card-header">Últimos envíos</div><div class="table-responsive" style="max-height:520px"><table class="table table-sm mb-0 small">
+      <thead><tr><th>Cuándo</th><th>Sistema</th><th>Lead</th><th>Resultado</th><th></th></tr></thead>
+      <tbody>{% for e in envios %}<tr>
+        <td class="text-nowrap">{{ e.created_at|date:"d/m H:i" }}</td>
+        <td>{{ e.destino }}<div class="muted">{{ e.origen|truncatechars:40 }}</div></td>
+        <td>{% if e.oportunidad %}<a href="{{ e.oportunidad.get_absolute_url }}">{{ e.oportunidad.contacto.nombre }}</a>{% else %}—{% endif %}</td>
+        <td><span class="chip {% if e.estado == 'ok' %}ok{% elif e.estado == 'error' %}danger{% else %}info{% endif %}">{{ e.get_estado_display }}</span>
+          <div class="muted" title="{{ e.respuesta }}">HTTP {{ e.respuesta_status|default:"—" }} · {{ e.intentos }} intento{{ e.intentos|pluralize }}</div></td>
+        <td>{% if e.estado == 'error' %}<form method="post">{% csrf_token %}<input type="hidden" name="accion" value="reenviar"><input type="hidden" name="envio" value="{{ e.pk }}"><button class="btn btn-xs btn-outline-secondary">Reenviar</button></form>{% endif %}</td>
+      </tr>{% empty %}<tr><td colspan="5" class="muted text-center py-3">Sin envíos todavía.</td></tr>{% endfor %}</tbody>
+    </table></div></div>
+  </div>
+</div>
+{% endblock %}

@@ -77,6 +77,9 @@ class ConfigAgente(models.Model):
                                                 related_name='+', verbose_name='Motivo de cierre al descartar',
                                                 help_text='Si la etapa de descarte es un cierre, hace falta un motivo.')
 
+    derivar_destino = models.ForeignKey('integraciones.WebhookDestino', null=True, blank=True, on_delete=models.SET_NULL,
+                                        related_name='+', verbose_name='Sistema externo al derivar',
+                                        help_text='Se carga en Integraciones → Webhooks (con reintentos y registro).')
     derivar_url = models.CharField(max_length=500, blank=True, verbose_name='Webhook del CRM externo',
                                    help_text='Al derivar se le manda el lead por POST (JSON). Vacío = solo queda en este CRM.')
     derivar_token = CampoCifrado(blank=True, verbose_name='Token del webhook',

@@ -230,7 +230,12 @@ def _derivar(ctx, entrada):
     _apagar_bot(ctx, derivada=False)
     _mover(ctx, ctx.config.etapa_derivado)
     _actividad(ctx, f'Agente IA derivó al asesor. Motivo: {motivo}\n\nResumen: {resumen}')
-    if ctx.config.derivar_url:
+    if ctx.config.derivar_destino_id and ctx.config.derivar_destino.activo:
+        from apps.integraciones.webhooks import encolar
+        from .tasks import payload_derivacion
+        encolar(ctx.config.derivar_destino, payload_derivacion(ctx.conv, resumen, motivo), ctx.oportunidad,
+                'Derivación del agente IA')
+    elif ctx.config.derivar_url:
         from .tasks import enviar_derivacion
         conv_pk = ctx.conv.pk
         transaction.on_commit(lambda: enviar_derivacion.delay(conv_pk, resumen, motivo))

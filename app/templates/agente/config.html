@@ -48,6 +48,8 @@
       <div class="col-md-6"><label class="form-label">Motivo de cierre</label>{{ form.tipificacion_descartado }}</div>
     </div></div></div>
     <div class="card mb-3"><div class="card-header">Derivación al cerrador</div><div class="card-body"><div class="row g-2">
+      <div class="col-12"><label class="form-label">{{ form.derivar_destino.label }}</label>{{ form.derivar_destino }}<div class="form-text">{{ form.derivar_destino.help_text }} <a href="{% url 'integraciones:webhooks' %}" target="_blank">Cargar sistemas</a></div></div>
+      <div class="col-12 muted small">… o una URL directa (sin reintentos largos ni registro de envíos):</div>
       <div class="col-12"><label class="form-label">{{ form.derivar_url.label }}</label>{{ form.derivar_url }}<div class="form-text">{{ form.derivar_url.help_text }} Se manda: datos del lead, campos, resumen de la charla, motivo y link al chat.</div></div>
       <div class="col-12"><label class="form-label">{{ form.derivar_token.label }}</label>{{ form.derivar_token }}</div>
       <div class="col-12"><label class="form-label">{{ form.mensaje_derivacion.label }}</label>{{ form.mensaje_derivacion }}</div>

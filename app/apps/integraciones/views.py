@@ -381,3 +381,115 @@ class SMSWebhookView(View):
         if tel and request.POST.get('Body'):
             sms.recibir(tel, request.POST['Body'])
         return HttpResponse('<Response/>', content_type='text/xml')
+
+
+# ── Eventos entrantes (el sistema externo avisa un resultado) ──────────────
+
+@method_decorator(csrf_exempt, name='dispatch')
+class EventoTokenView(View):
+    """POST /api/v1/eventos/<token>/ {"evento": "validacion_ok", "datos": {...}} — la URL de retorno de cada envío.
+    El token firmado identifica al lead: no hace falta API key."""
+
+    def post(self, request, token):
+        from . import webhooks
+        op = webhooks.oportunidad_de_token(token)
+        if op is None:
+            return JsonResponse({'ok': False, 'error': 'Token inválido'}, status=404)
+        return _procesar_evento(request, op)
+
+
+class EventoView(ApiBase):
+    """POST /api/v1/eventos/ con X-API-Key: {"oportunidad_id" | "telefono", "evento": "...", "datos": {...}}."""
+
+    def post(self, request):
+        from apps.crm.models import Oportunidad
+        from apps.crm.services import buscar_contacto, oportunidad_activa_de
+        op = None
+        if self.data.get('oportunidad_id'):
+            op = Oportunidad.objects.filter(pk=self.data['oportunidad_id']).first()
+        elif self.data.get('telefono'):
+            c = buscar_contacto(str(self.data['telefono']))
+            op = oportunidad_activa_de(c) if c else None
+        if op is None:
+            return self._resp(request, {'ok': False, 'error': 'Oportunidad no encontrada'}, 404)
+        return _procesar_evento(request, op, self.data, self)
+
+
+def _procesar_evento(request, op, data=None, vista=None):
+    from . import webhooks
+    if data is None:
+        try:
+            data = json.loads(request.body or b'{}') if 'json' in (request.content_type or '') else request.POST.dict()
+        except ValueError:
+            return JsonResponse({'ok': False, 'error': 'JSON inválido'}, status=400)
+    nombre = webhooks.slug_evento(data.get('evento'))
+    if not nombre:
+        return JsonResponse({'ok': False, 'error': 'Falta "evento"'}, status=400)
+    n = webhooks.recibir_evento(op, nombre, data.get('datos'))
+    resp = {'ok': True, 'oportunidad_id': op.pk, 'evento': nombre, 'automatizaciones': n}
+    return vista._resp(request, resp) if vista else JsonResponse(resp)
+
+
+# ── Webhooks salientes (UI) ────────────────────────────────────────────────
+
+class WebhooksView(PermisoRequeridoMixin, View):
+    permiso = 'integraciones'
+
+    def get(self, request):
+        from .models import EnvioWebhook, WebhookDestino
+        editar = WebhookDestino.objects.filter(pk=request.GET.get('editar')).first() if request.GET.get('editar') else None
+        return render(request, 'integraciones/webhooks.html', {
+            'destinos': WebhookDestino.objects.all(), 'editar': editar,
+            'envios': EnvioWebhook.objects.select_related('destino', 'oportunidad__contacto')[:100],
+            'auth_choices': WebhookDestino.AUTH_CHOICES, 'seccion': 'integraciones',
+            'base': tenancy.url_sitio(),
+        })
+
+    def post(self, request):
+        from .models import EnvioWebhook, WebhookDestino
+        from . import webhooks
+        accion = request.POST.get('accion')
+        if accion == 'guardar':
+            d = WebhookDestino.objects.filter(pk=request.POST.get('destino')).first() or WebhookDestino()
+            d.nombre = request.POST.get('nombre', '').strip()[:100] or 'Sistema externo'
+            d.url = request.POST.get('url', '').strip()
+            d.autenticacion = request.POST.get('autenticacion') or WebhookDestino.AUTH_BEARER
+            d.header_nombre = request.POST.get('header_nombre', '').strip()[:60]
+            d.activo = bool(request.POST.get('activo'))
+            if request.POST.get('token', '').strip():
+                d.token = request.POST['token'].strip()
+            if not d.url.startswith(('https://', 'http://')):
+                messages.error(request, 'La URL tiene que empezar con https://')
+                return redirect('integraciones:webhooks')
+            d.save()
+            messages.success(request, f'"{d.nombre}" guardado.')
+        elif accion == 'probar':
+            d = get_object_or_404(WebhookDestino, pk=request.POST.get('destino'))
+            envio = EnvioWebhook(destino=d, origen='Prueba', payload=_payload_prueba())
+            envio.save()
+            ok = webhooks.enviar_ahora(envio)
+            if not ok:
+                envio.estado = EnvioWebhook.ERROR
+                envio.save(update_fields=['estado'])
+            (messages.success if ok else messages.error)(
+                request, f'Prueba a "{d}": HTTP {envio.respuesta_status or "sin respuesta"}' + ('' if ok else f' · {envio.respuesta[:150]}'))
+        elif accion == 'reenviar':
+            envio = get_object_or_404(EnvioWebhook, pk=request.POST.get('envio'))
+            nuevo = webhooks.encolar(envio.destino, envio.payload, envio.oportunidad, f'Reenvío de #{envio.pk}')
+            messages.success(request, f'Reenviando (envío #{nuevo.pk}).')
+        elif accion == 'borrar':
+            d = get_object_or_404(WebhookDestino, pk=request.POST.get('destino'))
+            if d.acciones.exists():
+                messages.error(request, 'Lo usa una automatización: desactivalo o cambiá la automatización primero.')
+            else:
+                d.delete()
+                messages.success(request, 'Borrado.')
+        return redirect('integraciones:webhooks')
+
+
+def _payload_prueba():
+    return {'evento': 'prueba', 'origen': 'Prueba desde el CRM', 'fecha': timezone.localtime().isoformat(),
+            'contacto': {'id': 0, 'nombre': 'Lead de Prueba', 'telefono': '5491100000000', 'email': 'prueba@ejemplo.com'},
+            'campos': {}, 'oportunidad': {'id': 0, 'embudo': 'Prueba', 'etapa': 'Prueba'},
+            'callback': {'url': f'{tenancy.url_sitio()}/api/v1/eventos/<token-del-lead>/',
+                         'ejemplo': {'evento': 'validacion_ok', 'datos': {}}}}
