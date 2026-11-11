@@ -9,6 +9,11 @@ def crm(request):
            # En el CRM de cada cliente, debajo del logo va el nombre de su empresa.
            'CRM_SUBTITULO': cliente.nombre if cliente is not None else settings.CRM_SUBTITULO}
     user = getattr(request, 'user', None)
+    if settings.MONITOR_SALUD and user and user.is_authenticated and (user.is_superuser or getattr(user, 'is_admin', False)):
+        from core.salud import estado_cacheado
+        e = estado_cacheado()
+        if not e['ok']:
+            ctx['salud_problemas'] = e['problemas']
     if not user or not user.is_authenticated or cliente is None:
         return ctx  # dominio principal (panel de la plataforma): no hay tablas del CRM
     from apps.users.services import contar_no_leidas

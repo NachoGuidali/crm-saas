@@ -51,3 +51,15 @@ def media_protegida(request, ruta):
     resp = FileResponse(open(completa, 'rb'), content_type=tipo or 'application/octet-stream')
     resp['Cache-Control'] = 'public, max-age=86400' if publico else 'private, max-age=3600'
     return resp
+
+
+def salud(request):
+    """Para un monitor externo (UptimeRobot, etc.): 200 "ok" o 503 con el problema. Sin login, sin datos sensibles."""
+    from django.http import JsonResponse
+    from core.salud import estado
+    e = estado()
+    if not e['ok']:
+        from core.salud import avisar_por_email
+        avisar_por_email(e)
+    return JsonResponse({'ok': e['ok'], 'estado': 'ok' if e['ok'] else 'falla', 'problemas': e['problemas']},
+                        status=200 if e['ok'] else 503)

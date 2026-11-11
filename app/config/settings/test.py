@@ -16,3 +16,6 @@ STORAGES = {
     'default': {'BACKEND': 'core.storage.ArchivosPorCliente'},
     'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'},
 }
+
+# El monitor de salud consulta Redis en cada página: en los tests no hay workers que laten.
+MONITOR_SALUD = False

@@ -247,6 +247,8 @@
     </div>
 
     <div class="content-area">
+      {% if salud_problemas %}<div class="alert alert-danger py-2 small mb-3"><b><i class="bi bi-exclamation-octagon"></i> Falla en el servidor</b> (solo lo ven los administradores):
+        {% for p in salud_problemas %}<div>• {{ p }}</div>{% endfor %}<div class="mt-1">Revisá con <code>docker compose ps</code> y <code>docker compose logs --tail=30 &lt;contenedor&gt;</code>. Estado: <a href="/salud/" target="_blank">/salud/</a></div></div>{% endif %}
       {% if aviso_suscripcion %}
       <div class="alert {% if aviso_suscripcion.vencido %}alert-danger{% else %}alert-warning{% endif %} py-2 small mb-3">
         <i class="bi bi-exclamation-triangle me-1"></i>

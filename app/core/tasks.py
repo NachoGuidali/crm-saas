@@ -25,3 +25,10 @@ def purgar_logs():
     }
     logger.info('Purga de logs: %s', resultado)
     return resultado
+
+
+@shared_task(name='core.latido')
+def latido(cola):
+    """Lo encola beat cada minuto en cada cola: el worker que lo procesa anota que está vivo (ver core.salud)."""
+    from core.salud import latir
+    latir(cola)

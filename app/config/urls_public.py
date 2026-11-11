@@ -2,6 +2,7 @@
 URLs del dominio principal (schema público): la pantalla para ingresar y el panel de la plataforma.
 El CRM de cada cliente se sirve en su subdominio con config/urls.py.
 """
+from core.views import salud
 from django.urls import include, path
 
 from apps.clientes import views as clientes_views
@@ -9,6 +10,7 @@ from apps.clientes import views as clientes_views
 urlpatterns = [
     path('', clientes_views.HomeView.as_view(), name='home'),
     path('robots.txt', clientes_views.robots_txt, name='robots'),
+    path('salud/', salud, name='salud'),
     path('sitemap.xml', clientes_views.sitemap_xml, name='sitemap'),
     path('ingresar/', clientes_views.IngresarView.as_view(), name='ingresar'),
     path('panel/', include('apps.clientes.urls')),

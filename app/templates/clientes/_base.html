@@ -24,6 +24,8 @@
 </nav>
 <main class="container py-4" style="max-width:1100px">
   {% for m in messages %}<div class="alert alert-{% if m.tags == 'error' %}danger{% else %}{{ m.tags }}{% endif %} py-2 small">{{ m }}</div>{% endfor %}
+  {% if salud_problemas %}<div class="alert alert-danger py-2 small mb-3"><b><i class="bi bi-exclamation-octagon"></i> Falla en el servidor</b> (solo lo ven los administradores):
+        {% for p in salud_problemas %}<div>• {{ p }}</div>{% endfor %}<div class="mt-1">Revisá con <code>docker compose ps</code> y <code>docker compose logs --tail=30 &lt;contenedor&gt;</code>. Estado: <a href="/salud/" target="_blank">/salud/</a></div></div>{% endif %}
   {% block content %}{% endblock %}
 </main>
 </body>

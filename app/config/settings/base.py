@@ -35,7 +35,10 @@ SAAS_DIAS_GRACIA = int(env('SAAS_DIAS_GRACIA', '5'))      # días después del v
 SAAS_SUSPENDER_VENCIDOS = env_bool('SAAS_SUSPENDER_VENCIDOS', True)
 SAAS_EMAIL_AVISOS = env_bool('SAAS_EMAIL_AVISOS', True)   # email al cliente antes de vencer y al suspender
 SAAS_DATOS_PAGO = env('SAAS_DATOS_PAGO', '')              # ej: "Alias: mi.alias.mp · CBU 000... · Titular X"
-SAAS_EMAIL_AVISOS_COPIA = env('SAAS_EMAIL_AVISOS_COPIA', '')  # copia de los avisos (tu email)
+SAAS_EMAIL_AVISOS_COPIA = env('SAAS_EMAIL_AVISOS_COPIA', '')
+# A quién avisar por email si se cae un worker (ver core.salud). Por defecto, el email del superusuario.
+ALERTAS_EMAIL = env('ALERTAS_EMAIL', env('ADMIN_EMAIL', ''))
+MONITOR_SALUD = env_bool('MONITOR_SALUD', True)  # copia de los avisos (tu email)
 # Home pública (supregcrm.com): WhatsApp de ventas para el botón "Pedir demo". Solo dígitos, con país y 9.
 # Ej. Argentina: 5491112345678. Vacío = el botón no se muestra.
 SAAS_WHATSAPP_VENTAS = env('SAAS_WHATSAPP_VENTAS', '')
@@ -252,6 +255,9 @@ CELERY_BEAT_SCHEDULE = {
     'recordatorios-personales': {'task': 'cuentas.enviar_recordatorios', 'schedule': crontab(hour=8, minute=0)},
     'agente-seguimientos': {'task': 'agente.seguimientos', 'schedule': 300},
     'agente-precios': {'task': 'agente.sincronizar_precios', 'schedule': 1800},
+    # Monitor de salud: un latido por minuto en cada cola (una sola vez, en el schema público). Ver core.salud.
+    **{f'latido-{c}': {'task': 'core.latido', 'schedule': 60, 'args': (c,), 'options': {'queue': c, 'expires': 120},
+                       'tenant_schemas': ['public']} for c in ('default', 'entrantes', 'salientes', 'masivos', 'agente')},
     'purgar-logs': {'task': 'core.purgar_logs', 'schedule': crontab(hour=3, minute=30)},
     # Solo en el schema público (plataforma): avisos de vencimiento y suspensión por falta de pago.
     'clientes-cobros': {'task': 'clientes.revisar_cobros', 'schedule': crontab(hour=9, minute=0),

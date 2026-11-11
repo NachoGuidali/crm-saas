@@ -2,7 +2,7 @@ from django.conf import settings
 from django.contrib import admin
 from django.urls import include, path, re_path
 
-from core.views import media_protegida, robots_privado
+from core.views import media_protegida, robots_privado, salud
 
 from apps.integraciones.urls import api_urlpatterns as api_integraciones
 from django.views.decorators.csrf import csrf_exempt
@@ -17,6 +17,7 @@ from apps.agente import urls as agente_urls
 
 urlpatterns = [
     path('robots.txt', robots_privado, name='robots_privado'),
+    path('salud/', salud, name='salud'),
     path('', reportes_views.inicio, name='inicio'),
     path('pulso/', reportes_views.PulsoView.as_view(), name='pulso'),
     path('demo/formulario/', landing.LandingView.as_view(), name='demo_formulario'),
