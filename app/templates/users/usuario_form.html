@@ -13,6 +13,7 @@
     <div class="col-md-6"><label class="form-label">Rol base</label>{{ form.rol }}{{ form.rol.errors }}</div>
     <div class="col-md-6"><label class="form-label">Rol personalizado</label>{{ form.rol_custom }}<div class="form-text">{{ form.rol_custom.help_text }}</div></div>
     <div class="col-md-6"><label class="form-label">Teléfono</label>{{ form.telefono }}</div>
+    <div class="col-md-6"><label class="form-label">WhatsApp para avisos</label>{{ form.whatsapp }}<div class="form-text">Ej. 5491155551234</div></div>
     <div class="col-md-6"><label class="form-label">Interno de Anura</label><input name="interno_anura" value="{{ interno.interno|default:'' }}" class="form-control" placeholder="Para llamar desde el CRM"></div>
     <div class="col-md-6"><label class="form-label">Alias en Anura <span class="muted">(opcional)</span></label><input name="alias_anura" value="{{ interno.alias|default:'' }}" class="form-control" placeholder="ej: ras_201, 5401">
       <div class="form-text">Si Anura nombra este teléfono de otra forma en los avisos. Varios separados por coma.</div></div>

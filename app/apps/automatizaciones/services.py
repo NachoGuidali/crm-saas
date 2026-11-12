@@ -164,6 +164,9 @@ def formulario_firmado(sol):
     """El lead firmó un formulario: dispara "Cuando se recibe un formulario firmado" (de ese formulario o cualquiera)."""
     from django.db.models import Q
     op = sol.oportunidad
+    from apps.avisos.models import EV_FIRMA
+    from apps.avisos.services import disparar
+    disparar(EV_FIRMA, oportunidad=op, motivo=sol.formulario.nombre)
     acciones = list(AccionEtapa.objects.filter(AccionEtapa.q_etapa(op.etapa_id, op.embudo_id), activa=True,
                                                disparador=AccionEtapa.DISP_FIRMA)
                     .filter(Q(formulario_firma__isnull=True) | Q(formulario_firma_id=sol.formulario_id))
@@ -336,6 +339,16 @@ def _encolar(ejec, cuando, ahora):
         logger.error('No se pudo encolar la ejecución %s: %s', ejec.pk, e)
 
 
+def _avisar_por_canales(accion, usuarios, titulo, op):
+    if not (accion.aviso_email or accion.aviso_whatsapp):
+        return
+    from core import tenancy
+    from apps.avisos.services import entregar_directo
+    texto = f'{titulo}\n{op.contacto.nombre} · {op.etapa}\n{tenancy.url_sitio()}{op.get_absolute_url()}'
+    entregar_directo(usuarios, titulo, texto, email=accion.aviso_email,
+                     whatsapp_linea=accion.linea if accion.aviso_whatsapp and accion.linea_id else None)
+
+
 REPROGRAMAR_MANANA = 'reprogramar'
 
 
@@ -496,11 +509,13 @@ def _correr(accion, op, ejec_desde=None, etapa_ref=None):
         if op.agente is None:
             return E.ESTADO_OMITIDA, 'La oportunidad no tiene agente asignado.'
         notificar(op.agente, 'sistema', titulo, f'{contacto.nombre} · {op.etapa}', op.get_absolute_url())
+        _avisar_por_canales(accion, [op.agente], titulo, op)
         return E.ESTADO_EJECUTADA, f'Notificado {op.agente.display_name}'
 
     if accion.tipo == AccionEtapa.TIPO_NOTIF_SUPERVISORES:
         destinatarios = supervisores_de(op.embudo)
         notificar_varios(destinatarios, 'sistema', titulo, f'{contacto.nombre} · {op.etapa}', op.get_absolute_url())
+        _avisar_por_canales(accion, destinatarios, titulo, op)
         return E.ESTADO_EJECUTADA, f'Notificados {len(destinatarios)} supervisores'
 
     if accion.tipo == AccionEtapa.TIPO_EMBUDO:

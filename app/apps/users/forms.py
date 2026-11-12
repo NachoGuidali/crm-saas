@@ -58,7 +58,7 @@ class UsuarioForm(forms.ModelForm):
 
     class Meta:
         model = User
-        fields = ['username', 'first_name', 'last_name', 'email', 'telefono', 'rol', 'rol_custom', 'disponible',
+        fields = ['username', 'first_name', 'last_name', 'email', 'telefono', 'whatsapp', 'rol', 'rol_custom', 'disponible',
                   'is_active', 'avatar']
         labels = {'first_name': 'Nombre', 'last_name': 'Apellido', 'is_active': 'Activo (puede ingresar)',
                   'username': 'Usuario'}
@@ -111,7 +111,7 @@ class UsuarioForm(forms.ModelForm):
 class PerfilForm(forms.ModelForm):
     class Meta:
         model = User
-        fields = ['first_name', 'last_name', 'email', 'telefono', 'avatar']
+        fields = ['first_name', 'last_name', 'email', 'telefono', 'whatsapp', 'avatar']
         labels = {'first_name': 'Nombre', 'last_name': 'Apellido'}
 
     def __init__(self, *args, **kwargs):

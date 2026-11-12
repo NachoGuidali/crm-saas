@@ -21,7 +21,7 @@ class AccionForm(forms.ModelForm):
                   'tipificacion', 'plantilla_email', 'activa', 'solo_si_sigue_en_etapa', 'solo_si_bot_activo', 'solo_en_horario', 'plantilla',
                   'texto', 'linea', 'email_asunto', 'tarea_titulo', 'tarea_vence_horas', 'modo_embudo', 'embudo_destino',
                   'etapa_destino', 'volver_a', 'asignar_destino', 'usuario_destino', 'reparto', 'volver_a_etapa',
-                  'etiqueta', 'formulario_firma', 'canal_firma', 'webhook_destino', 'webhook_plantilla', 'evento_nombre',
+                  'etiqueta', 'formulario_firma', 'canal_firma', 'webhook_destino', 'webhook_plantilla', 'evento_nombre', 'aviso_email', 'aviso_whatsapp',
                   'solo_pautas', 'solo_etiquetas', 'excluir_etiquetas']
         widgets = {'texto': forms.Textarea(attrs={'rows': 4}), 'webhook_plantilla': forms.Textarea(attrs={'rows': 5}), 'otras_etapas': forms.CheckboxSelectMultiple,
                    'solo_pautas': forms.CheckboxSelectMultiple, 'solo_etiquetas': forms.CheckboxSelectMultiple,

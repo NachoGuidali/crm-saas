@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Avisos internos{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-bell"></i> Avisos internos <span class="sub">cuando pasa algo, avisarle a quien corresponda</span></h1>
+  <a href="{% url 'avisos:nueva' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Nuevo aviso</a></div>
+<div class="row g-3">
+  <div class="col-lg-7"><div class="card"><div class="table-responsive"><table class="table table-sm align-middle mb-0 small">
+    <thead><tr><th>Aviso</th><th>A quién</th><th>Por dónde</th></tr></thead>
+    <tbody>{% for r in reglas %}<tr class="{% if not r.activa %}text-secondary{% endif %}">
+      <td><a href="{% url 'avisos:editar' r.pk %}"><b>{{ r.nombre }}</b></a>{% if not r.activa %} <span class="chip">pausado</span>{% endif %}
+        <div class="muted">{{ r.get_evento_display }}{% if r.evento == 'sin_atender' %} ({{ r.minutos }} min){% endif %}{% if r.embudo %} · {{ r.embudo }}{% endif %}</div></td>
+      <td>{% if r.al_vendedor %}Vendedor{% endif %}{% if r.a_supervisores %}{% if r.al_vendedor %} · {% endif %}Supervisión{% endif %}
+        {% for u in r.usuarios.all %}{% if forloop.first and r.al_vendedor or forloop.first and r.a_supervisores %} · {% endif %}{{ u.display_name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+        {% if r.emails_extra or r.whatsapps_extra %}<div class="muted">+ externos</div>{% endif %}</td>
+      <td class="text-nowrap">{% if r.por_campanita %}<i class="bi bi-bell" title="Campanita"></i> {% endif %}{% if r.por_email %}<i class="bi bi-envelope" title="Email"></i> {% endif %}{% if r.por_whatsapp %}<i class="bi bi-whatsapp" title="WhatsApp"></i>{% endif %}
+        {% if r.desde %}<div class="muted">{{ r.desde|time:"H:i" }}–{{ r.hasta|time:"H:i" }}</div>{% endif %}</td>
+    </tr>{% empty %}<tr><td colspan="3" class="muted text-center py-4">Todavía no hay avisos. Ejemplo: "Cuando el bot pasa un chat a una persona → WhatsApp a la asesora".</td></tr>{% endfor %}</tbody>
+  </table></div></div>
+  <div class="form-text mt-2">Para que un usuario reciba avisos por WhatsApp, tiene que cargar su número en <b>Mi perfil</b> (o se lo cargás en Usuarios). Para email hace falta el SMTP configurado. Las automatizaciones "Notificar al agente / a supervisión" también pueden avisar por email y WhatsApp.</div></div>
+  <div class="col-lg-5"><div class="card"><div class="card-header">Últimos avisos por email / WhatsApp</div>
+    <div class="table-responsive" style="max-height:480px"><table class="table table-sm mb-0 small"><tbody>{% for e in envios %}<tr>
+      <td class="text-nowrap">{{ e.created_at|date:"d/m H:i" }}</td>
+      <td>{% if e.canal == 'email' %}<i class="bi bi-envelope"></i>{% else %}<i class="bi bi-whatsapp"></i>{% endif %} {{ e.destino }}<div class="muted">{{ e.regla|default:"automatización" }}</div></td>
+      <td>{% if e.ok %}<span class="chip ok">ok</span>{% else %}<span class="chip danger" title="{{ e.error }}">falló</span>{% endif %}</td>
+    </tr>{% empty %}<tr><td class="muted text-center py-3">Sin envíos todavía.</td></tr>{% endfor %}</tbody></table></div></div></div>
+</div>
+{% endblock %}

@@ -38,6 +38,7 @@ urlpatterns = [
     path('firmas/', include('apps.firmas.urls')),
     path('f/', include(firmas_urls.publicas)),
     path('agente/', include('apps.agente.urls')),
+    path('avisos/', include('apps.avisos.urls')),
     path('w/', include(agente_urls.publicas)),
     path('', include('apps.crm.urls')),
 ] + api_telefonia + api_integraciones + firmas_urls.api_urlpatterns

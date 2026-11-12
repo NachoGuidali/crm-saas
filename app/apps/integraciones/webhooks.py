@@ -196,6 +196,9 @@ def recibir_evento(op, nombre, datos=None):
     resumen = ', '.join(f'{k}: {v}' for k, v in list(datos.items())[:8])
     Actividad.objects.create(contacto_id=op.contacto_id, oportunidad=op, tipo=Actividad.TIPO_SISTEMA,
                              texto=f'Evento externo "{nombre}"' + (f' · {resumen}' if resumen else ''))
+    from apps.avisos.models import EV_EVENTO_EXTERNO
+    from apps.avisos.services import disparar
+    disparar(EV_EVENTO_EXTERNO, oportunidad=op, motivo=nombre, evento_nombre=nombre)
     return evento_externo(op, nombre)
 
 

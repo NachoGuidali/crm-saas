@@ -230,6 +230,9 @@ def _derivar(ctx, entrada):
     _apagar_bot(ctx, derivada=False)
     _mover(ctx, ctx.config.etapa_derivado)
     _actividad(ctx, f'Agente IA derivó al asesor. Motivo: {motivo}\n\nResumen: {resumen}')
+    from apps.avisos.models import EV_DERIVADO_IA
+    from apps.avisos.services import disparar
+    disparar(EV_DERIVADO_IA, oportunidad=ctx.oportunidad, conv=ctx.conv, motivo=motivo)
     if ctx.config.derivar_destino_id and ctx.config.derivar_destino.activo:
         from apps.integraciones.webhooks import encolar
         from .tasks import payload_derivacion
@@ -274,6 +277,9 @@ def _pedir_ayuda(ctx, entrada):
         User.objects.filter(is_active=True).exclude(rol=User.ROL_AGENTE))
     for u in destinatarios:
         notificar(u, 'whatsapp', f'El agente IA necesita ayuda con {ctx.conv.nombre_mostrar}', motivo[:150], url)
+    from apps.avisos.models import EV_HUMANO
+    from apps.avisos.services import disparar
+    disparar(EV_HUMANO, oportunidad=ctx.oportunidad, conv=ctx.conv, motivo=f'Agente IA: {motivo}')
     return 'Avisado al equipo. Decile que en breve lo atiende una persona.'
 
 

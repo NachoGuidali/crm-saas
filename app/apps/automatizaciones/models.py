@@ -163,6 +163,9 @@ class AccionEtapa(models.Model):
     formulario_firma = models.ForeignKey('firmas.FormularioFirma', null=True, blank=True, on_delete=models.SET_NULL,
                                          related_name='+', verbose_name='Formulario de firma',
                                          help_text='En el disparador "cuando se recibe firmado": vacío = cualquiera.')
+    aviso_email = models.BooleanField(default=False, verbose_name='También por email')
+    aviso_whatsapp = models.BooleanField(default=False, verbose_name='También por WhatsApp',
+                                         help_text='Por la línea elegida arriba, al WhatsApp que cada usuario cargó en su perfil.')
     webhook_destino = models.ForeignKey('integraciones.WebhookDestino', null=True, blank=True, on_delete=models.PROTECT,
                                         related_name='acciones', verbose_name='Sistema externo')
     webhook_plantilla = models.TextField(

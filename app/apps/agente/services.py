@@ -35,6 +35,10 @@ def al_recibir(conv, mensaje):
 def linea_cambio_estado(linea, anterior, nuevo):
     """Una línea del agente que estaba conectada se cayó: entra la de reserva y se avisa."""
     from apps.whatsapp.models import LineaWhatsApp as L
+    if anterior == L.ESTADO_CONECTADA and nuevo in (L.ESTADO_DESCONECTADA, L.ESTADO_ERROR):
+        from apps.avisos.models import EV_LINEA_CAIDA
+        from apps.avisos.services import disparar
+        disparar(EV_LINEA_CAIDA, linea=linea, motivo='Puede estar bloqueada o se cerró la sesión: revisá la conexión.')
     if anterior == L.ESTADO_CONECTADA and nuevo in (L.ESTADO_DESCONECTADA, L.ESTADO_ERROR) and habilitado():
         from .lineas import linea_caida
         linea.estado = nuevo

@@ -77,6 +77,7 @@ TENANT_APPS = [
     'apps.cuentas',
     'apps.firmas',
     'apps.agente',
+    'apps.avisos',
 ]
 INSTALLED_APPS = SHARED_APPS + [a for a in TENANT_APPS if a not in SHARED_APPS]
 
@@ -255,6 +256,7 @@ CELERY_BEAT_SCHEDULE = {
     'whatsapp-sync-plantillas': {'task': 'whatsapp.sincronizar_plantillas', 'schedule': crontab(minute=0)},
     'avisos-recurrentes': {'task': 'cuentas.enviar_avisos_recurrentes', 'schedule': crontab(hour=10, minute=0)},
     'recordatorios-personales': {'task': 'cuentas.enviar_recordatorios', 'schedule': crontab(hour=8, minute=0)},
+    'avisos-sin-atender': {'task': 'avisos.sin_atender', 'schedule': 300},
     'agente-seguimientos': {'task': 'agente.seguimientos', 'schedule': 300},
     'agente-precios': {'task': 'agente.sincronizar_precios', 'schedule': 1800},
     # Monitor de salud: un latido por minuto en cada cola (una sola vez, en el schema público). Ver core.salud.

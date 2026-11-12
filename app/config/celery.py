@@ -10,4 +10,4 @@ app = CeleryApp('crm_ventas')
 app.config_from_object('django.conf:settings', namespace='CELERY')
 app.autodiscover_tasks(['core', 'apps.clientes', 'apps.crm', 'apps.whatsapp', 'apps.telefonia',
                         'apps.automatizaciones', 'apps.cuentas', 'apps.agente',
-                        'apps.integraciones'])
+                        'apps.integraciones', 'apps.avisos'])

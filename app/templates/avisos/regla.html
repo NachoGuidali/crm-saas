@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ regla|default:"Nuevo aviso" }}{% endblock %}
+{% block content %}
+<div class="page-head"><h1><i class="bi bi-bell"></i> {{ regla|default:"Nuevo aviso" }}</h1><a href="{% url 'avisos:lista' %}" class="btn btn-outline-secondary btn-sm">Volver</a></div>
+<form method="post">{% csrf_token %}
+{% if form.errors %}<div class="alert alert-danger py-2 small">Revisá los campos marcados.{{ form.non_field_errors }}</div>{% endif %}
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card mb-3"><div class="card-header">Cuándo</div><div class="card-body"><div class="row g-2">
+      <div class="col-md-8"><label class="form-label">Nombre</label>{{ form.nombre }}</div>
+      <div class="col-md-4 d-flex align-items-end"><label class="d-flex gap-2 small">{{ form.activa }} Activo</label></div>
+      <div class="col-12"><label class="form-label">Evento</label>{{ form.evento }}</div>
+      <div class="col-md-6 ev ev-sin_atender"><label class="form-label">Minutos sin atender</label>{{ form.minutos }}</div>
+      <div class="col-md-6 ev ev-evento_externo"><label class="form-label">Nombre del evento</label>{{ form.evento_nombre }}<div class="form-text">{{ form.evento_nombre.help_text }}</div></div>
+      <div class="col-12"><label class="form-label">Embudo</label>{{ form.embudo }}<div class="form-text">{{ form.embudo.help_text }}</div></div>
+    </div></div></div>
+    <div class="card mb-3"><div class="card-header">A quién</div><div class="card-body small">
+      <label class="d-flex gap-2">{{ form.al_vendedor }} {{ form.al_vendedor.label }} <span class="muted">(si no tiene, a supervisión)</span></label>{{ form.al_vendedor.errors }}
+      <label class="d-flex gap-2 mb-2">{{ form.a_supervisores }} {{ form.a_supervisores.label }}</label>
+      <div class="fw-semibold mb-1">Y a estos usuarios</div>
+      <div class="d-flex flex-wrap gap-3 mb-2">{% for c in form.usuarios %}<label class="d-flex gap-1">{{ c.tag }} {{ c.choice_label }}</label>{% endfor %}</div>
+      <div class="row g-2"><div class="col-md-6"><label class="form-label">{{ form.emails_extra.label }}</label>{{ form.emails_extra }}<div class="form-text">{{ form.emails_extra.help_text }}</div></div>
+        <div class="col-md-6"><label class="form-label">{{ form.whatsapps_extra.label }}</label>{{ form.whatsapps_extra }}<div class="form-text">{{ form.whatsapps_extra.help_text }}</div></div></div>
+    </div></div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card mb-3"><div class="card-header">Por dónde</div><div class="card-body small">
+      <div class="d-flex flex-wrap gap-3 mb-2"><label class="d-flex gap-1">{{ form.por_campanita }} <i class="bi bi-bell"></i> Campanita</label>
+        <label class="d-flex gap-1">{{ form.por_email }} <i class="bi bi-envelope"></i> Email</label>
+        <label class="d-flex gap-1">{{ form.por_whatsapp }} <i class="bi bi-whatsapp"></i> WhatsApp</label></div>{{ form.por_campanita.errors }}
+      <div class="mb-2"><label class="form-label">{{ form.linea.label }}</label>{{ form.linea }}{{ form.linea.errors }}<div class="form-text">{{ form.linea.help_text }}</div></div>
+      <div class="row g-2 mb-2"><div class="col-6"><label class="form-label">{{ form.desde.label }}</label>{{ form.desde }}</div><div class="col-6"><label class="form-label">{{ form.hasta.label }}</label>{{ form.hasta }}{{ form.hasta.errors }}</div>
+        <div class="col-12 form-text mt-0">{{ form.desde.help_text }}</div></div>
+      <label class="form-label">Texto</label>{{ form.texto }}
+      <div class="form-text">Vacío = <span id="txtDefecto"></span><br>Variables: <code>{nombre}</code> <code>{telefono}</code> <code>{motivo}</code> <code>{etapa}</code> <code>{embudo}</code> <code>{vendedor}</code> <code>{linea}</code> <code>{link}</code></div>
+    </div></div>
+    <div class="d-flex gap-2"><button class="btn btn-primary">Guardar</button>
+      <button class="btn btn-outline-secondary" name="probar" value="1">Guardar y mandar prueba</button>
+      {% if regla %}<button class="btn btn-outline-danger ms-auto" name="eliminar" value="1" onclick="return confirm('¿Eliminar este aviso?')">Eliminar</button>{% endif %}</div>
+  </div>
+</div>
+</form>
+{{ textos|json_script:"textosAviso" }}
+<script>
+(function () {
+  const ev = document.getElementById('id_evento'), textos = JSON.parse(document.getElementById('textosAviso').textContent);
+  const upd = () => {
+    document.querySelectorAll('.ev').forEach(el => el.style.display = el.classList.contains('ev-' + ev.value) ? '' : 'none');
+    document.getElementById('txtDefecto').textContent = '«' + (textos[ev.value] || '') + '»';
+  };
+  ev.addEventListener('change', upd); upd();
+})();
+</script>
+{% endblock %}

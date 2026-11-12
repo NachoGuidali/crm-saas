@@ -316,6 +316,9 @@ class HandoffView(ApiBase):
 
         wa.invalidar_no_leidos([agente.pk if agente else None])
         wa.marcar_cambio_inbox()
+        from apps.avisos.models import EV_HUMANO
+        from apps.avisos.services import disparar
+        disparar(EV_HUMANO, oportunidad=op, conv=conv, motivo=str(self.data.get('motivo') or 'El bot derivó el chat'))
         return self._resp(request, {'ok': True, 'conversation_id': conv.pk, 'estado': 'pendiente',
                                    'asignado_a': agente.pk if agente else None})
 

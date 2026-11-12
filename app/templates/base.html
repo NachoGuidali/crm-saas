@@ -140,6 +140,11 @@
         <span class="nav-icon"><i class="bi bi-lightning-charge"></i></span> Automatizaciones
       </a>
       {% endif %}
+      {% if 'automatizaciones' in perms_crm %}
+      <a href="{% url 'avisos:lista' %}" class="nav-item {% if seccion == 'avisos' %}active{% endif %}">
+        <span class="nav-icon"><i class="bi bi-bell"></i></span> Avisos internos
+      </a>
+      {% endif %}
       {% if 'automatizaciones' in perms_crm or 'difusiones' in perms_crm or 'plantillas' in perms_crm %}
       <a href="{% url 'automatizaciones:plantillas_email' %}" class="nav-item {% if 'plantilla_email' in url_name or 'plantillas_email' in url_name %}active{% endif %}">
         <span class="nav-icon"><i class="bi bi-envelope-paper"></i></span> Plantillas de email

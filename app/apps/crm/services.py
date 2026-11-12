@@ -271,6 +271,11 @@ def ingresar_prospecto(datos: dict, embudo: Embudo, origen: str, fuente='', usua
         _disparar_entrada_etapa(op, historial)
     from .puntaje import recalcular
     transaction.on_commit(lambda: recalcular(op))
+    if op.origen != Oportunidad.ORIGEN_IMPORTACION:  # una base de 5.000 leads no son 5.000 avisos
+        from apps.avisos.models import EV_LEAD_NUEVO
+        from apps.avisos.services import disparar
+        transaction.on_commit(lambda: disparar(EV_LEAD_NUEVO, oportunidad=op,
+                                               motivo=f'{op.get_origen_display()}{f" · {op.fuente}" if op.fuente else ""}'))
     return ResultadoIngreso(contacto, op, contacto_nuevo, True)
 
 
@@ -616,6 +621,10 @@ def mover_etapa(op: Oportunidad, etapa: Etapa, usuario=None, tipificacion: Tipif
                     invalidar_tareas(op.agente)
             _sacar_de_discador(op)
 
+    if op.estado == Oportunidad.ESTADO_GANADA:
+        from apps.avisos.models import EV_VENTA
+        from apps.avisos.services import disparar
+        transaction.on_commit(lambda: disparar(EV_VENTA, oportunidad=op, motivo=str(tipificacion or '')))
     if op.estado == Oportunidad.ESTADO_GANADA and op.embudo.notificar_venta_supervisores:
         from apps.users.services import notificar_varios, supervisores_de
         notificar_varios(

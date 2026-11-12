@@ -105,6 +105,8 @@ class User(AbstractUser):
     )
     email = models.EmailField('email', blank=True, db_index=True)
     telefono = models.CharField(max_length=30, blank=True, verbose_name='Teléfono / interno')
+    whatsapp = models.CharField(max_length=20, blank=True, verbose_name='WhatsApp para avisos',
+                                help_text='Con código de país, ej. 5491155551234. Para recibir avisos internos.')
     avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
     disponible = models.BooleanField(
         default=True, verbose_name='Disponible para asignaciones',
