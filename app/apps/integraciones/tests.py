@@ -39,9 +39,19 @@ class ApiLeadsTests(TestCase):
         r = self.post({'telefono': '1155550000', 'etapa': 'Negociación'})  # el lead ya existe: se mueve
         self.assertTrue(r.json()['movida'])
         self.assertEqual(Oportunidad.objects.get().etapa.nombre, 'Negociación')
-        r = self.post({'telefono': '1155550001', 'etapa': 'No existe'})
-        self.assertEqual(r.status_code, 400)
-        self.assertIn('Negociación', r.json()['etapas'])
+        # Etapa o vendedor inexistentes no tiran abajo el lead: entra igual y la respuesta avisa
+        r = self.post({'telefono': '1155550001', 'etapa': 'No existe', 'agente': 'laura', 'edades': '30, 30',
+                       'resumen_bot': 'Monotributista, pareja, Canning'})
+        self.assertEqual(r.status_code, 201, r.content)
+        adv = ' '.join(r.json()['advertencias'])
+        self.assertIn('Negociación', adv)
+        self.assertIn('No existe el usuario "laura"', adv)
+        op = Oportunidad.objects.get(contacto__telefono__endswith='1155550001')
+        self.assertEqual(op.contacto.datos_extra['edades'], '30, 30')
+        self.assertNotIn('resumen_bot', op.contacto.datos_extra)
+        self.assertEqual(op.actividades.filter(tipo='nota').get().texto, '[Landing] Monotributista, pareja, Canning')
+        self.post({'telefono': '1155550001', 'resumen_bot': 'Monotributista, pareja, Canning'})
+        self.assertEqual(op.actividades.filter(tipo='nota').count(), 1)  # el mismo resumen no se repite
 
     def test_clave_invalida(self):
         self.assertEqual(self.post({'telefono': '1'}, clave='mala').status_code, 401)

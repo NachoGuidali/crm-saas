@@ -31,6 +31,7 @@ logger = logging.getLogger('apps.integraciones')
 CAMPOS_LEAD = {'nombre', 'telefono', 'email', 'dni', 'fecha_atencion', 'especialidad_atencion', 'localidad',
                'provincia', 'fecha_nacimiento', 'telefono_alternativo'}
 LIMITE_POR_MINUTO = 120
+CLAVES_NOTA = ('nota', 'resumen', 'resumen_bot', 'notas')
 
 
 def _ip(request):
@@ -111,8 +112,10 @@ class LeadCrearView(ApiBase):
             return re.sub(r'[\s_-]+', '-', str(s).strip().lower())
         alias = {_norm_clave(slug): campo for slug, campo in personalizados.items()}
         extra, advertencias = {}, []
+        # Resumen / nota (ej. la ficha que arma el bot): va como nota en la ficha, no mezclado entre los datos.
+        nota = next((str(d[k]).strip() for k in CLAVES_NOTA if d.get(k) not in (None, '')), '')
         for k, v in d.items():
-            if k in CAMPOS_LEAD | {'embudo', 'etapa', 'agente', 'fuente', 'origen', 'valor', 'nota', *claves_pauta} \
+            if k in CAMPOS_LEAD | {'embudo', 'etapa', 'agente', 'fuente', 'origen', 'valor', *CLAVES_NOTA, *claves_pauta} \
                     or v in (None, ''):
                 continue
             campo = personalizados.get(k) or alias.get(_norm_clave(k))
@@ -136,14 +139,16 @@ class LeadCrearView(ApiBase):
             etapa = (etapas.filter(pk=d['etapa']) if str(d['etapa']).isdigit()
                      else etapas.filter(nombre__iexact=str(d['etapa']).strip())).first()
             if etapa is None:
-                return self._resp(request, {'error': f'La etapa "{d["etapa"]}" no existe (abierta) en {embudo}',
-                                            'etapas': list(etapas.values_list('nombre', flat=True))}, 400)
+                # No se pierde el lead por un nombre de etapa mal escrito: entra en la etapa inicial y se avisa.
+                advertencias.append(f'La etapa "{d["etapa"]}" no existe (abierta) en {embudo}: quedó en la etapa inicial. '
+                                    f'Etapas: {", ".join(etapas.values_list("nombre", flat=True))}')
         if d.get('agente'):
             from apps.users.models import User
             agente = User.objects.filter(is_active=True).filter(
                 Q(username__iexact=str(d['agente'])) | Q(email__iexact=str(d['agente']))).first()
             if agente is None:
-                return self._resp(request, {'error': f'No existe el usuario "{d["agente"]}"'}, 400)
+                # Tampoco por un vendedor que no existe en este CRM: se asigna con el reparto normal y se avisa.
+                advertencias.append(f'No existe el usuario "{d["agente"]}": se asignó con el reparto normal del embudo.')
         try:
             res = ingresar_prospecto(datos, embudo, origen,
                                      fuente=str(d.get('fuente') or (self.api_key.fuente if self.api_key else '') or 'API'),
@@ -158,11 +163,15 @@ class LeadCrearView(ApiBase):
             except ErrorNegocio:
                 movida = False
             res.oportunidad.refresh_from_db()
-        if d.get('nota') and res.oportunidad:
-            from apps.crm.services import agregar_nota
+        if nota and res.oportunidad:
             from apps.crm.models import Actividad
-            Actividad.objects.create(contacto=res.contacto, oportunidad=res.oportunidad, tipo=Actividad.TIPO_NOTA,
-                                     texto=f'[API] {d["nota"]}'[:2000])
+            texto = f'[{self.api_key.nombre if self.api_key else "API"}] {nota}'[:4000]
+            # El bot puede mandar el mismo resumen varias veces (cada avance): no repetir la nota.
+            ultima = (Actividad.objects.filter(oportunidad=res.oportunidad, tipo=Actividad.TIPO_NOTA)
+                      .order_by('-created_at').values_list('texto', flat=True).first())
+            if ultima != texto:
+                Actividad.objects.create(contacto=res.contacto, oportunidad=res.oportunidad, tipo=Actividad.TIPO_NOTA,
+                                         texto=texto)
         # Campos personalizados que mandó la integración (ej. el bot marca "es socio"): dispara automatizaciones por campo.
         if extra and res.contacto:
             from apps.automatizaciones.services import campos_cambiaron
