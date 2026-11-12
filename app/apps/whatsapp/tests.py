@@ -457,3 +457,13 @@ class ReactivarBotSoloTests(WhatsAppBase):
         for c in (reciente, baja):
             c.refresh_from_db()
             self.assertFalse(c.bot_activo)
+
+
+class AbrirChatPorTelefonoTests(WhatsAppBase):
+    def test_link_por_telefono_abre_el_chat(self):
+        conv = Conversacion.objects.create(linea=self.linea, telefono='+5491163589975', agente=self.agente)
+        cl = Client()
+        cl.force_login(self.agente)
+        r = cl.get('/whatsapp/', {'tel': '5491163589975'})
+        self.assertEqual(r.context['conv'], conv)
+        self.assertIsNone(cl.get('/whatsapp/', {'tel': '5491100000000'}).context['conv'])

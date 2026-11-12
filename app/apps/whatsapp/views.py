@@ -181,6 +181,14 @@ class InboxView(LoginRequiredMixin, View):
         conv = None
         if request.GET.get('conv'):
             conv = _conv_visible(request, request.GET['conv'])
+        elif request.GET.get('tel'):
+            # Link por teléfono (ej. la ficha que arma un bot externo, que no conoce el id del chat): el más reciente.
+            from core.phone import normalizar_telefono
+            tel = normalizar_telefono(request.GET['tel'])
+            conv = (Conversacion.objects.visibles_para(request.user).select_related('linea', 'contacto', 'agente')
+                    .filter(telefono=tel).order_by('-ultimo_mensaje_at').first()) if tel else None
+            if conv is None:
+                messages.info(request, 'No encontré un chat de WhatsApp con ese número (o no tenés acceso).')
         ctx = {
             'conversaciones': list(qs[:80]), 'bandeja': bandeja, 'filtros': request.GET, 'conv': conv,
             'lineas': LineaWhatsApp.para_usuario(request.user), 'version': services.version_inbox(),
