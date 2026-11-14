@@ -64,6 +64,9 @@ class ConfigAgente(models.Model):
     campos_base = models.JSONField(default=list, blank=True, verbose_name='Datos del contacto a completar')
     campos = models.ManyToManyField('crm.CampoPersonalizado', blank=True, related_name='+',
                                     verbose_name='Campos personalizados a completar')
+    campos_obligatorios = models.JSONField(
+        default=list, blank=True, verbose_name='Obligatorios para derivar',
+        help_text='Claves de los datos sin los cuales el agente no puede derivar (los pide antes).')
 
     embudo = models.ForeignKey('crm.Embudo', null=True, blank=True, on_delete=models.SET_NULL, related_name='+',
                                help_text='Embudo donde trabaja el agente (para mover etapas).')
@@ -71,6 +74,9 @@ class ConfigAgente(models.Model):
                                           related_name='+', verbose_name='Etapa mientras conversa')
     etapa_derivado = models.ForeignKey('crm.Etapa', null=True, blank=True, on_delete=models.SET_NULL,
                                        related_name='+', verbose_name='Etapa al derivar al asesor')
+    etapa_pendiente = models.ForeignKey('crm.Etapa', null=True, blank=True, on_delete=models.SET_NULL,
+                                        related_name='+', verbose_name='Etapa "Pendiente / Nutrición"',
+                                        help_text='Le interesa pero todavía no (ej. "escribime la semana que viene").')
     etapa_descartado = models.ForeignKey('crm.Etapa', null=True, blank=True, on_delete=models.SET_NULL,
                                          related_name='+', verbose_name='Etapa al descartar')
     tipificacion_descartado = models.ForeignKey('crm.Tipificacion', null=True, blank=True, on_delete=models.SET_NULL,

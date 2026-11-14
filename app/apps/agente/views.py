@@ -52,11 +52,13 @@ class ConfigForm(forms.ModelForm):
                                             widget=forms.CheckboxSelectMultiple, label='Borrar key propia')
     campos_base = forms.MultipleChoiceField(choices=[c for c in CAMPOS_BASE_AGENTE if c[0] != 'nombre'], required=False,
                                             widget=forms.CheckboxSelectMultiple, label='Datos del contacto a completar')
+    campos_obligatorios = forms.MultipleChoiceField(required=False, widget=forms.CheckboxSelectMultiple,
+                                                    label='Obligatorios para derivar')
 
     class Meta:
         model = ConfigAgente
         fields = ['activo', 'nombre', 'empresa', 'modelo', 'esfuerzo', 'instrucciones', 'criterios', 'campos_base',
-                  'campos', 'embudo', 'etapa_calificando', 'etapa_derivado', 'etapa_descartado',
+                  'campos', 'campos_obligatorios', 'embudo', 'etapa_calificando', 'etapa_derivado', 'etapa_pendiente', 'etapa_descartado',
                   'tipificacion_descartado', 'derivar_destino', 'derivar_url', 'derivar_token', 'mensaje_derivacion', 'demora_segundos',
                   'max_turnos', 'presupuesto_diario']
         widgets = {'instrucciones': forms.Textarea(attrs={'rows': 9}), 'criterios': forms.Textarea(attrs={'rows': 5}),
@@ -69,7 +71,9 @@ class ConfigForm(forms.ModelForm):
         self.fields['campos'].queryset = CampoPersonalizado.objects.filter(activo=True).exclude(
             tipo=CampoPersonalizado.TIPO_ARCHIVO).order_by('nombre')
         etapas = Etapa.objects.select_related('embudo').order_by('embudo__nombre', 'orden')
-        for k in ('etapa_calificando', 'etapa_derivado', 'etapa_descartado'):
+        self.fields['campos_obligatorios'].choices = CAMPOS_BASE_AGENTE + [
+            (c.slug, c.nombre) for c in self.fields['campos'].queryset]
+        for k in ('etapa_calificando', 'etapa_derivado', 'etapa_pendiente', 'etapa_descartado'):
             self.fields[k].queryset = etapas
             self.fields[k].label_from_instance = lambda e: f'{e.embudo} · {e}'
         self.fields['tipificacion_descartado'].queryset = Tipificacion.objects.all()
@@ -78,9 +82,16 @@ class ConfigForm(forms.ModelForm):
     def clean(self):
         d = super().clean()
         emb = d.get('embudo')
-        for k in ('etapa_calificando', 'etapa_derivado', 'etapa_descartado'):
+        for k in ('etapa_calificando', 'etapa_derivado', 'etapa_pendiente', 'etapa_descartado'):
             if d.get(k) and emb and d[k].embudo_id != emb.pk:
                 self.add_error(k, 'Tiene que ser una etapa del embudo elegido.')
+        # Un dato obligatorio tiene que estar entre los que junta el agente
+        elegidos = {'nombre'} | set(d.get('campos_base') or []) | {c.slug for c in (d.get('campos') or [])}
+        sueltos = [k for k in d.get('campos_obligatorios') or [] if k not in elegidos]
+        if sueltos:
+            nombres = dict(self.fields['campos_obligatorios'].choices)
+            self.add_error('campos_obligatorios', 'Para que sea obligatorio, tildalo también arriba como dato a completar: '
+                           + ', '.join(nombres.get(k, k) for k in sueltos))
         return d
 
 
@@ -339,12 +350,13 @@ class RegistroView(ModuloMixin, View):
         derivados = acts.filter(texto__startswith='Agente IA derivó').count()
         descartados = acts.filter(texto__startswith='Agente IA descartó').count()
         humano = acts.filter(texto__startswith='Agente IA pidió').count()
+        pendientes = acts.filter(texto__startswith='Agente IA dejó pendiente').count()
         costo = resumen['costo'] or Decimal(0)
         turnos = (TurnoAgente.objects.filter(created_at__gte=desde, simulado=request.GET.get('sim') == '1')
                   .select_related('conversacion__contacto')[:200])
         return render(request, 'agente/registro.html', {
             'seccion': 'agente', 'tab': 'registro', 'dias': dias, 'resumen': resumen, 'costo': costo,
-            'derivados': derivados, 'descartados': descartados, 'humano': humano, 'turnos': turnos,
+            'derivados': derivados, 'descartados': descartados, 'humano': humano, 'pendientes': pendientes, 'turnos': turnos,
             'costo_derivado': (costo / derivados) if derivados else None, 'gasto_hoy': motor.gasto_hoy(),
             'cfg': ConfigAgente.get(), 'sim': request.GET.get('sim') == '1',
         })

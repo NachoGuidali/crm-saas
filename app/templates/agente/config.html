@@ -21,6 +21,10 @@
       <div class="mb-2 muted">Siempre guarda el nombre. Elegí qué más tiene que conseguir; lo guarda en la ficha del lead a medida que se lo dicen.</div>
       <div class="row"><div class="col-md-5"><div class="fw-semibold mb-1">Del contacto</div>{% for c in form.campos_base %}<div class="form-check">{{ c.tag }} <label class="form-check-label" for="{{ c.id_for_label }}">{{ c.choice_label }}</label></div>{% endfor %}</div>
         <div class="col-md-7"><div class="fw-semibold mb-1">Campos personalizados</div>{% for c in form.campos %}<div class="form-check">{{ c.tag }} <label class="form-check-label" for="{{ c.id_for_label }}">{{ c.choice_label }}</label></div>{% empty %}<div class="muted">No hay campos personalizados. Crealos en Configuración → Campos (ej. "¿Tiene recibo de sueldo?", "Grupo familiar").</div>{% endfor %}</div></div>
+      <div class="border-top mt-2 pt-2"><div class="fw-semibold mb-1"><i class="bi bi-lock"></i> Obligatorios para derivar</div>
+        <div class="muted mb-1">Sin estos datos el agente <b>no puede derivar</b>: se los pide al lead primero. Los demás los pide, pero si no los consigue deriva igual.</div>
+        <div class="d-flex flex-wrap gap-3">{% for c in form.campos_obligatorios %}<label class="d-flex gap-1">{{ c.tag }} {{ c.choice_label }}</label>{% endfor %}</div>
+        {{ form.campos_obligatorios.errors }}</div>
     </div></div>
   </div>
   <div class="col-lg-5">
@@ -44,6 +48,7 @@
       <div class="col-12"><label class="form-label">Embudo</label>{{ form.embudo }}{{ form.embudo.errors }}</div>
       <div class="col-12"><label class="form-label">{{ form.etapa_calificando.label }}</label>{{ form.etapa_calificando }}{{ form.etapa_calificando.errors }}</div>
       <div class="col-12"><label class="form-label">{{ form.etapa_derivado.label }}</label>{{ form.etapa_derivado }}{{ form.etapa_derivado.errors }}</div>
+      <div class="col-12"><label class="form-label">{{ form.etapa_pendiente.label }}</label>{{ form.etapa_pendiente }}{{ form.etapa_pendiente.errors }}<div class="form-text">{{ form.etapa_pendiente.help_text }} El agente le vuelve a escribir solo en la fecha que acuerden; si el lead escribe antes, vuelve a "{{ form.etapa_calificando.label|lower }}".</div></div>
       <div class="col-md-6"><label class="form-label">{{ form.etapa_descartado.label }}</label>{{ form.etapa_descartado }}{{ form.etapa_descartado.errors }}</div>
       <div class="col-md-6"><label class="form-label">Motivo de cierre</label>{{ form.tipificacion_descartado }}</div>
     </div></div></div>

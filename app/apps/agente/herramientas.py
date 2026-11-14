@@ -35,6 +35,25 @@ def campos_disponibles(config):
     return campos
 
 
+def valor_actual(ctx, clave):
+    """Valor que tiene hoy el lead en ese dato (ficha + lo guardado en este turno / en el simulador)."""
+    if clave in ctx.datos:
+        return ctx.datos[clave]
+    c = ctx.contacto
+    if c is None:
+        return None
+    if clave in dict(CAMPOS_BASE_AGENTE):
+        return getattr(c, clave, None)
+    return (c.datos_extra or {}).get(clave)
+
+
+def faltantes(ctx):
+    """Etiquetas de los datos obligatorios para derivar que todavía no tiene el lead."""
+    obligatorios = set(ctx.config.campos_obligatorios or [])
+    return [etiqueta for clave, etiqueta, _, _ in campos_disponibles(ctx.config)
+            if clave in obligatorios and valor_actual(ctx, clave) in (None, '', [])]
+
+
 def definiciones(config, documentos_enviables, formularios_firma):
     """Lista de tools para la API. Orden y contenido estables (no cambian entre mensajes: ayuda a la caché)."""
     claves = [c[0] for c in campos_disponibles(config)]
@@ -60,6 +79,11 @@ def definiciones(config, documentos_enviables, formularios_firma):
               'despedite avisándole que un asesor lo va a contactar.',
               {'resumen': {'type': 'string', 'description': 'Resumen para el asesor: quién es, qué busca, qué le cotizaste, objeciones.'},
                'motivo': {'type': 'string', 'description': 'Por qué califica.'}}),
+        _tool('marcar_pendiente',
+              'Le interesa pero todavía no está listo (ej. "lo hablo con mi pareja", "escribime la semana que viene", '
+              '"cobro a fin de mes"). Queda en espera y le volvés a escribir solo en la fecha indicada.',
+              {'motivo': {'type': 'string', 'description': 'Por qué queda pendiente, en pocas palabras.'},
+               'en_dias': {'type': 'number', 'description': 'En cuántos días recontactarlo (entre 1 y 90).'}}),
         _tool('descartar_lead',
               'El lead NO califica, no le interesa, o pide que no le escriban más. Despedite con amabilidad.',
               {'motivo': {'type': 'string'},
@@ -86,7 +110,7 @@ def ejecutar(ctx, nombre, entrada):
     fn = {
         'guardar_datos': _guardar_datos, 'consultar_precios': _consultar_precios,
         'programar_seguimiento': _programar_seguimiento, 'derivar_a_asesor': _derivar,
-        'descartar_lead': _descartar, 'pedir_ayuda_humano': _pedir_ayuda,
+        'descartar_lead': _descartar, 'pedir_ayuda_humano': _pedir_ayuda, 'marcar_pendiente': _pendiente,
         'enviar_documento': _enviar_documento, 'enviar_formulario_firma': _enviar_firma,
     }.get(nombre)
     if fn is None:
@@ -223,6 +247,11 @@ def _actividad(ctx, texto):
 
 def _derivar(ctx, entrada):
     resumen, motivo = (entrada.get('resumen') or '').strip(), (entrada.get('motivo') or '').strip()
+    faltan = faltantes(ctx)
+    if faltan:
+        ctx.acciones.append(f'Quiso derivar pero faltan: {", ".join(faltan)}')
+        return ('Todavía NO se puede derivar: faltan estos datos obligatorios: ' + ', '.join(faltan)
+                + '. Pedíselos al lead (de a uno, con naturalidad), guardalos con guardar_datos y después volvé a derivar.')
     ctx.resultado = 'derivado'
     ctx.acciones.append(f'Derivado al asesor: {motivo}')
     if ctx.simulado:
@@ -244,6 +273,24 @@ def _derivar(ctx, entrada):
         transaction.on_commit(lambda: enviar_derivacion.delay(conv_pk, resumen, motivo))
     guia = ctx.config.mensaje_derivacion or ''
     return 'Derivado. Despedite avisando que un asesor lo va a contactar' + (f' (por ejemplo: "{guia}").' if guia else '.')
+
+
+def _pendiente(ctx, entrada):
+    from .models import SeguimientoAgente
+    motivo = (entrada.get('motivo') or '').strip()[:250]
+    dias = int(min(max(float(entrada.get('en_dias') or 7), 1), 90))
+    cuando = timezone.now() + timedelta(days=dias)
+    ctx.resultado = 'pendiente'
+    ctx.acciones.append(f'Pendiente {dias} días: {motivo}')
+    if ctx.simulado:
+        return f'Queda pendiente (simulación): le volvés a escribir en {dias} días. Despedite hasta entonces.'
+    _mover(ctx, ctx.config.etapa_pendiente)
+    SeguimientoAgente.objects.filter(conversacion=ctx.conv, hecho=False).update(hecho=True, resultado='Reemplazado')
+    SeguimientoAgente.objects.create(conversacion=ctx.conv, cuando=cuando,
+                                     motivo=f'Retomar: quedó pendiente porque {motivo}'[:300])
+    _actividad(ctx, f'Agente IA dejó pendiente: {motivo} · recontacto el {timezone.localtime(cuando):%d/%m/%Y}')
+    return (f'Listo: queda pendiente y le escribís el {timezone.localtime(cuando):%d/%m}. Despedite cordialmente '
+            'diciéndole que le escribís entonces (si escribe antes, le respondés).')
 
 
 def _descartar(ctx, entrada):

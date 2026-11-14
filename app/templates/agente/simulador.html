@@ -46,7 +46,7 @@
       d.herramientas.forEach(h => nota(`🔧 ${h.nombre}${h.error ? ' (error)' : ''}`));
       if (d.rechazo) nota('⚠ El modelo no quiso responder: en un chat real pasaría a una persona.');
       datos = d.datos || datos; acciones = acciones.concat(d.acciones || []); costo += parseFloat(d.costo || 0);
-      if (d.resultado) nota({derivado: '✅ Derivado al asesor', descartado: '⛔ Lead descartado', humano: '🙋 Pasado a una persona'}[d.resultado] || d.resultado);
+      if (d.resultado) nota({derivado: '✅ Derivado al asesor', descartado: '⛔ Lead descartado', humano: '🙋 Pasado a una persona', pendiente: '⏳ Pendiente: le vuelve a escribir en la fecha acordada'}[d.resultado] || d.resultado);
       pintarPanel();
     } catch (e) { pensando.remove(); } finally { btn.disabled = false; txt.focus(); }
   }

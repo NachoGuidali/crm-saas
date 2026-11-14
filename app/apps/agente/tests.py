@@ -452,3 +452,64 @@ class ClavesTests(AgenteBase):
         self.assertEqual(ConfigAgente.get().openai_api_key, 'sk-openai-secreta-9876')
         self.web.post('/agente/', {**datos, 'nueva_openai': '', 'borrar_keys': ['openai']})
         self.assertEqual(ConfigAgente.get().openai_api_key, '')
+
+
+class ObligatoriosYPendienteTests(AgenteBase):
+    def test_no_deriva_sin_los_datos_obligatorios(self):
+        self.cfg.campos_obligatorios = ['dni', self.recibo.slug]
+        self.cfg.save()
+        claude = ClaudeFalso(
+            respuesta(tool('derivar_a_asesor', {'resumen': 'ok', 'motivo': 'quiere avanzar'})),
+            respuesta(texto('Antes de pasarte con un asesor, ¿me decís tu DNI?')),
+        )
+        conv = self.entrante(claude)
+        resultado = claude.llamadas[1]['messages'][-1]['content'][0]['content']
+        self.assertIn('Todavía NO se puede derivar', resultado)
+        self.assertIn('DNI', resultado)
+        self.assertIn('Tiene recibo de sueldo', resultado)
+        conv.refresh_from_db()
+        self.assertTrue(conv.bot_activo)  # sigue atendiendo: no derivó
+        self.assertIn('(OBLIGATORIO para derivar)', claude.llamadas[0]['system'][0]['text'])
+        # Con los datos guardados, ahora sí deriva
+        claude2 = ClaudeFalso(
+            respuesta(tool('guardar_datos', {'datos': [{'campo': 'dni', 'valor': '30123456'},
+                                                       {'campo': self.recibo.slug, 'valor': 'si'}]}, 't1'),
+                      tool('derivar_a_asesor', {'resumen': 'ok', 'motivo': 'califica'}, 't2')),
+            respuesta(texto('¡Listo! Te contacta un asesor.')),
+        )
+        self.entrante(claude2, wa_id='ABC2', texto_='30123456, sí tengo recibo')
+        conv.refresh_from_db()
+        self.assertFalse(conv.bot_activo)
+        self.assertEqual(conv.contacto.oportunidades.get().etapa, self.etapas[-1])
+
+    def test_pendiente_recontacta_solo_y_vuelve_si_escribe(self):
+        from apps.agente.models import SeguimientoAgente
+        pendiente = self.embudo.etapas.create(nombre='Pendiente IA', orden=50)
+        self.cfg.etapa_calificando = self.etapas[1]
+        self.cfg.etapa_pendiente = pendiente
+        self.cfg.save()
+        conv = self.entrante(ClaudeFalso(
+            respuesta(tool('marcar_pendiente', {'motivo': 'lo habla con la pareja', 'en_dias': 7})),
+            respuesta(texto('Dale, te escribo la semana que viene 😊'))))
+        op = conv.contacto.oportunidades.get()
+        self.assertEqual(op.etapa, pendiente)
+        seg = SeguimientoAgente.objects.get(hecho=False)
+        self.assertAlmostEqual((seg.cuando - timezone.now()).days, 6, delta=1)
+        self.assertIn('lo habla con la pareja', seg.motivo)
+        self.assertTrue(op.actividades.filter(texto__startswith='Agente IA dejó pendiente').exists())
+        conv.refresh_from_db()
+        self.assertTrue(conv.bot_activo)
+        # El lead escribe antes: vuelve a "Calificando" y el agente responde
+        self.entrante(ClaudeFalso(respuesta(texto('¡Hola de nuevo!'))), wa_id='ABC2', texto_='Ya lo hablamos, avancemos')
+        op.refresh_from_db()
+        self.assertEqual(op.etapa, self.etapas[1])
+
+    def test_config_obligatorio_tiene_que_estar_tildado(self):
+        datos = {'nombre': 'Clara', 'modelo': 'claude-opus-5-5', 'esfuerzo': 'medium', 'demora_segundos': 12,
+                 'max_turnos': 40, 'presupuesto_diario': '20', 'campos_obligatorios': ['email']}
+        r = self.web.post('/agente/', datos)
+        self.assertContains(r, 'tildalo también arriba')
+        r = self.web.post('/agente/', {**datos, 'campos_base': ['email']})
+        self.assertEqual(r.status_code, 302)
+        from apps.agente.models import ConfigAgente
+        self.assertEqual(ConfigAgente.get().campos_obligatorios, ['email'])
