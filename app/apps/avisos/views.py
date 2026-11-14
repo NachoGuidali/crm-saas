@@ -23,6 +23,10 @@ class ReglaForm(forms.ModelForm):
         from apps.users.models import User
         self.fields['usuarios'].queryset = User.objects.filter(is_active=True).order_by('first_name', 'username')
         self.fields['usuarios'].label_from_instance = lambda u: f'{u.display_name}' + ('' if u.whatsapp else ' (sin WhatsApp)')
+        from apps.agente.services import habilitado as agente_habilitado
+        from .models import EV_DERIVADO_IA
+        if not agente_habilitado() and self.instance.evento != EV_DERIVADO_IA:  # evento del módulo Agente IA
+            self.fields['evento'].choices = [c for c in self.fields['evento'].choices if c[0] != EV_DERIVADO_IA]
         for f in self.fields.values():
             w = f.widget
             if isinstance(w, forms.CheckboxInput):

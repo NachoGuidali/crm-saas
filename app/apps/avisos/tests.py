@@ -107,3 +107,16 @@ class AvisosTests(TestCase):
         r = web.post('/avisos/nueva/', {'nombre': 'Ventas', 'evento': 'venta', 'por_campanita': 'on', 'al_vendedor': 'on',
                                         'minutos': 15, 'activa': 'on'})
         self.assertEqual(r.status_code, 302)
+
+
+class AvisosSinModuloAgenteTests(AvisosTests):
+    def test_sin_modulo_no_ofrece_el_evento_del_agente(self):
+        from django.db import connection
+        connection.tenant.funciones_extra = []
+        connection.tenant.save(update_fields=['funciones_extra'])
+        web = Client()
+        web.force_login(self.admin)
+        self.assertNotContains(web.get('/avisos/nueva/'), 'El agente IA deriva')
+        connection.tenant.funciones_extra = ['agente_ia']
+        connection.tenant.save(update_fields=['funciones_extra'])
+        self.assertContains(web.get('/avisos/nueva/'), 'El agente IA deriva')
