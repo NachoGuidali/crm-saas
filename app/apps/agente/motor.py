@@ -197,6 +197,11 @@ def contexto_lead(ctx, modo, motivo=''):
             v = getattr(c, clave, None) if clave in dict(CAMPOS_BASE_AGENTE) else (c.datos_extra or {}).get(clave)
             datos.append(f'- {etiqueta}: {v if v not in (None, "") else "(falta)"}')
         lineas.append('Datos en la ficha:\n' + '\n'.join(datos))
+        if ctx.config.leer_recibos:  # lo que ya se leyó del recibo, para cotizar y recomendar plan en toda la charla
+            extra = c.datos_extra or {}
+            leidos = [f'- {nombre}: {extra[slug]}' for slug, nombre, _, _ in herramientas.CAMPOS_RECIBO
+                      if extra.get(slug) not in (None, '') and slug != 'recibo_cuil']
+            lineas.append('Recibo de sueldo: ' + ('\n' + '\n'.join(leidos) if leidos else 'todavía no lo mandó.'))
     elif ctx.datos:
         lineas.append('Datos guardados:\n' + '\n'.join(f'- {k}: {v}' for k, v in ctx.datos.items()))
     if op is not None:

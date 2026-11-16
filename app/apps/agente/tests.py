@@ -592,3 +592,18 @@ class RecibosTests(AgenteBase):
         from apps.agente.herramientas import definiciones
         self.cfg.leer_recibos = False
         self.assertNotIn('registrar_recibo', [t['name'] for t in definiciones(self.cfg, [], [])])
+
+
+class ReciboEnContextoTests(RecibosTests):
+    def test_el_agente_ve_el_recibo_en_los_mensajes_siguientes(self):
+        from apps.agente import motor
+        conv, _ = self._chat_con_pdf()
+        c = conv.contacto
+        c.datos_extra = {**(c.datos_extra or {}), 'recibo_sueldo_bruto': '850000', 'recibo_aporte_os': '25500',
+                         'recibo_cuil': '20-30123456-7'}
+        c.save()
+        ctx = motor.Contexto(config=self.cfg, conv=conv, contacto=c, oportunidad=None)
+        texto_ctx = motor.contexto_lead(ctx, 'respuesta')
+        self.assertIn('Recibo: sueldo bruto: 850000', texto_ctx)
+        self.assertIn('Recibo: descuento obra social (3%): 25500', texto_ctx)
+        self.assertNotIn('30123456', texto_ctx)  # el CUIL no hace falta para cotizar
