@@ -15,6 +15,29 @@ logger = logging.getLogger('apps.agente')
 
 CAMPO_OBSERVACION = 'observacion'
 
+# Campos de la ficha que completa la lectura del recibo de sueldo: (slug, nombre, tipo, clave en la herramienta)
+CAMPOS_RECIBO = [
+    ('recibo_sueldo_bruto', 'Recibo: sueldo bruto', 'numero', 'sueldo_bruto'),
+    ('recibo_periodo', 'Recibo: período', 'texto', 'periodo'),
+    ('recibo_es_sac', 'Recibo: es aguinaldo (SAC)', 'sino', 'es_aguinaldo'),
+    ('recibo_aporte_os', 'Recibo: descuento obra social (3%)', 'numero', 'descuento_obra_social'),
+    ('recibo_extras', 'Recibo: premios / conceptos extra', 'texto', 'premios_o_extras'),
+    ('recibo_cuil', 'Recibo: CUIL', 'texto', 'cuil'),
+    ('recibo_empleador', 'Recibo: empleador', 'texto', 'empleador'),
+    ('recibo_antiguedad', 'Recibo: antigüedad', 'texto', 'antiguedad'),
+    ('recibo_revision', 'Recibo: revisión del agente', 'texto_largo', 'revision'),
+]
+
+
+def asegurar_campos_recibo():
+    """Crea (si faltan) los campos personalizados del recibo, para todos los embudos."""
+    from apps.crm.models import CampoPersonalizado
+    for slug, nombre, tipo, _ in CAMPOS_RECIBO:
+        if not CampoPersonalizado.objects.filter(slug=slug).exists():
+            c = CampoPersonalizado(nombre=nombre, tipo=tipo)
+            c.slug = slug
+            c.save()
+
 
 def _tool(nombre, descripcion, propiedades, requeridos=None):
     return {
@@ -93,6 +116,20 @@ def definiciones(config, documentos_enviables, formularios_firma):
               'podés resolver o no sabés la respuesta. Avisale que en breve lo atiende una persona.',
               {'motivo': {'type': 'string'}}),
     ]
+    if config.leer_recibos:
+        tools.append(_tool(
+            'registrar_recibo',
+            'Guarda lo que leíste en el recibo de sueldo que mandó el lead (foto o PDF). Usala apenas lo leas. '
+            'Lo que no se vea en el recibo, mandalo vacío ("") — nunca lo inventes.',
+            {'legible': {'type': 'boolean', 'description': 'false si no se puede leer bien (borroso, cortado).'},
+             'sueldo_bruto': {'type': 'string', 'description': 'Total bruto o remuneración bruta, solo el número.'},
+             'periodo': {'type': 'string', 'description': 'Mes y año (o quincena) que liquida, ej. "10/2026".'},
+             'es_aguinaldo': {'type': 'boolean', 'description': 'true si es un recibo de SAC / aguinaldo.'},
+             'descuento_obra_social': {'type': 'string', 'description': 'Monto del descuento "obra social" (3%), solo el número.'},
+             'premios_o_extras': {'type': 'string', 'description': 'Premios, horas extra u otros conceptos no habituales.'},
+             'cuil': {'type': 'string'}, 'empleador': {'type': 'string'},
+             'antiguedad': {'type': 'string', 'description': 'Fecha de ingreso o años de antigüedad.'},
+             'revision': {'type': 'string', 'description': 'Qué notaste para el asesor: datos que no coinciden, falta el 3%, etc.'}}))
     if documentos_enviables:
         tools.append(_tool('enviar_documento', 'Le manda al lead un archivo (folleto, cartilla…).',
                            {'documento': {'type': 'string', 'enum': [d.titulo for d in documentos_enviables]}}))
@@ -112,6 +149,7 @@ def ejecutar(ctx, nombre, entrada):
         'programar_seguimiento': _programar_seguimiento, 'derivar_a_asesor': _derivar,
         'descartar_lead': _descartar, 'pedir_ayuda_humano': _pedir_ayuda, 'marcar_pendiente': _pendiente,
         'enviar_documento': _enviar_documento, 'enviar_formulario_firma': _enviar_firma,
+        'registrar_recibo': _registrar_recibo,
     }.get(nombre)
     if fn is None:
         return f'Herramienta desconocida: {nombre}', True
@@ -328,6 +366,62 @@ def _pedir_ayuda(ctx, entrada):
     from apps.avisos.services import disparar
     disparar(EV_HUMANO, oportunidad=ctx.oportunidad, conv=ctx.conv, motivo=f'Agente IA: {motivo}')
     return 'Avisado al equipo. Decile que en breve lo atiende una persona.'
+
+
+def _numero(texto):
+    """'$ 850.000,50' → '850000.50' ('' si no hay número)."""
+    t = re.sub(r'[^\d,.]', '', str(texto or ''))
+    if not t:
+        return ''
+    if ',' in t and '.' in t:  # 850.000,50 (formato argentino) o 850,000.50
+        t = t.replace('.', '').replace(',', '.') if t.rfind(',') > t.rfind('.') else t.replace(',', '')
+    elif ',' in t:
+        t = t.replace('.', '').replace(',', '.') if len(t.rsplit(',', 1)[1]) <= 2 else t.replace(',', '')
+    elif '.' in t and (t.count('.') > 1 or len(t.rsplit('.', 1)[1]) == 3):
+        t = t.replace('.', '')  # 850.000 = miles
+    try:
+        return f'{float(t):.2f}'.rstrip('0').rstrip('.')
+    except ValueError:
+        return ''
+
+
+def _registrar_recibo(ctx, entrada):
+    if not ctx.config.leer_recibos:
+        return 'La lectura de recibos no está activada.'
+    if not entrada.get('legible', True):
+        ctx.acciones.append('Recibo ilegible: pidió otro')
+        return 'Anotado que no se lee: pedile una foto más clara (de frente, con buena luz, sin cortar los bordes).'
+    valores = {}
+    for slug, nombre, tipo, clave in CAMPOS_RECIBO:
+        v = entrada.get(clave)
+        if tipo == 'numero':
+            v = _numero(v)
+        elif tipo == 'sino':
+            v = bool(v)
+        else:
+            v = str(v or '').strip()[:500]
+        if v not in ('', None):
+            valores[slug] = v
+    if valores.get('recibo_cuil'):
+        valores['recibo_cuil'] = re.sub(r'[^\d-]', '', valores['recibo_cuil'])
+    ctx.datos.update(valores)
+    bruto, os_ = valores.get('recibo_sueldo_bruto'), valores.get('recibo_aporte_os')
+    resumen = (f'bruto ${bruto or "?"}, período {valores.get("recibo_periodo") or "?"}'
+               f'{", SAC" if valores.get("recibo_es_sac") else ""}, obra social ${os_ or "no figura"}')
+    ctx.acciones.append(f'Leyó el recibo: {resumen}')
+    if not ctx.simulado and ctx.contacto is not None:
+        c = ctx.contacto
+        c.datos_extra = {**(c.datos_extra or {}), **valores}
+        c.save(update_fields=['datos_extra', 'updated_at'])
+        _actividad(ctx, f'Agente IA leyó el recibo de sueldo: {resumen}.'
+                        + (f' Revisión: {valores["recibo_revision"]}' if valores.get('recibo_revision') else ''))
+    avisos = []
+    if valores.get('recibo_es_sac'):
+        avisos.append('es un recibo de aguinaldo: pedile el de un mes normal')
+    if not os_:
+        avisos.append('no figura el descuento de obra social: preguntale o anotalo para el asesor')
+    return 'Recibo guardado en la ficha. ' + ('Ojo: ' + '; '.join(avisos) + '.' if avisos else
+                                              'No le repitas los números sensibles (CUIL, sueldo) en el chat.')
 
 
 def _enviar_documento(ctx, entrada):

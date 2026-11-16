@@ -23,6 +23,8 @@ logger = logging.getLogger('apps.agente')
 MAX_HISTORIAL = 40
 MAX_VUELTAS = 6
 MAX_IMAGENES = 3
+MAX_PDFS = 2
+MAX_BYTES_PDF = 8 * 1024 * 1024
 MAX_BYTES_IMAGEN = 4 * 1024 * 1024
 MIME_IMAGEN = ('image/jpeg', 'image/png', 'image/gif', 'image/webp')
 SEPARADOR = re.compile(r'^\s*-{3,}\s*$', re.M)
@@ -98,6 +100,13 @@ def instrucciones(config):
     if config.precios_columnas:
         partes.append('## Tabla de precios\nColumnas: ' + ' | '.join(config.precios_columnas)
                       + f'\n({len(config.precios_filas)} filas: consultalas con consultar_precios.)')
+    if config.leer_recibos:
+        partes.append(
+            '## Recibos de sueldo\nSi el lead manda su recibo (foto o PDF), leelo con atención y usá registrar_recibo '
+            'con lo que ves: sueldo bruto, período, si es aguinaldo (SAC), el descuento de obra social (3%), premios o '
+            'conceptos extra, CUIL, empleador y antigüedad. Si es de aguinaldo, pedí el de un mes normal; si no se lee, '
+            'pedí otra foto. No le repitas al lead su CUIL ni su sueldo en el chat: solo confirmale que lo recibiste. '
+            'Vos no validás si le alcanza el aporte: eso lo confirma el asesor.')
     docs = DocumentoAgente.objects.filter(activo=True).exclude(texto='')
     if docs:
         partes.append('## Información del producto\n' + '\n\n'.join(f'### {d.titulo}\n{d.texto.strip()}' for d in docs))
@@ -118,6 +127,22 @@ def _imagen(m):
                                              'data': base64.standard_b64encode(f.read()).decode()}}
 
 
+def _es_pdf(m):
+    return ((m.media_mime or '').split(';')[0] == 'application/pdf'
+            or (m.media_filename or '').lower().endswith('.pdf'))
+
+
+def _pdf(m):
+    from .transcripcion import ruta_de_media
+    ruta = ruta_de_media(m.media_url)
+    if not ruta or os.path.getsize(ruta) > MAX_BYTES_PDF:
+        return None
+    with open(ruta, 'rb') as f:
+        return {'type': 'document', 'title': (m.media_filename or 'documento.pdf')[:200],
+                'source': {'type': 'base64', 'media_type': 'application/pdf',
+                           'data': base64.standard_b64encode(f.read()).decode()}}
+
+
 def _texto_mensaje(m):
     from apps.whatsapp.models import Mensaje as M
     if m.tipo == M.TIPO_AUDIO:
@@ -136,11 +161,16 @@ def historial_de(conv):
     from apps.whatsapp.models import Mensaje as M
     msgs = list(conv.mensajes.filter(eliminado_at__isnull=True).select_related('enviado_por')
                 .order_by('-timestamp', '-pk')[:MAX_HISTORIAL])[::-1]
-    salida, imagenes = [], 0
-    for m in reversed(msgs):  # de atrás para adelante para quedarnos con las imágenes más nuevas
-        if m.direccion == M.DIR_ENTRANTE and m.tipo == M.TIPO_IMAGEN and imagenes < MAX_IMAGENES and m.media_url:
+    salida, imagenes, pdfs = [], 0, 0
+    for m in reversed(msgs):  # de atrás para adelante: se adjuntan las imágenes y PDF más nuevos
+        if m.direccion != M.DIR_ENTRANTE or not m.media_url:
+            continue
+        if m.tipo == M.TIPO_IMAGEN and imagenes < MAX_IMAGENES:
             m._img = _imagen(m)
             imagenes += bool(m._img)
+        elif m.tipo == M.TIPO_DOCUMENTO and _es_pdf(m) and pdfs < MAX_PDFS:
+            m._img = _pdf(m)
+            pdfs += bool(m._img)
     for m in msgs:
         texto = _texto_mensaje(m)
         if m.direccion == M.DIR_ENTRANTE:
@@ -287,6 +317,10 @@ def _input_openai(mensajes):
             if b.get('type') == 'image':
                 src = b['source']
                 partes.append({'type': 'input_image', 'image_url': f"data:{src['media_type']};base64,{src['data']}"})
+            elif b.get('type') == 'document':
+                src = b['source']
+                partes.append({'type': 'input_file', 'filename': b.get('title') or 'documento.pdf',
+                               'file_data': f"data:{src['media_type']};base64,{src['data']}"})
             elif b.get('type') == 'text':
                 partes.append({'type': 'input_text', 'text': b['text']})
         salida.append({'role': 'user', 'content': partes})

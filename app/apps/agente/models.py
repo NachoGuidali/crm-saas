@@ -64,6 +64,9 @@ class ConfigAgente(models.Model):
     campos_base = models.JSONField(default=list, blank=True, verbose_name='Datos del contacto a completar')
     campos = models.ManyToManyField('crm.CampoPersonalizado', blank=True, related_name='+',
                                     verbose_name='Campos personalizados a completar')
+    leer_recibos = models.BooleanField(
+        default=False, verbose_name='Leer recibos de sueldo',
+        help_text='El agente lee los recibos que manda el lead (foto o PDF) y completa los campos "Recibo: …" de la ficha.')
     campos_obligatorios = models.JSONField(
         default=list, blank=True, verbose_name='Obligatorios para derivar',
         help_text='Claves de los datos sin los cuales el agente no puede derivar (los pide antes).')

@@ -58,7 +58,7 @@ class ConfigForm(forms.ModelForm):
     class Meta:
         model = ConfigAgente
         fields = ['activo', 'nombre', 'empresa', 'modelo', 'esfuerzo', 'instrucciones', 'criterios', 'campos_base',
-                  'campos', 'campos_obligatorios', 'embudo', 'etapa_calificando', 'etapa_derivado', 'etapa_pendiente', 'etapa_descartado',
+                  'campos', 'campos_obligatorios', 'leer_recibos', 'embudo', 'etapa_calificando', 'etapa_derivado', 'etapa_pendiente', 'etapa_descartado',
                   'tipificacion_descartado', 'derivar_destino', 'derivar_url', 'derivar_token', 'mensaje_derivacion', 'demora_segundos',
                   'max_turnos', 'presupuesto_diario']
         widgets = {'instrucciones': forms.Textarea(attrs={'rows': 9}), 'criterios': forms.Textarea(attrs={'rows': 5}),
@@ -126,6 +126,9 @@ class ConfigView(ModuloMixin, View):
                 setattr(cfg, f'{prov}_api_key', d[f'nueva_{prov}'].strip())
         cfg.save()
         form.save_m2m()
+        if cfg.leer_recibos:
+            from .herramientas import asegurar_campos_recibo
+            asegurar_campos_recibo()
         messages.success(request, 'Agente guardado.' + ('' if cfg.activo else ' Está APAGADO: prendelo para que responda.'))
         return redirect('agente:config')
 

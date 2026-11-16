@@ -513,3 +513,82 @@ class ObligatoriosYPendienteTests(AgenteBase):
         self.assertEqual(r.status_code, 302)
         from apps.agente.models import ConfigAgente
         self.assertEqual(ConfigAgente.get().campos_obligatorios, ['email'])
+
+
+class RecibosTests(AgenteBase):
+    def setUp(self):
+        super().setUp()
+        from apps.agente.herramientas import asegurar_campos_recibo
+        self.cfg.leer_recibos = True
+        self.cfg.save()
+        asegurar_campos_recibo()
+
+    def _chat_con_pdf(self):
+        from apps.whatsapp.proveedores.base import guardar_media
+        conv = Conversacion.objects.create(linea=self.linea, telefono='+5491155551234', bot_activo=True)
+        from apps.crm.services import ingresar_prospecto
+        op = ingresar_prospecto({'telefono': '1155551234', 'nombre': 'Ana'}, self.embudo, 'web').oportunidad
+        Conversacion.objects.filter(pk=conv.pk).update(contacto=op.contacto)
+        url = guardar_media(b'%PDF-1.4 recibo de prueba', conv.pk, 'recibo1', 'application/pdf', 'recibo_octubre.pdf')
+        m = Mensaje.objects.create(conversacion=conv, direccion='in', tipo='document', media_url=url,
+                                   media_mime='application/pdf', media_filename='recibo_octubre.pdf', contenido='')
+        conv.refresh_from_db()
+        return conv, m
+
+    def test_lee_pdf_y_guarda_los_campos_del_recibo(self):
+        from apps.agente import tasks
+        conv, m = self._chat_con_pdf()
+        claude = ClaudeFalso(
+            respuesta(tool('registrar_recibo', {
+                'legible': True, 'sueldo_bruto': '$ 850.000,50', 'periodo': '10/2026', 'es_aguinaldo': False,
+                'descuento_obra_social': '25.500', 'premios_o_extras': 'Premio presentismo', 'cuil': '20-30123456-7',
+                'empleador': 'Acme SA', 'antiguedad': 'Ingreso 03/2019', 'revision': ''})),
+            respuesta(texto('¡Gracias Ana! Recibí tu recibo 🙌')))
+        with mock.patch('apps.agente.motor._cliente', return_value=claude), \
+                mock.patch('django.conf.settings.ANTHROPIC_API_KEY', 'sk-test'), \
+                self.captureOnCommitCallbacks(execute=True):
+            tasks.atender.run(conv.pk, m.pk)
+        req = claude.llamadas[0]
+        doc = req['messages'][-2]['content'][0]
+        self.assertEqual((doc['type'], doc['source']['media_type'], doc['title']), ('document', 'application/pdf', 'recibo_octubre.pdf'))
+        self.assertIn('## Recibos de sueldo', req['system'][0]['text'])
+        self.assertIn('registrar_recibo', [t['name'] for t in req['tools']])
+        c = conv.contacto
+        c.refresh_from_db()
+        self.assertEqual(c.datos_extra['recibo_sueldo_bruto'], '850000.5')
+        self.assertEqual(c.datos_extra['recibo_aporte_os'], '25500')
+        self.assertEqual(c.datos_extra['recibo_cuil'], '20-30123456-7')
+        self.assertIs(c.datos_extra['recibo_es_sac'], False)
+        self.assertTrue(c.actividades.filter(texto__startswith='Agente IA leyó el recibo').exists())
+        # Los campos se ven en la ficha con su nombre
+        from apps.crm.models import CampoPersonalizado
+        self.assertEqual(CampoPersonalizado.objects.get(slug='recibo_sueldo_bruto').nombre, 'Recibo: sueldo bruto')
+
+    def test_aguinaldo_y_openai_lee_el_pdf(self):
+        from apps.agente import tasks
+        self.cfg.modelo = 'gpt-6.1-sol'
+        self.cfg.save()
+        conv, m = self._chat_con_pdf()
+        oa = OpenAIFalso(
+            oa_respuesta(oa_tool('registrar_recibo', {
+                'legible': True, 'sueldo_bruto': '400000', 'periodo': '2do SAC 2026', 'es_aguinaldo': True,
+                'descuento_obra_social': '12000', 'premios_o_extras': '', 'cuil': '', 'empleador': '', 'antiguedad': '',
+                'revision': ''})),
+            oa_respuesta(oa_texto('Este es de aguinaldo, ¿me mandás el de un mes normal?')))
+        with mock.patch('apps.agente.motor._cliente', return_value=oa), self.captureOnCommitCallbacks(execute=True):
+            tasks.atender.run(conv.pk, m.pk)
+        parte = oa.llamadas[0]['input'][-2]['content'][0]
+        self.assertEqual((parte['type'], parte['filename']), ('input_file', 'recibo_octubre.pdf'))
+        self.assertTrue(parte['file_data'].startswith('data:application/pdf;base64,'))
+        self.assertIn('aguinaldo', oa.llamadas[1]['input'][-1]['output'])
+
+    def test_montos_argentinos(self):
+        from apps.agente.herramientas import _numero
+        for entrada, esperado in [('$ 850.000,50', '850000.5'), ('850.000', '850000'), ('25,5', '25.5'),
+                                  ('1,234', '1234'), ('850000', '850000'), ('no figura', '')]:
+            self.assertEqual(_numero(entrada), esperado, entrada)
+
+    def test_sin_leer_recibos_no_ofrece_la_herramienta(self):
+        from apps.agente.herramientas import definiciones
+        self.cfg.leer_recibos = False
+        self.assertNotIn('registrar_recibo', [t['name'] for t in definiciones(self.cfg, [], [])])
