@@ -333,6 +333,39 @@ class CorreoYDifusionesTests(TestCase):
         self.assertEqual(Mensaje.objects.filter(direccion='out').count(), 4)
         self.assertEqual(Mensaje.objects.filter(contenido='Hola Persona1!').count(), 1)
 
+    def test_difusion_fallidos_filtro_y_exportar(self):
+        from django.utils import timezone
+        from apps.whatsapp.models import LineaWhatsApp, Mensaje
+        from .difusiones import tick
+        LineaWhatsApp.objects.create(nombre='Demo', proveedor='demo')
+        dif = self.crear_desde_lista()
+        self.client.post(f'/automatizaciones/difusiones/{dif.pk}/', {'accion': 'enviar', 'nombre': 'WA', 'canal': 'whatsapp',
+                                                                     'texto_wa': 'Hola {primer_nombre}!'})
+        with mock.patch('apps.whatsapp.proveedores.demo.ProveedorDemo._quizas_responder'):
+            tick()
+        msgs = list(Mensaje.objects.filter(direccion='out').order_by('pk'))
+        Mensaje.objects.filter(pk__in=[msgs[0].pk, msgs[1].pk]).update(status='failed', error='El número no tiene WhatsApp')
+        Mensaje.objects.filter(pk=msgs[2].pk).update(status='read')
+        Mensaje.objects.create(conversacion=msgs[2].conversacion, direccion='in', contenido='¡Me interesa!',
+                               timestamp=timezone.now() + timezone.timedelta(minutes=5))
+        url = f'/automatizaciones/difusiones/{dif.pk}/'
+        r = self.client.get(url)
+        self.assertContains(r, 'Fallidos')
+        self.assertEqual(r.context['r']['fallidos'], 2)
+        r = self.client.get(url, {'resultado': 'fallido'})
+        self.assertEqual(r.context['page'].paginator.count, 2)
+        self.assertContains(r, 'El número no tiene WhatsApp')
+        self.assertEqual(self.client.get(url, {'resultado': 'respondio'}).context['page'].paginator.count, 1)
+        self.assertEqual(self.client.get(url, {'resultado': 'leido'}).context['page'].paginator.count, 1)
+        # Exportar solo los fallidos
+        r = self.client.get(f'{url}exportar/', {'resultado': 'fallido'})
+        self.assertEqual(r.status_code, 200)
+        contenido = b''.join(r.streaming_content).decode('utf-8-sig')
+        filas = [f for f in contenido.strip().split('\r\n')]
+        self.assertEqual(len(filas), 3)  # encabezado + 2 fallidos
+        self.assertIn('Fallido: El número no tiene WhatsApp', contenido)
+        self.assertIn('fallido', r['Content-Disposition'])
+
     def test_borrador_sin_mensaje_no_sale_y_cancelar(self):
         from .models import Difusion
         dif = self.crear_desde_lista()

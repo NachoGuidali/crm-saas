@@ -156,6 +156,63 @@ def resultados(dif, horas_respuesta=48):
     return r
 
 
+# Filtro por resultado (lo que pasó después de enviado). clave → etiqueta
+RESULTADOS_WA = [('entregado', 'Entregados'), ('leido', 'Leídos'), ('respondio', 'Respondieron'),
+                 ('fallido', 'Fallidos'), ('sin_confirmar', 'Sin confirmar')]
+RESULTADOS_EMAIL = [('abierto', 'Abrieron'), ('clic', 'Hicieron clic'), ('sin_abrir', 'Sin abrir'), ('baja', 'Se dieron de baja')]
+
+
+def resultados_de(dif):
+    return RESULTADOS_EMAIL if dif.canal == Difusion.CANAL_EMAIL else RESULTADOS_WA
+
+
+def con_respuesta(qs, horas_respuesta=48):
+    from apps.whatsapp.models import Mensaje
+    resp = Mensaje.objects.filter(conversacion=OuterRef('mensaje__conversacion'), direccion=Mensaje.DIR_ENTRANTE,
+                                  timestamp__gt=OuterRef('mensaje__timestamp'),
+                                  timestamp__lte=OuterRef('mensaje__timestamp') + timedelta(hours=horas_respuesta))
+    return qs.annotate(resp=Exists(resp))
+
+
+def filtrar_resultado(qs, dif, resultado):
+    """Destinatarios enviados con ese resultado (los mismos criterios que los contadores de resultados())."""
+    from apps.whatsapp.models import Mensaje
+    D = DifusionDestinatario
+    env = qs.filter(estado=D.ENVIADO)
+    if dif.canal == Difusion.CANAL_EMAIL:
+        return {'abierto': env.filter(email__abierto_at__isnull=False), 'clic': env.filter(email__clic_at__isnull=False),
+                'sin_abrir': env.filter(email__abierto_at__isnull=True),
+                'baja': env.filter(email__baja_at__isnull=False)}.get(resultado, qs)
+    filtrado = {
+        'entregado': env.filter(mensaje__status__in=[Mensaje.STATUS_ENTREGADO, Mensaje.STATUS_LEIDO]),
+        'leido': env.filter(mensaje__status=Mensaje.STATUS_LEIDO),
+        'fallido': env.filter(mensaje__status=Mensaje.STATUS_FALLIDO),
+        'sin_confirmar': env.filter(Q(mensaje__isnull=True) | Q(mensaje__status__in=[Mensaje.STATUS_PENDIENTE, Mensaje.STATUS_ENVIADO])),
+    }.get(resultado) if resultado != 'respondio' else (
+        env if 'resp' in env.query.annotations else con_respuesta(env)).filter(resp=True)
+    return filtrado if filtrado is not None else qs
+
+
+def resultado_texto(d, dif):
+    """Resultado legible de un destinatario (para la tabla y el Excel)."""
+    D = DifusionDestinatario
+    if d.estado != D.ENVIADO:
+        return d.detalle or d.get_estado_display()
+    if dif.canal == Difusion.CANAL_EMAIL:
+        if d.email is None:
+            return 'Enviado'
+        t = 'Hizo clic' if d.email.clic_at else 'Abrió' if d.email.abierto_at else 'Sin abrir'
+        return t + (' · se dio de baja' if d.email.baja_at else '')
+    if d.mensaje is None:
+        return 'Enviado'
+    t = d.mensaje.get_status_display()
+    if d.mensaje.status == d.mensaje.STATUS_FALLIDO and d.mensaje.error:
+        t += f': {d.mensaje.error}'
+    if getattr(d, 'resp', False):
+        t += ' · respondió'
+    return t
+
+
 def omitidos_previstos(dif):
     """Cuántos se van a omitir por falta de email/teléfono, baja o "no contactar" (para avisar antes de enviar)."""
     qs = dif.destinatarios.filter(estado=DifusionDestinatario.PENDIENTE)

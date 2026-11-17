@@ -16,6 +16,7 @@
   <div class="col-6 col-md-2"><div class="kpi"><div class="v">{{ r.pct.entregados }}%</div><div class="l">Entregados</div></div></div>
   <div class="col-6 col-md-2"><div class="kpi"><div class="v">{{ r.pct.leidos }}%</div><div class="l">Leídos</div></div></div>
   <div class="col-6 col-md-2"><div class="kpi"><div class="v">{{ r.pct.respondidos }}%</div><div class="l">Respondieron (48 h)</div><div class="d">{{ r.respondidos }}</div></div></div>
+  <div class="col-6 col-md-2"><a href="?resultado=fallido" class="text-decoration-none" title="Ver los fallidos (ej. el número no tiene WhatsApp)"><div class="kpi"><div class="v {% if r.fallidos %}text-danger{% endif %}">{{ r.fallidos|default:0 }}</div><div class="l">Fallidos</div><div class="d">{{ r.pct.fallidos|default:0 }}% de los enviados</div></div></a></div>
   {% endif %}
   <div class="col-6 col-md-2"><div class="kpi"><div class="v">{{ r.omitidos }}</div><div class="l">Omitidos</div><div class="d">{{ r.errores }} con error</div></div></div>
 </div>
@@ -52,15 +53,19 @@
 </div></div>
 {% endif %}
 
-<div class="card"><div class="card-header d-flex gap-2 align-items-center">Destinatarios
-  <div class="ms-auto d-flex gap-1">{% for k, t in estados %}<a href="?estado={{ k }}" class="btn btn-xs {% if request.GET.estado == k %}btn-primary{% else %}btn-outline-secondary{% endif %}">{{ t }}</a>{% endfor %}<a href="?" class="btn btn-xs btn-outline-secondary">Todos</a></div></div>
+<div class="card"><div class="card-header d-flex flex-wrap gap-2 align-items-center">Destinatarios
+  <div class="ms-auto d-flex flex-wrap gap-1 align-items-center"><span class="small muted me-1">Envío:</span>{% for k, t in estados %}<a href="?estado={{ k }}" class="btn btn-xs {% if request.GET.estado == k %}btn-primary{% else %}btn-outline-secondary{% endif %}">{{ t }}</a>{% endfor %}
+    <span class="small muted ms-2 me-1">Resultado:</span>{% for k, t in resultados %}<a href="?resultado={{ k }}" class="btn btn-xs {% if request.GET.resultado == k %}btn-primary{% else %}btn-outline-secondary{% endif %}">{{ t }}</a>{% endfor %}
+    <a href="?" class="btn btn-xs btn-outline-secondary ms-2">Todos</a>
+    {% if puede_exportar %}<a href="{% url 'automatizaciones:difusion_exportar' dif.pk %}?{{ request.GET.urlencode }}" class="btn btn-xs btn-outline-primary ms-2"><i class="bi bi-download"></i> Exportar{% if request.GET.resultado or request.GET.estado %} lo filtrado{% endif %}</a>{% endif %}</div></div>
+  {% if page.paginator.count is not None %}<div class="px-3 pt-2 small muted">{{ page.paginator.count }} persona{{ page.paginator.count|pluralize }}{% if request.GET.resultado or request.GET.estado %} con este filtro{% endif %}</div>{% endif %}
   <div class="table-responsive"><table class="table table-sm mb-0">
     <thead><tr><th>Persona</th><th>{% if dif.canal == 'email' %}Email{% else %}Teléfono{% endif %}</th><th>Estado</th><th>Resultado</th></tr></thead>
     <tbody>{% for d in page %}<tr>
       <td>{% if d.oportunidad %}<a href="{% url 'crm:oportunidad_detalle' d.oportunidad_id %}">{{ d.contacto.nombre }}</a>{% else %}{{ d.contacto.nombre }}{% endif %}</td>
       <td class="small">{% if dif.canal == 'email' %}{{ d.contacto.email|default:"—" }}{% else %}{{ d.contacto.telefono|telefono }}{% endif %}</td>
       <td><span class="chip {% if d.estado == 'enviado' %}ok{% elif d.estado == 'error' %}danger{% elif d.estado == 'omitido' %}warn{% endif %}">{{ d.get_estado_display }}</span></td>
-      <td class="small muted">{% if d.detalle %}{{ d.detalle }}{% elif d.email %}{% if d.email.clic_at %}Hizo clic{% elif d.email.abierto_at %}Abrió{% else %}Sin abrir{% endif %}{% if d.email.baja_at %} · se dio de baja{% endif %}{% elif d.mensaje %}{{ d.mensaje.get_status_display }}{% endif %}</td></tr>
+      <td class="small {% if d.mensaje.status == 'failed' %}text-danger{% else %}muted{% endif %}">{{ d.resultado_txt }}</td></tr>
     {% empty %}<tr><td colspan="4" class="muted text-center py-3">—</td></tr>{% endfor %}</tbody>
   </table></div>
   {% include "_paginacion.html" %}

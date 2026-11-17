@@ -207,14 +207,69 @@ class DifusionDetalleView(PermisoRequeridoMixin, View):
         return redirect('automatizaciones:difusion', pk=dif.pk)
 
     def _render(self, request, dif, form):
-        dest = dif.destinatarios.select_related('contacto', 'oportunidad__etapa', 'email', 'mensaje').order_by('pk')
-        if request.GET.get('estado'):
-            dest = dest.filter(estado=request.GET['estado'])
+        dest = destinatarios_filtrados(dif, request.GET)
+        page = paginar(request, dest, 50)
+        for d in page:
+            d.resultado_txt = difusiones.resultado_texto(d, dif)
         return render(request, 'automatizaciones/difusion.html', {
-            'dif': dif, 'form': form, 'r': difusiones.resultados(dif), 'page': paginar(request, dest, 50),
+            'dif': dif, 'form': form, 'r': difusiones.resultados(dif), 'page': page,
             'omitidos_previstos': difusiones.omitidos_previstos(dif) if dif.estado == Difusion.BORRADOR else 0,
-            'estados': DifusionDestinatario.ESTADOS,
+            'estados': DifusionDestinatario.ESTADOS, 'resultados': difusiones.resultados_de(dif),
+            'puede_exportar': request.user.tiene_permiso('exportar'),
         })
+
+
+def destinatarios_filtrados(dif, params):
+    dest = dif.destinatarios.select_related('contacto', 'oportunidad__etapa', 'email', 'mensaje').order_by('pk')
+    if dif.canal != Difusion.CANAL_EMAIL:
+        dest = difusiones.con_respuesta(dest)
+    if params.get('estado'):
+        dest = dest.filter(estado=params['estado'])
+    if params.get('resultado'):
+        dest = difusiones.filtrar_resultado(dest, dif, params['resultado'])
+    return dest
+
+
+class DifusionExportarView(PermisoRequeridoMixin, View):
+    """CSV (se abre en Excel) de los destinatarios, con los mismos filtros de la pantalla (ej. solo los fallidos)."""
+    permiso = 'difusiones'
+
+    def get(self, request, pk):
+        import csv
+        from django.core.exceptions import PermissionDenied
+        from django.http import StreamingHttpResponse
+        from core import tenancy
+        from core.auditoria import auditar
+        from apps.users.models import RegistroAuditoria
+        if not request.user.tiene_permiso('exportar'):
+            raise PermissionDenied
+        dif = get_object_or_404(Difusion, pk=pk)
+        dest = destinatarios_filtrados(dif, request.GET)
+        base = tenancy.url_sitio()
+
+        class Eco:
+            def write(self, v):
+                return v
+
+        writer = csv.writer(Eco(), delimiter=';')
+
+        def filas():
+            yield '\ufeff' + writer.writerow(['Nombre', 'Teléfono', 'Email', 'Estado', 'Resultado', 'Enviado',
+                                               'Etapa', 'Oportunidad', 'Ficha'])
+            for d in dest.iterator(chunk_size=500):
+                c, op = d.contacto, d.oportunidad
+                yield writer.writerow([
+                    c.nombre, c.telefono, c.email, d.get_estado_display(), difusiones.resultado_texto(d, dif),
+                    timezone.localtime(d.enviado_at).strftime('%d/%m/%Y %H:%M') if d.enviado_at else '',
+                    op.etapa if op else '', op.pk if op else '', f'{base}{op.get_absolute_url()}' if op else ''])
+
+        filtro = request.GET.get('resultado') or request.GET.get('estado') or 'todos'
+        auditar(RegistroAuditoria.EXPORT, request=request, objeto=f'difusión «{dif}»',
+                detalle=f'{dest.count()} filas; filtro={filtro}')
+        resp = StreamingHttpResponse(filas(), content_type='text/csv; charset=utf-8')
+        nombre = f'difusion_{dif.pk}_{filtro}_{timezone.localdate():%Y%m%d}.csv'
+        resp['Content-Disposition'] = f'attachment; filename="{nombre}"'
+        return resp
 
 
 def baja_email(request, token):

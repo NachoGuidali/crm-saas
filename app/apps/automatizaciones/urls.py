@@ -16,4 +16,5 @@ urlpatterns = [
     path('correo/', views_correo.ConfigEmailView.as_view(), name='config_email'),
     path('difusiones/', views_correo.DifusionListView.as_view(), name='difusiones'),
     path('difusiones/<int:pk>/', views_correo.DifusionDetalleView.as_view(), name='difusion'),
+    path('difusiones/<int:pk>/exportar/', views_correo.DifusionExportarView.as_view(), name='difusion_exportar'),
 ]
