@@ -11,8 +11,11 @@ def enviar_aviso(self, regla_pk, evento, canal, destino, titulo, texto, linea_pk
     error = ''
     try:
         if canal == 'email':
-            from django.core.mail import send_mail
-            send_mail(titulo, texto, None, [destino], fail_silently=False)
+            # Mismo SMTP que difusiones y automatizaciones: el de "Configuración de email" del cliente (o el del .env).
+            from django.core.mail import EmailMessage
+            from apps.automatizaciones.services import conexion_email
+            con, remitente = conexion_email()
+            EmailMessage(titulo, texto, remitente, [destino], connection=con).send(fail_silently=False)
         else:
             regla = ReglaAviso.objects.select_related('linea').filter(pk=regla_pk).first() if regla_pk else None
             from apps.whatsapp.models import LineaWhatsApp

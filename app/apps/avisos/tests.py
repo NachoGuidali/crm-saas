@@ -120,3 +120,18 @@ class AvisosSinModuloAgenteTests(AvisosTests):
         connection.tenant.funciones_extra = ['agente_ia']
         connection.tenant.save(update_fields=['funciones_extra'])
         self.assertContains(web.get('/avisos/nueva/'), 'El agente IA deriva')
+
+
+class AvisosUsanElSmtpDelClienteTests(AvisosTests):
+    def test_email_de_aviso_sale_por_la_configuracion_del_cliente(self):
+        from apps.automatizaciones.models import ConfigEmail
+        from . import services
+        cfg = ConfigEmail.get()
+        cfg.activo, cfg.host, cfg.usuario, cfg.remitente = True, 'smtp.cliente.test', 'u', 'Avisos <avisos@cliente.test>'
+        cfg.save()
+        self._regla(por_whatsapp=False)
+        with mock.patch('django.core.mail.backends.smtp.EmailBackend.send_messages', return_value=1) as enviar, \
+                self.captureOnCommitCallbacks(execute=True):
+            services.disparar('humano', conv=self.conv, motivo='x')
+        msg = enviar.call_args.args[0][0]
+        self.assertEqual((msg.from_email, msg.to), ('Avisos <avisos@cliente.test>', ['laura@x.com']))
