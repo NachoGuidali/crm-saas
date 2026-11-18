@@ -182,6 +182,8 @@ class TurnoAgente(models.Model):
     error = models.TextField(blank=True)
     request_id = models.CharField(max_length=100, blank=True)
     simulado = models.BooleanField(default=False)
+    mensajes = models.ManyToManyField('whatsapp.Mensaje', blank=True, related_name='turnos_agente',
+                                      help_text='Mensajes de WhatsApp que salieron de esta respuesta (para medir entregas).')
     created_at = models.DateTimeField(default=timezone.now, db_index=True)
 
     class Meta:

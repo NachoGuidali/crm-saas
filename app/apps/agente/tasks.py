@@ -202,6 +202,7 @@ def enviar_derivacion(self, conv_pk, resumen, motivo):
 
 def payload_derivacion(conv, resumen, motivo):
     from core import tenancy
+    from apps.integraciones.webhooks import url_evento
     from apps.crm.services import oportunidad_activa_de
     from . import herramientas
     from .models import ConfigAgente
@@ -223,6 +224,8 @@ def payload_derivacion(conv, resumen, motivo):
         'resumen': resumen, 'motivo': motivo,
         'origen': {'linea': str(conv.linea), 'campana': str(op.pauta) if op and op.pauta_id else '',
                    'fuente': op.fuente if op else ''},
+        # El CRM de los closers avisa acá el resultado: POST {"evento": "venta"} o {"evento": "no_venta"}
+        'callback': ({'url': url_evento(op), 'eventos': ['venta', 'no_venta']} if op else None),
         'crm_origen': {'oportunidad_id': op.pk if op else None, 'conversacion_id': conv.pk,
                        'url_chat': f'{base}/whatsapp/?conv={conv.pk}',
                        'url_ficha': f'{base}{op.get_absolute_url()}' if op else ''},

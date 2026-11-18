@@ -15,6 +15,35 @@
   <div class="col-6 col-md-2"><div class="card card-body"><div class="muted small">A una persona</div><div class="fs-4 fw-bold">{{ humano }}</div></div></div>
   <div class="col-6 col-md-2"><div class="card card-body"><div class="muted small">Costo</div><div class="fs-4 fw-bold">US$ {{ costo|floatformat:2 }}</div>{% if costo_derivado %}<div class="small muted">US$ {{ costo_derivado|floatformat:2 }} por derivado</div>{% endif %}</div></div>
 </div>
+<div class="row g-3 mb-3">
+  <div class="col-lg-6"><div class="card h-100"><div class="card-header">Embudo de la conversación <span class="muted small">— dónde se cae la gente</span></div><div class="card-body small">
+    {% for etapa, n, pct in embudo %}<div class="mb-2"><div class="d-flex justify-content-between"><span>{{ etapa }}</span><span><b>{{ n }}</b> <span class="muted">· {{ pct }}%</span></span></div>
+      <div style="height:10px;background:var(--bg3,#e9ecef);border-radius:5px;overflow:hidden"><div style="height:10px;width:{{ pct }}%;background:{% if forloop.last %}#198754{% elif forloop.revcounter == 2 %}#0d6efd{% else %}#6f42c1{% endif %}"></div></div></div>
+    {% empty %}<div class="muted">Sin conversaciones en este período.</div>{% endfor %}
+    <div class="form-text">Sobre los leads que atendió el agente en el período. Los pasos de datos son los <b>obligatorios para derivar</b> (o todos los que junta, si no marcaste obligatorios).</div>
+  </div></div></div>
+  <div class="col-lg-6 d-flex flex-column gap-3">
+    <div class="card"><div class="card-header">Mensajes que manda el agente</div><div class="table-responsive"><table class="table table-sm mb-0 small">
+      <thead><tr><th></th><th class="text-end">Mensajes</th><th class="text-end">Entregados</th><th class="text-end">Leídos</th><th class="text-end">Fallidos</th><th class="text-end">Le respondieron</th></tr></thead>
+      <tbody>
+      {% with m=mensajes.proactivos %}<tr><td>Primer contacto y seguimientos</td><td class="text-end">{{ m.total }}</td><td class="text-end">{{ m.pct.entregados }}%</td><td class="text-end">{{ m.pct.leidos }}%</td><td class="text-end {% if m.fallidos %}text-danger{% endif %}">{{ m.fallidos }}</td><td class="text-end">{{ m.respondidos }} <span class="muted">({{ m.pct_respondidos }}%)</span></td></tr>{% endwith %}
+      {% with m=mensajes.respuestas %}<tr><td>Respuestas a leads</td><td class="text-end">{{ m.total }}</td><td class="text-end">{{ m.pct.entregados }}%</td><td class="text-end">{{ m.pct.leidos }}%</td><td class="text-end {% if m.fallidos %}text-danger{% endif %}">{{ m.fallidos }}</td><td class="text-end muted">—</td></tr>{% endwith %}
+      </tbody></table></div>
+      <div class="card-footer small muted">"Le respondieron" = el lead escribió después de que el agente le escribió primero o le hizo un seguimiento.</div></div>
+    <div class="card"><div class="card-header">Conversiones de los closers</div><div class="card-body small">
+      <div class="d-flex flex-wrap gap-4 mb-2">
+        <div><div class="muted">Derivados</div><div class="fs-4 fw-bold">{{ conv.derivados }}</div></div>
+        <div><div class="muted">Ventas</div><div class="fs-4 fw-bold text-success">{{ conv.ventas }}</div></div>
+        <div><div class="muted">No venta</div><div class="fs-4 fw-bold">{{ conv.no_ventas }}</div></div>
+        <div><div class="muted">Sin resultado aún</div><div class="fs-4 fw-bold">{{ conv.sin_resultado }}</div></div>
+        <div><div class="muted">Conversión</div><div class="fs-4 fw-bold">{{ conv.tasa }}%</div></div>
+        {% if conv.costo_por_venta %}<div><div class="muted">Costo IA por venta</div><div class="fs-4 fw-bold">US$ {{ conv.costo_por_venta|floatformat:2 }}</div></div>{% endif %}
+      </div>
+      {% if not conv.informado %}<div class="alert alert-info py-2 mb-0">Todavía no llegó ningún resultado del CRM de los closers. Al derivar, cada lead lleva una <b>URL de retorno</b> (<code>callback.url</code>): cuando el closer cierra, su CRM tiene que hacer <code>POST</code> ahí con <code>{"evento": "venta"}</code> o <code>{"evento": "no_venta"}</code>. También se pueden usar esos eventos en Automatizaciones (ej. mover a "Ganado").</div>{% endif %}
+    </div></div>
+  </div>
+</div>
+
 <div class="card"><div class="card-header d-flex justify-content-between">Últimas respuestas{% if resumen.errores %} <span class="chip danger">{{ resumen.errores }} con error</span>{% endif %}
   <a href="?dias={{ dias }}{% if not sim %}&sim=1{% endif %}" class="small">{% if sim %}Ver chats reales{% else %}Ver pruebas del simulador{% endif %}</a></div>
   <div class="table-responsive"><table class="table table-sm mb-0 small align-top">

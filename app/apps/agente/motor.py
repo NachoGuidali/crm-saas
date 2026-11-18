@@ -459,16 +459,17 @@ def atender(conv, modo=TurnoAgente.MODO_RESPUESTA, motivo=''):
     for i, texto in enumerate(partes):
         demora += min(max(len(texto) / 18, 2), 10) if i else 1  # "escribiendo…": proporcional al largo
         try:
-            wa.enviar_mensaje(conv, texto=texto, automatico=True, demora_segundos=int(demora), por_ia=True)
+            turno.mensajes.add(wa.enviar_mensaje(conv, texto=texto, automatico=True, demora_segundos=int(demora),
+                                                 por_ia=True))
         except wa.ErrorEnvio as e:
             logger.warning('Agente IA no pudo enviar en conv %s: %s', conv.pk, e)
             break
     for doc in ctx.adjuntos:
         demora += 3
         try:
-            wa.enviar_mensaje(conv, archivo_url=doc.archivo.url, archivo_mime=_mime(doc.archivo.name),
-                              archivo_nombre=os.path.basename(doc.archivo.name), automatico=True,
-                              demora_segundos=int(demora), por_ia=True)
+            turno.mensajes.add(wa.enviar_mensaje(conv, archivo_url=doc.archivo.url, archivo_mime=_mime(doc.archivo.name),
+                                                 archivo_nombre=os.path.basename(doc.archivo.name), automatico=True,
+                                                 demora_segundos=int(demora), por_ia=True))
         except wa.ErrorEnvio as e:
             logger.warning('Agente IA no pudo mandar el documento %s: %s', doc, e)
     return turno

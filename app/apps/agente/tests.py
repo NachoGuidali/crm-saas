@@ -1,6 +1,7 @@
 import io
 import json
 from datetime import timedelta
+from decimal import Decimal
 from types import SimpleNamespace
 from unittest import mock
 
@@ -607,3 +608,59 @@ class ReciboEnContextoTests(RecibosTests):
         self.assertIn('Recibo: sueldo bruto: 850000', texto_ctx)
         self.assertIn('Recibo: descuento obra social (3%): 25500', texto_ctx)
         self.assertNotIn('30123456', texto_ctx)  # el CUIL no hace falta para cotizar
+
+
+class MetricasTests(AgenteBase):
+    def test_mensajes_embudo_y_conversion_de_punta_a_punta(self):
+        from apps.agente import metricas, tasks
+        from apps.agente.models import TurnoAgente
+        from apps.crm import services as crm
+        self.cfg.campos_obligatorios = ['dni']
+        self.cfg.derivar_url = 'https://closers.test/hook'
+        self.cfg.save()
+        op = crm.ingresar_prospecto({'telefono': '1150000077', 'nombre': 'Beto'}, self.embudo, 'importacion').oportunidad
+        from apps.agente.services import iniciar_chat
+        claude = ClaudeFalso(respuesta(texto('Hola Beto, soy Clara, asistente virtual de RAS.')))
+        with mock.patch('apps.agente.motor._cliente', return_value=claude), \
+                mock.patch('django.conf.settings.ANTHROPIC_API_KEY', 'sk-test'), \
+                self.captureOnCommitCallbacks(execute=True):
+            ok, _, _ = iniciar_chat(op, 'Presentate')
+        self.assertTrue(ok)
+        turno = TurnoAgente.objects.get(modo='inicio')
+        msg = turno.mensajes.get()
+        Mensaje.objects.filter(pk=msg.pk).update(status='read')
+        # El lead responde con su DNI y el agente deriva
+        conv = msg.conversacion
+        entrante = Mensaje.objects.create(conversacion=conv, direccion='in', contenido='Sí, mi DNI es 30123456',
+                                          timestamp=timezone.now() + timedelta(minutes=1))
+        claude2 = ClaudeFalso(
+            respuesta(tool('guardar_datos', {'datos': [{'campo': 'dni', 'valor': '30123456'}]}, 't1'),
+                      tool('derivar_a_asesor', {'resumen': 'Beto, interesado', 'motivo': 'califica'}, 't2')),
+            respuesta(texto('¡Listo! Te contacta un asesor.')))
+        with mock.patch('apps.agente.motor._cliente', return_value=claude2), \
+                mock.patch('django.conf.settings.ANTHROPIC_API_KEY', 'sk-test'), \
+                mock.patch('apps.agente.tasks.requests.post', return_value=mock.Mock(status_code=200)) as post, \
+                self.captureOnCommitCallbacks(execute=True):
+            tasks.atender.run(conv.pk, entrante.pk)
+        callback = post.call_args.kwargs['json']['callback']
+        self.assertEqual(callback['eventos'], ['venta', 'no_venta'])
+        # El CRM de los closers avisa la venta
+        ruta = '/' + callback['url'].split('://', 1)[1].split('/', 1)[1]
+        r = Client().post(ruta, json.dumps({'evento': 'venta'}), content_type='application/json')
+        self.assertEqual(r.status_code, 200)
+
+        desde = timezone.now() - timedelta(days=1)
+        m = metricas.mensajes(desde)
+        self.assertEqual((m['proactivos']['total'], m['proactivos']['leidos'], m['proactivos']['respondidos']), (1, 1, 1))
+        self.assertEqual(m['respuestas']['total'], 1)
+        pasos = dict((e, n) for e, n, _ in metricas.embudo(desde, self.cfg))
+        self.assertEqual(pasos['Atendidos por el agente'], 1)
+        self.assertEqual(pasos['Respondieron'], 1)
+        self.assertEqual(pasos['Dio: DNI'], 1)
+        self.assertEqual(pasos['Aptos (derivados al closer)'], 1)
+        self.assertEqual(pasos['Ventas cerradas por el closer'], 1)
+        conv_ = metricas.conversiones(desde, Decimal('2'))
+        self.assertEqual((conv_['derivados'], conv_['ventas'], conv_['tasa']), (1, 1, 100))
+        r = self.web.get('/agente/registro/')
+        self.assertContains(r, 'Embudo de la conversación')
+        self.assertContains(r, 'Conversiones de los closers')

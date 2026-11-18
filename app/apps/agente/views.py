@@ -357,7 +357,11 @@ class RegistroView(ModuloMixin, View):
         costo = resumen['costo'] or Decimal(0)
         turnos = (TurnoAgente.objects.filter(created_at__gte=desde, simulado=request.GET.get('sim') == '1')
                   .select_related('conversacion__contacto')[:200])
+        from . import metricas
+        cfg = ConfigAgente.get()
         return render(request, 'agente/registro.html', {
+            'mensajes': metricas.mensajes(desde), 'embudo': metricas.embudo(desde, cfg),
+            'conv': metricas.conversiones(desde, costo),
             'seccion': 'agente', 'tab': 'registro', 'dias': dias, 'resumen': resumen, 'costo': costo,
             'derivados': derivados, 'descartados': descartados, 'humano': humano, 'pendientes': pendientes, 'turnos': turnos,
             'costo_derivado': (costo / derivados) if derivados else None, 'gasto_hoy': motor.gasto_hoy(),
