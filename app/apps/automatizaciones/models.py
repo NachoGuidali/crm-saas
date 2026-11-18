@@ -521,7 +521,9 @@ class Difusion(models.Model):
     """Envío masivo a un grupo de leads (elegidos con los filtros de la lista), por email o WhatsApp."""
     CANAL_EMAIL = 'email'
     CANAL_WHATSAPP = 'whatsapp'
-    CANALES = [(CANAL_EMAIL, 'Email'), (CANAL_WHATSAPP, 'WhatsApp')]
+    CANAL_AGENTE = 'agente'
+    CANALES = [(CANAL_EMAIL, 'Email'), (CANAL_WHATSAPP, 'WhatsApp (mismo texto o plantilla)'),
+               (CANAL_AGENTE, 'WhatsApp escrito por el agente IA (un mensaje distinto a cada uno)')]
     BORRADOR, PROGRAMADA, ENVIANDO, FINALIZADA, CANCELADA = 'borrador', 'programada', 'enviando', 'finalizada', 'cancelada'
     ESTADOS = [(BORRADOR, 'Borrador'), (PROGRAMADA, 'Programada'), (ENVIANDO, 'Enviando'), (FINALIZADA, 'Finalizada'),
                (CANCELADA, 'Cancelada')]

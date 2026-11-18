@@ -60,11 +60,28 @@ def cupo_dia(linea, hoy=None):
     return tope
 
 
+def _clave_reservas(linea):
+    return f'agente_inicios_{linea.pk}_{timezone.localdate():%Y%m%d}'
+
+
+def reservar_inicio(linea):
+    """Ocupa un lugar del cupo de hoy en el momento de encolar (atómico): varias tandas en paralelo no se pasan."""
+    clave = _clave_reservas(linea)
+    cache.add(clave, 0, 60 * 60 * 48)
+    try:
+        return cache.incr(clave)
+    except ValueError:
+        cache.set(clave, 1, 60 * 60 * 48)
+        return 1
+
+
 def iniciados_hoy(linea):
+    """Chats que el agente inició hoy desde esta línea (lo reservado o lo ya escrito, lo que sea mayor)."""
     from .models import TurnoAgente
     inicio = timezone.localtime().replace(hour=0, minute=0, second=0, microsecond=0)
-    return TurnoAgente.objects.filter(conversacion__linea=linea, modo=TurnoAgente.MODO_INICIO, simulado=False,
-                                      created_at__gte=inicio, error='').count()
+    escritos = TurnoAgente.objects.filter(conversacion__linea=linea, modo=TurnoAgente.MODO_INICIO, simulado=False,
+                                          created_at__gte=inicio, error='').count()
+    return max(escritos, cache.get(_clave_reservas(linea), 0) or 0)
 
 
 def elegir_para_iniciar(contacto):

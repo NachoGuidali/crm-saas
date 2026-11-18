@@ -664,3 +664,43 @@ class MetricasTests(AgenteBase):
         r = self.web.get('/agente/registro/')
         self.assertContains(r, 'Embudo de la conversación')
         self.assertContains(r, 'Conversiones de los closers')
+
+
+class DifusionConAgenteTests(AgenteBase):
+    def test_difusion_escrita_por_el_agente_respeta_tope_y_vincula_mensajes(self):
+        from apps.automatizaciones.models import Difusion, DifusionDestinatario as D
+        from apps.automatizaciones import difusiones
+        from apps.crm import services as crm
+        LineaWhatsApp.objects.filter(pk=self.linea.pk).update(max_salientes_dia=2)
+        ops = [crm.ingresar_prospecto({'telefono': f'115000009{i}', 'nombre': f'Lead{i}'}, self.embudo, 'importacion').oportunidad
+               for i in range(3)]
+        dif = Difusion.objects.create(nombre='Base empresas', canal=Difusion.CANAL_AGENTE,
+                                      texto_wa='Presentate y ofrecé las opciones 1, 2 y 3')
+        for op in ops:
+            D.objects.create(difusion=dif, contacto=op.contacto, oportunidad=op)
+        self.assertIsNone(difusiones.validar(dif))
+        difusiones.iniciar(dif)
+        claude = ClaudeFalso(respuesta(texto('Hola Lead0, soy Clara de RAS…')), respuesta(texto('Buenas Lead1! Te cuento…')))
+        with mock.patch('apps.agente.motor._cliente', return_value=claude), \
+                mock.patch('django.conf.settings.ANTHROPIC_API_KEY', 'sk-test'), \
+                self.captureOnCommitCallbacks(execute=True):
+            difusiones.tick()
+        estados = dict(D.objects.values_list('oportunidad', 'estado'))
+        self.assertEqual(sorted(estados.values()), ['enviado', 'enviado', 'pendiente'])
+        enviados = D.objects.filter(estado='enviado')
+        self.assertTrue(all(d.mensaje_id for d in enviados))
+        textos = {d.mensaje.contenido for d in enviados}
+        self.assertEqual(len(textos), 2)  # un mensaje distinto para cada uno
+        self.assertIn('Presentate y ofrecé', claude.llamadas[0]['messages'][-1]['content'])
+        dif.refresh_from_db()
+        self.assertEqual(dif.estado, Difusion.ENVIANDO)  # el tercero sigue mañana
+        r = difusiones.resultados(dif)
+        self.assertEqual((r['enviados'], r['pendientes']), (2, 1))
+
+    def test_sin_agente_prendido_no_deja_enviar(self):
+        from apps.automatizaciones.models import Difusion
+        from apps.automatizaciones import difusiones
+        self.cfg.activo = False
+        self.cfg.save()
+        dif = Difusion.objects.create(nombre='X', canal=Difusion.CANAL_AGENTE, texto_wa='Hola')
+        self.assertIn('apagado', difusiones.validar(dif))

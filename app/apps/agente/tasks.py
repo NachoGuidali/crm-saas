@@ -49,7 +49,7 @@ def atender(self, conv_pk, mensaje_pk):
 
 
 @shared_task(name='agente.atender_modo', bind=True, max_retries=3, default_retry_delay=60)
-def atender_modo(self, conv_pk, modo, motivo=''):
+def atender_modo(self, conv_pk, modo, motivo='', destinatario_difusion=None):
     """Primer contacto o seguimiento (el agente escribe sin que el lead haya escrito recién)."""
     from apps.whatsapp.models import Conversacion
     from . import motor
@@ -62,13 +62,28 @@ def atender_modo(self, conv_pk, modo, motivo=''):
             turno = motor.atender(conv, modo=modo, motivo=motivo)
         except motor.ErrorAgente as e:
             _avisar_error(str(e))
+            _difusion(destinatario_difusion, None, f'El agente no pudo escribir: {e}')
             return f'error: {e}'
         except Exception as exc:
             if _reintentable(exc):
                 raise self.retry(exc=exc)
+            _difusion(destinatario_difusion, None, 'El agente no pudo escribir')
             raise
+        _difusion(destinatario_difusion, turno, 'El agente no le escribió (chat tomado, contacto bloqueado o sin presupuesto)')
         return 'escribió' if turno else 'no correspondía'
     return _con_candado(conv_pk, correr)
+
+
+def _difusion(dest_pk, turno, motivo_si_no):
+    """Difusión escrita por el agente: vincula el primer mensaje (para entregados / leídos / respondidos)."""
+    if not dest_pk:
+        return
+    from apps.automatizaciones.models import DifusionDestinatario as D
+    msg = turno.mensajes.order_by('pk').first() if turno is not None else None
+    if msg is not None:
+        D.objects.filter(pk=dest_pk).update(mensaje=msg)
+    else:
+        D.objects.filter(pk=dest_pk).update(estado=D.OMITIDO, detalle=motivo_si_no[:300])
 
 
 def _reintentable(exc):

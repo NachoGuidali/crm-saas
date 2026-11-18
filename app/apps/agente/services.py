@@ -46,7 +46,7 @@ def linea_cambio_estado(linea, anterior, nuevo):
     return None
 
 
-def iniciar_chat(oportunidad, objetivo=''):
+def iniciar_chat(oportunidad, objetivo='', destinatario_difusion=None):
     """
     El agente le escribe primero a un lead (automatización o prospección). Elige la línea con cupo, abre el chat
     con el bot activo y encola el turno. Devuelve (ok, detalle, reintentar): reintentar=True si hoy no hay cupo
@@ -69,7 +69,8 @@ def iniciar_chat(oportunidad, objetivo=''):
     conv = wa.conversacion_para_contacto(contacto, linea)
     if not conv.bot_activo and conv.mensajes.exists():
         return False, 'Ese chat ya lo atiende una persona.', False
+    lineas.reservar_inicio(linea)
     Conversacion.objects.filter(pk=conv.pk).update(bot_activo=True, bot_derivada=False)
     conv_pk = conv.pk
-    transaction.on_commit(lambda: tasks.atender_modo.delay(conv_pk, 'inicio', objetivo))
+    transaction.on_commit(lambda: tasks.atender_modo.delay(conv_pk, 'inicio', objetivo, destinatario_difusion))
     return True, f'El agente le escribe desde {linea}.', False

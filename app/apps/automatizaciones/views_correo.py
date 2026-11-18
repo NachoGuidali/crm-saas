@@ -150,6 +150,9 @@ class DifusionForm(forms.ModelForm):
         self.fields['plantilla_email'].queryset = PlantillaEmail.objects.filter(activa=True)
         self.fields['plantilla_wa'].queryset = Plantilla.objects.filter(activa=True)
         self.fields['linea'].queryset = LineaWhatsApp.objects.filter(activa=True)
+        from apps.agente.services import habilitado as agente_habilitado
+        if not agente_habilitado() and (self.instance.canal != Difusion.CANAL_AGENTE):
+            self.fields['canal'].choices = [c for c in self.fields['canal'].choices if c[0] != Difusion.CANAL_AGENTE]
         _estilizar(self)
 
 

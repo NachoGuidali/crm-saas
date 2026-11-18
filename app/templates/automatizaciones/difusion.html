@@ -30,7 +30,8 @@
     <div class="col-md-6 cnl cnl-email"><label class="form-label">Plantilla de email</label>{{ form.plantilla_email }}<div class="form-text"><a href="{% url 'automatizaciones:plantillas_email' %}" target="_blank">Crear o editar plantillas de email</a></div></div>
     <div class="col-md-6 cnl cnl-whatsapp"><label class="form-label">Plantilla de WhatsApp</label>{{ form.plantilla_wa }}<div class="form-text">En líneas oficiales es obligatoria (y aprobada).</div></div>
     <div class="col-md-6 cnl cnl-whatsapp"><label class="form-label">Línea</label>{{ form.linea }}<div class="form-text">{{ form.linea.help_text }}</div></div>
-    <div class="col-12 cnl cnl-whatsapp"><label class="form-label">{{ form.texto_wa.label }}</label>{{ form.texto_wa }}</div>
+    <div class="col-12 cnl cnl-whatsapp cnl-agente"><label class="form-label"><span class="cnl cnl-whatsapp">{{ form.texto_wa.label }}</span><span class="cnl cnl-agente">Objetivo del mensaje (el agente escribe uno distinto para cada persona)</span></label>{{ form.texto_wa }}
+      <div class="form-text cnl cnl-agente">Ej.: "Presentate, contale que con sus aportes puede atenderse en sanatorios de su zona sin pagar extra y ofrecele las opciones 1, 2 y 3". Sale por las líneas del agente con sus pausas, el tope diario y el calentamiento; lo que no entra hoy sigue mañana. Si contestan, sigue el agente.</div></div>
   </div>
   {% if omitidos_previstos %}<div class="alert alert-warning small py-2 mt-3 mb-0">{{ omitidos_previstos }} de {{ r.total }} se van a omitir (sin {% if dif.canal == 'email' %}email, dados de baja{% else %}teléfono{% endif %} o "no contactar").</div>{% endif %}
   <div class="mt-3 d-flex gap-2 flex-wrap align-items-end">

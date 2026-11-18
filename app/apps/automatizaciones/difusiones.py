@@ -39,6 +39,15 @@ def validar(dif):
         return 'Elegí la plantilla de email.'
     if dif.canal == Difusion.CANAL_WHATSAPP and dif.plantilla_wa is None and not dif.texto_wa.strip():
         return 'Elegí una plantilla de WhatsApp o escribí el texto.'
+    if dif.canal == Difusion.CANAL_AGENTE:
+        from apps.agente.models import ConfigAgente
+        from apps.agente.services import habilitado
+        if not habilitado():
+            return 'El módulo Agente IA no está habilitado.'
+        if not ConfigAgente.get().activo:
+            return 'El agente IA está apagado: prendelo en Agente IA → Configuración.'
+        if not dif.texto_wa.strip():
+            return 'Escribí el objetivo del mensaje para el agente.'
     if not dif.destinatarios.exists():
         return 'La difusión no tiene destinatarios.'
     return None
@@ -55,6 +64,10 @@ def iniciar(dif, cuando=None):
 
 def _omitir(dest, motivo):
     DifusionDestinatario.objects.filter(pk=dest.pk).update(estado=DifusionDestinatario.OMITIDO, detalle=motivo[:300])
+
+
+SIN_CUPO = 'sin_cupo'
+TANDA_AGENTE = 5  # por minuto: el espaciado real lo dan las pausas de cada línea
 
 
 def _enviar_uno(dif, dest, conexion=None):
@@ -75,9 +88,20 @@ def _enviar_uno(dif, dest, conexion=None):
         DifusionDestinatario.objects.filter(pk=dest.pk).update(estado=DifusionDestinatario.ENVIADO, email=envio,
                                                                enviado_at=timezone.now())
         return
-    from apps.whatsapp.services import enviar_automatico
     if op is None:
         return _omitir(dest, 'Sin oportunidad')
+    if dif.canal == Difusion.CANAL_AGENTE:
+        # El agente escribe un mensaje propio para cada uno, con las pausas, topes y reparto de líneas del agente.
+        from apps.agente.services import iniciar_chat
+        ok, detalle, reintentar = iniciar_chat(op, objetivo=dif.texto_wa, destinatario_difusion=dest.pk)
+        if reintentar:
+            return SIN_CUPO  # hoy no hay cupo en las líneas: queda pendiente y se sigue en la próxima vuelta
+        if not ok:
+            return _omitir(dest, detalle)
+        DifusionDestinatario.objects.filter(pk=dest.pk).update(estado=DifusionDestinatario.ENVIADO,
+                                                               enviado_at=timezone.now(), detalle='')
+        return None
+    from apps.whatsapp.services import enviar_automatico
     msg, detalle = enviar_automatico(op, plantilla=dif.plantilla_wa, texto=dif.texto_wa, linea=dif.linea)
     if msg is None:
         return _omitir(dest, detalle)
@@ -98,6 +122,8 @@ def tick():
     for dif in Difusion.objects.filter(estado=Difusion.ENVIANDO).select_related('plantilla_email', 'plantilla_wa', 'linea'):
         if dif.canal == Difusion.CANAL_EMAIL:
             tanda = max(config.por_minuto, 1)
+        elif dif.canal == Difusion.CANAL_AGENTE:
+            tanda = TANDA_AGENTE
         else:
             tanda = TANDA_WHATSAPP if cupo_wa is None else min(TANDA_WHATSAPP, cupo_wa)
             if tanda <= 0:
@@ -112,7 +138,8 @@ def tick():
         for dest in DifusionDestinatario.objects.filter(pk__in=ids).select_related('contacto', 'oportunidad__embudo',
                                                                                    'oportunidad__agente'):
             try:
-                _enviar_uno(dif, dest, conexion)
+                if _enviar_uno(dif, dest, conexion) == SIN_CUPO:
+                    break  # las líneas del agente llegaron al tope de hoy: el resto sigue pendiente
                 enviados += 1
                 if dif.canal == Difusion.CANAL_WHATSAPP and cupo_wa is not None:
                     cupo_wa -= 1  # consume cupo diario del cliente (afecta a las demás difusiones del tick)
