@@ -160,15 +160,25 @@ def cliente_respondio(op):
     return sum(1 for a in acciones if _programar_ya(a, op, historial))
 
 
+def formulario_enviado(sol):
+    """Se le mandó al lead un formulario para firmar (la primera vez): dispara "Cuando se le envía un formulario"."""
+    return _por_formulario(sol, AccionEtapa.DISP_FIRMA_ENVIADA)
+
+
 def formulario_firmado(sol):
     """El lead firmó un formulario: dispara "Cuando se recibe un formulario firmado" (de ese formulario o cualquiera)."""
-    from django.db.models import Q
-    op = sol.oportunidad
     from apps.avisos.models import EV_FIRMA
     from apps.avisos.services import disparar
-    disparar(EV_FIRMA, oportunidad=op, motivo=sol.formulario.nombre)
+    disparar(EV_FIRMA, oportunidad=sol.oportunidad, motivo=sol.formulario.nombre)
+    return _por_formulario(sol, AccionEtapa.DISP_FIRMA)
+
+
+def _por_formulario(sol, disparador):
+    from django.db.models import Q
+    op = sol.oportunidad
+    op.refresh_from_db(fields=['etapa', 'embudo'])
     acciones = list(AccionEtapa.objects.filter(AccionEtapa.q_etapa(op.etapa_id, op.embudo_id), activa=True,
-                                               disparador=AccionEtapa.DISP_FIRMA)
+                                               disparador=disparador)
                     .filter(Q(formulario_firma__isnull=True) | Q(formulario_firma_id=sol.formulario_id))
                     .distinct().select_related('embudo').order_by('orden', 'pk'))
     ahora, n = timezone.now(), 0

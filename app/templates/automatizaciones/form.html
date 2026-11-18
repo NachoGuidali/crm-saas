@@ -150,6 +150,7 @@
     reingreso: ['Cuánto esperar después de que reingresa', 'Cuando la persona vuelve a entrar (escribe de nuevo, llena otro formulario, se importa de nuevo) y no se duplicó porque ya tenía la tarjeta.'],
     despues_de: ['Cuánto esperar después de esa automatización', 'Cuando la automatización elegida se ejecutó (por ejemplo, se envió el mensaje de bienvenida).'],
     firma: ['Cuánto esperar después de que firma', 'Cuando el lead completa y firma un formulario (el elegido o cualquiera) estando en la etapa. Ej.: pasarlo a "Documentación recibida" y avisarle al vendedor.'],
+    firma_enviada: ['Cuánto esperar después de enviarle el formulario', 'Cuando se le manda un formulario para firmar (por la ficha, una automatización o el agente IA), la primera vez. Ej.: pasarlo al embudo "Firmas".'],
     evento: ['Cuánto esperar después del evento', 'Cuando un sistema externo (ej. la videollamada de validación) avisa que terminó algo, con el nombre de evento de abajo. Ej.: mover a "Validado".'],
     silencio: ['Si deja de contestar durante', 'El cliente escribió, se le contestó (bot o agente) y no volvió a escribir en ese tiempo. Una vez por cada silencio; si vuelve a escribir, no se hace. Ideal para un "¿querés retomar?".'],
     campo: ['Cuánto esperar después de cambiar el campo', 'Cuando el agente (o una integración como n8n) completa o cambia un campo del contacto y se cumplen las condiciones de campo de más abajo.'],
@@ -161,7 +162,7 @@
     espejo.addEventListener('change', () => { formFirma.value = espejo.value; }); }
   const sincFirma = () => {
     if (!formFirma) return;
-    const porDisp = disp.value === 'firma';
+    const porDisp = disp.value === 'firma' || disp.value === 'firma_enviada';
     $('boxFormFirma').style.display = porDisp && tipo.value !== 'firma' ? '' : 'none';
     if (porDisp && tipo.value !== 'firma') espejo.value = formFirma.value;
   };
@@ -173,7 +174,7 @@
     $('boxPrevia').style.display = disp.value === 'despues_de' ? '' : 'none';
     $('boxTodas').style.display = $('boxOtras').style.display = disp.value === 'despues_de' ? 'none' : '';
     etapa.disabled = $('id_todas_las_etapas').checked;
-    $('ayudaDemora').textContent = ['entrada', 'respuesta', 'despues_de', 'reingreso', 'campo', 'firma', 'evento'].includes(disp.value) ? '0 = enseguida.' : '';
+    $('ayudaDemora').textContent = ['entrada', 'respuesta', 'despues_de', 'reingreso', 'campo', 'firma', 'firma_enviada', 'evento'].includes(disp.value) ? '0 = enseguida.' : '';
     sincFirma();
     $('boxEvento').style.display = disp.value === 'evento' ? '' : 'none';
   };
@@ -195,10 +196,11 @@
       reingreso: `Cuando el lead <b>reingresa</b> estando en <b>${et}</b>`,
       campo: `Cuando <b>cambia un campo</b> (según las condiciones) estando en <b>${et}</b>`,
       firma: `Cuando el lead <b>firma ${sel($('id_formulario_firma')) ? '«' + esc(sel($('id_formulario_firma'))) + '»' : 'un formulario'}</b> estando en <b>${et}</b>`,
+      firma_enviada: `Cuando se le <b>envía ${sel($('id_formulario_firma')) ? '«' + esc(sel($('id_formulario_firma'))) + '»' : 'un formulario para firmar'}</b> estando en <b>${et}</b>`,
       silencio: `Si el cliente, estando en <b>${et}</b>, <b>deja de contestar ${espera || '…'}</b> después de su último mensaje`,
       evento: `Cuando llega el evento externo <b>${esc($('id_evento_nombre').value) || '…'}</b> estando en <b>${et}</b>`,
     }[disp.value];
-    if (espera && ['entrada', 'respuesta', 'despues_de', 'reingreso', 'campo', 'firma', 'evento'].includes(disp.value)) cuando += `, esperar <b>${espera}</b> y`;
+    if (espera && ['entrada', 'respuesta', 'despues_de', 'reingreso', 'campo', 'firma', 'firma_enviada', 'evento'].includes(disp.value)) cuando += `, esperar <b>${espera}</b> y`;
     let que = ACC[tipo.value] || '';
     if (tipo.value === 'whatsapp' && sel(pl)) que += ` (plantilla «${esc(sel(pl))}»)`;
     if (tipo.value === 'email' && sel(pe)) que += ` (plantilla «${esc(sel(pe))}»)`;

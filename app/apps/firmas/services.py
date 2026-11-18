@@ -12,6 +12,7 @@ from django.core.files.storage import default_storage
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from core.tenancy import tiene_funcion
@@ -169,6 +170,7 @@ def enviar_whatsapp(sol, usuario=None):
 
 def enviar(sol, canales, usuario=None):
     """Envía por los canales pedidos ('email', 'whatsapp'). Devuelve (enviados, errores) como textos."""
+    ya_enviada = SolicitudFirma.objects.filter(pk=sol.pk).filter(Q(enviada_email=True) | Q(enviada_whatsapp=True)).exists()
     enviados, errores = [], []
     for canal, fn in (('email', enviar_email), ('whatsapp', enviar_whatsapp)):
         if canal in canales:
@@ -179,6 +181,11 @@ def enviar(sol, canales, usuario=None):
             except Exception as e:  # SMTP caído, etc.: no rompe el otro canal
                 logger.exception('Error enviando firma %s por %s', sol.pk, canal)
                 errores.append(f'{canal.capitalize()}: {e}')
+    if enviados and not ya_enviada:  # la primera vez que le llega: "Cuando se le envía un formulario para firmar"
+        from apps.automatizaciones.services import formulario_enviado
+        sol_pk = sol.pk
+        transaction.on_commit(lambda: formulario_enviado(SolicitudFirma.objects.select_related(
+            'oportunidad', 'formulario').get(pk=sol_pk)))
     return enviados, errores
 
 

@@ -31,6 +31,7 @@ class AccionEtapa(models.Model):
     DISP_CAMPO = 'campo'
     DISP_SILENCIO = 'silencio'
     DISP_FIRMA = 'firma'
+    DISP_FIRMA_ENVIADA = 'firma_enviada'
     DISP_EVENTO = 'evento'
     DISPARADORES = [
         (DISP_ENTRADA, 'Al entrar a la etapa'),
@@ -41,6 +42,7 @@ class AccionEtapa(models.Model):
         (DISP_REINGRESO, 'Cuando el lead reingresa (vuelve a escribir, llenar un formulario o se importa de nuevo)'),
         (DISP_CAMPO, 'Cuando se completa o cambia un campo del contacto'),
         (DISP_SILENCIO, 'Si el cliente respondió y después dejó de contestar (tiempo de demora desde su último mensaje)'),
+        (DISP_FIRMA_ENVIADA, 'Cuando se le envía un formulario para firmar'),
         (DISP_FIRMA, 'Cuando se recibe un formulario firmado'),
         (DISP_EVENTO, 'Cuando llega un evento de un sistema externo (ej. validación terminada)'),
     ]

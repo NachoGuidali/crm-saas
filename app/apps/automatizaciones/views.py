@@ -50,7 +50,8 @@ class AccionForm(forms.ModelForm):
             self.fields['tipo'].choices = [c for c in self.fields['tipo'].choices
                                            if c[0] != AccionEtapa.TIPO_FIRMA or c[0] == actual_tipo]
             self.fields['disparador'].choices = [c for c in self.fields['disparador'].choices
-                                                 if c[0] != AccionEtapa.DISP_FIRMA or c[0] == actual_disp]
+                                                 if c[0] not in (AccionEtapa.DISP_FIRMA, AccionEtapa.DISP_FIRMA_ENVIADA)
+                                                 or c[0] == actual_disp]
         from apps.agente.services import habilitado as agente_habilitado
         if not agente_habilitado():
             actual_tipo = self.instance.tipo if self.instance.pk else None

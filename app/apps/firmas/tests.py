@@ -193,3 +193,34 @@ class FirmasTests(TestCase):
         r = self.client.post('/api/v1/firmas/', json.dumps({'telefono': '1199999999', 'formulario': 'ddjj salud'}),
                              content_type='application/json', HTTP_X_API_KEY=clave)
         self.assertEqual(r.status_code, 404)
+
+
+class FlujoEmbudoFirmasTests(FirmasTests):
+    def test_enviar_formulario_pasa_a_firmas_y_al_firmar_vuelve(self):
+        from apps.automatizaciones.models import AccionEtapa
+        from apps.crm.models import Embudo
+        firmas = Embudo.objects.create(nombre='Firmas')
+        esperando = firmas.etapas.create(nombre='Esperando firma', orden=1)
+        origen = self.op.etapa
+        AccionEtapa.objects.create(embudo=self.embudo, etapa=origen, nombre='A Firmas', disparador='firma_enviada',
+                                   formulario_firma=self.form, tipo='embudo', modo_embudo='mover',
+                                   embudo_destino=firmas, etapa_destino=esperando, solo_en_horario=False)
+        AccionEtapa.objects.create(embudo=firmas, etapa=esperando, nombre='Firmó: vuelve', disparador='firma',
+                                   tipo='embudo', modo_embudo='volver', volver_a='misma', solo_en_horario=False)
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(f'/firmas/enviar/{self.op.pk}/', {'formulario': self.form.pk, 'canal': ['email']})
+        self.op.refresh_from_db()
+        self.assertEqual((self.op.embudo, self.op.etapa), (firmas, esperando))
+        sol = self.op.firmas.get()
+        # Reenviar el mismo formulario no lo vuelve a disparar
+        from apps.firmas import services
+        with self.captureOnCommitCallbacks(execute=True):
+            services.enviar(sol, ['email'])
+        self.op.refresh_from_db()
+        self.assertEqual(self.op.embudo, firmas)
+        # Firma → vuelve al embudo y la etapa de origen
+        with self.captureOnCommitCallbacks(execute=True):
+            r = self.client.post(f'/f/{sol.token}/', self._datos_ok())
+        self.assertEqual(r.status_code, 302)
+        self.op.refresh_from_db()
+        self.assertEqual((self.op.embudo, self.op.etapa), (self.embudo, origen))
