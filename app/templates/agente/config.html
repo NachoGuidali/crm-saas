@@ -46,6 +46,11 @@
       {% if puede_propia %}<div class="d-flex gap-3 mt-1">{% for c in form.borrar_keys %}<label class="d-flex gap-1">{{ c.tag }} Borrar key de {{ c.choice_label }}</label>{% endfor %}</div>
       <div class="form-text">Se guardan cifradas y no se vuelven a mostrar (solo los últimos 4 caracteres). "Probar" verifica la key sin gastar.</div>{% endif %}
     </div></div>
+    <div class="card mb-3"><div class="card-header">Si se cae una línea</div><div class="card-body small"><div class="row g-2">
+      <div class="col-12"><label class="d-flex gap-2 fw-semibold">{{ form.rescatar_chats }} {{ form.rescatar_chats.label }}</label><div class="form-text">{{ form.rescatar_chats.help_text }} Respeta el tope diario y las pausas de la línea nueva; lo que no entra hoy sale mañana. No toca los chats derivados, descartados ni los que atiende una persona.</div></div>
+      <div class="col-md-5"><label class="form-label">{{ form.rescate_dias.label }}</label>{{ form.rescate_dias }}</div>
+      <div class="col-12"><label class="form-label">{{ form.mensaje_rescate.label }}</label>{{ form.mensaje_rescate }}</div>
+    </div></div></div>
     <div class="card mb-3"><div class="card-header">Etapas en este CRM</div><div class="card-body"><div class="row g-2">
       <div class="col-12"><label class="form-label">Embudo</label>{{ form.embudo }}{{ form.embudo.errors }}</div>
       <div class="col-12"><label class="form-label">{{ form.etapa_calificando.label }}</label>{{ form.etapa_calificando }}{{ form.etapa_calificando.errors }}</div>

@@ -156,11 +156,9 @@ def _texto_mensaje(m):
     return m.contenido or ''
 
 
-def historial_de(conv):
-    """Mensajes del chat para la API: lead = user, nosotros = assistant. Imágenes solo de los últimos entrantes."""
+def _convertir(msgs):
+    """Mensajes → formato de la API: lead = user, nosotros = assistant. Imágenes/PDF solo de los últimos entrantes."""
     from apps.whatsapp.models import Mensaje as M
-    msgs = list(conv.mensajes.filter(eliminado_at__isnull=True).select_related('enviado_por')
-                .order_by('-timestamp', '-pk')[:MAX_HISTORIAL])[::-1]
     salida, imagenes, pdfs = [], 0, 0
     for m in reversed(msgs):  # de atrás para adelante: se adjuntan las imágenes y PDF más nuevos
         if m.direccion != M.DIR_ENTRANTE or not m.media_url:
@@ -181,6 +179,27 @@ def historial_de(conv):
                 texto = f'[Lo escribió un asesor humano del equipo] {texto}'
             salida.append({'role': 'assistant', 'content': [{'type': 'text', 'text': texto or '(archivo)'}]})
     return salida
+
+
+def _mensajes_de(conv, n):
+    return list(conv.mensajes.filter(eliminado_at__isnull=True).select_related('enviado_por')
+                .order_by('-timestamp', '-pk')[:n])[::-1]
+
+
+def historial_de(conv):
+    """Historial del chat. Si continúa a otro (la línea anterior cayó), el anterior va primero, con una marca."""
+    msgs = _mensajes_de(conv, MAX_HISTORIAL)
+    previo = conv.continua_de if conv.continua_de_id else None
+    if previo is None or len(msgs) >= MAX_HISTORIAL:
+        return _convertir(msgs)
+    anteriores = _mensajes_de(previo, MAX_HISTORIAL - len(msgs))
+    if not anteriores:
+        return _convertir(msgs)
+    # Las imágenes/PDF se toman solo del tramo más nuevo (lo que pesa es lo reciente).
+    marca = {'role': 'user', 'content': [{'type': 'text', 'text':
+             '[Cambio de número: la línea anterior dejó de funcionar y la charla sigue desde un número nuevo de la '
+             'empresa. Lo de arriba es lo que ya hablaron.]'}]}
+    return _convertir(anteriores) + [marca] + _convertir(msgs)
 
 
 def contexto_lead(ctx, modo, motivo=''):

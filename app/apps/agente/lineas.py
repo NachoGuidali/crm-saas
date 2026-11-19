@@ -7,6 +7,8 @@ import re
 
 from django.core.cache import cache
 from django.db.models import Q
+from datetime import timedelta
+
 from django.utils import timezone
 
 logger = logging.getLogger('apps.agente')
@@ -122,7 +124,61 @@ def linea_caida(linea):
         L.objects.filter(pk=reemplazo.pk).update(reserva=False, agente_ia_activo=True)
     cuerpo = (f'Entró en servicio la línea de reserva "{reemplazo}".' if reemplazo
               else 'No hay líneas de reserva conectadas: revisá y conectá otra.')
+    rescatados = rescatar_chats(linea)
+    if rescatados:
+        cuerpo += f' El agente va a retomar {rescatados} chat{"s" if rescatados != 1 else ""} desde las otras líneas.'
     for u in User.objects.filter(is_active=True).filter(Q(rol=User.ROL_ADMIN) | Q(is_superuser=True)):
         notificar(u, 'whatsapp', f'Se desconectó la línea "{linea}" (¿bloqueada?)', cuerpo, '/agente/lineas/')
     logger.warning('Línea del agente caída: %s → reemplazo %s', linea, reemplazo)
     return reemplazo
+
+
+GAP_RESCATE = timedelta(minutes=3)  # entre retomes por línea (además de las pausas anti-ráfaga de la línea)
+
+
+def rescatar_chats(caida):
+    """
+    Los chats que el agente atendía en una línea caída pasan a otra línea del agente (vinculados al anterior, así el
+    agente tiene todo el historial) y se programa un mensaje para retomar, escalonado y dentro del cupo diario.
+    Devuelve cuántos se programaron.
+    """
+    from apps.crm.models import Actividad
+    from apps.crm.services import oportunidad_activa_de
+    from apps.whatsapp import services as wa
+    from apps.whatsapp.models import Conversacion
+    from .models import ConfigAgente, SeguimientoAgente
+    cfg = ConfigAgente.get()
+    if not cfg.rescatar_chats:
+        return 0
+    destinos = [l for l in utilizables() if l.pk != caida.pk]
+    if not destinos:
+        return 0
+    ahora = timezone.now()
+    convs = (Conversacion.objects.filter(linea=caida, bot_activo=True, contacto__isnull=False,
+                                         ultimo_mensaje_at__gte=ahora - timedelta(days=cfg.rescate_dias))
+             .exclude(contacto__no_contactar=True).exclude(contacto__telefono_invalido=True)
+             .select_related('contacto').order_by('-ultimo_mensaje_at'))
+    proximo = {l.pk: ahora + timedelta(minutes=1) for l in destinos}
+    n = 0
+    for i, conv in enumerate(convs):
+        destino = destinos[i % len(destinos)]
+        nueva, _ = wa.obtener_conversacion(destino, conv.telefono, conv.nombre_perfil)
+        Conversacion.objects.filter(pk=nueva.pk).update(contacto=conv.contacto, continua_de=conv, bot_activo=True,
+                                                        bot_derivada=False, agente=conv.agente)
+        Conversacion.objects.filter(pk=conv.pk).update(bot_activo=False)
+        SeguimientoAgente.objects.filter(conversacion=conv, hecho=False).update(hecho=True, resultado='Línea caída: se retoma desde otra')
+        SeguimientoAgente.objects.create(conversacion_id=nueva.pk, cuando=proximo[destino.pk], tipo=SeguimientoAgente.TIPO_RESCATE,
+                                         motivo=cfg.mensaje_rescate[:300] or 'Retomá la charla desde el número nuevo.')
+        proximo[destino.pk] += GAP_RESCATE
+        Actividad.objects.create(contacto=conv.contacto, oportunidad=oportunidad_activa_de(conv.contacto),
+                                 tipo=Actividad.TIPO_SISTEMA,
+                                 texto=f'Se cayó la línea "{caida}": el agente retoma el chat desde "{destino}".')
+        n += 1
+    if n:
+        wa.marcar_cambio_inbox()
+    return n
+
+
+def cupo_libre(linea):
+    tope = cupo_dia(linea)
+    return None if tope is None else max(tope - iniciados_hoy(linea), 0)

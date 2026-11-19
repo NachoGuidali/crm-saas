@@ -200,6 +200,9 @@ class Conversacion(models.Model):
     bot_activo = models.BooleanField(
         default=False, db_index=True,
         help_text='El bot n8n está atendiendo esta conversación. Se apaga cuando un agente la toma o al hacer handoff.')
+    continua_de = models.ForeignKey(
+        'self', null=True, blank=True, on_delete=models.SET_NULL, related_name='continuaciones',
+        help_text='Chat anterior con este lead en otra línea (ej. la línea cayó y el agente siguió desde otra).')
     bot_derivada = models.BooleanField(
         default=False,
         help_text='El bot terminó y derivó esta conversación: hay que tomarla. Se apaga cuando un agente la atiende.')

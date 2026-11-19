@@ -97,6 +97,17 @@ class ConfigAgente(models.Model):
         blank=True, default='¡Genial! Ya le pasé tus datos a un asesor, en breve se comunica con vos 🙌',
         verbose_name='Mensaje al derivar', help_text='Lo que el agente le dice al lead cuando lo pasa al asesor.')
 
+    rescatar_chats = models.BooleanField(
+        default=True, verbose_name='Retomar los chats si se cae una línea',
+        help_text='Si una línea del agente se desconecta (ej. la bloquean), el agente les escribe desde otra línea a los '
+                  'chats que estaba atendiendo, con todo el historial.')
+    rescate_dias = models.PositiveSmallIntegerField(
+        default=7, verbose_name='Chats activos en los últimos (días)',
+        help_text='Solo se retoman los chats con mensajes en estos días.')
+    mensaje_rescate = models.TextField(
+        blank=True, verbose_name='Objetivo del mensaje al retomar',
+        default='Le escribís desde un número nuevo porque el anterior dejó de funcionar. Contáselo en una línea, '
+                'con naturalidad, y retomá la charla donde quedó (tenés el historial completo).')
     demora_segundos = models.PositiveSmallIntegerField(
         default=12, verbose_name='Espera antes de responder (seg)',
         help_text='Junta los mensajes seguidos del lead antes de contestar, como haría una persona.')
@@ -191,7 +202,10 @@ class TurnoAgente(models.Model):
 
 
 class SeguimientoAgente(models.Model):
-    """Recordatorio que se programa el agente ("le escribo mañana si no contesta")."""
+    """Recordatorio que se programa el agente ("le escribo mañana si no contesta"), o el retome tras una línea caída."""
+    TIPO_SEGUIMIENTO, TIPO_RESCATE = 'seguimiento', 'rescate'
+    tipo = models.CharField(max_length=12, default=TIPO_SEGUIMIENTO,
+                            choices=[(TIPO_SEGUIMIENTO, 'Seguimiento'), (TIPO_RESCATE, 'Retomar desde otra línea')])
     conversacion = models.ForeignKey('whatsapp.Conversacion', on_delete=models.CASCADE, related_name='seguimientos_agente')
     cuando = models.DateTimeField(db_index=True)
     motivo = models.CharField(max_length=300)

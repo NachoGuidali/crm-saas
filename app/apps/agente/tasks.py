@@ -152,8 +152,24 @@ def _seguimientos_cliente():
     from .models import SeguimientoAgente
     if not services.habilitado():
         return
-    for s in SeguimientoAgente.objects.filter(hecho=False, cuando__lte=timezone.now()).select_related('conversacion')[:50]:
+    from datetime import timedelta
+    from . import lineas
+    for s in SeguimientoAgente.objects.filter(hecho=False, cuando__lte=timezone.now()).select_related('conversacion__linea')[:50]:
         conv = s.conversacion
+        if s.tipo == SeguimientoAgente.TIPO_RESCATE:
+            if not conv.bot_activo:
+                s.hecho, s.resultado = True, 'El chat ya no lo atiende el agente'
+            elif lineas.cupo_libre(conv.linea) == 0:  # la línea nueva llegó al tope de hoy: mañana a la mañana
+                manana = timezone.localtime() + timedelta(days=1)
+                s.cuando = manana.replace(hour=9, minute=0, second=0, microsecond=0) + timedelta(minutes=s.pk % 180)
+                s.save(update_fields=['cuando'])
+                continue
+            else:
+                lineas.reservar_inicio(conv.linea)
+                s.hecho, s.resultado = True, 'Retomado'
+                atender_modo.delay(conv.pk, 'inicio', s.motivo)
+            s.save(update_fields=['hecho', 'resultado'])
+            continue
         if conv.ultimo_entrante_at and conv.ultimo_entrante_at > s.created_at:
             s.hecho, s.resultado = True, 'El lead respondió antes'
         elif not conv.bot_activo:

@@ -59,9 +59,10 @@ class ConfigForm(forms.ModelForm):
         model = ConfigAgente
         fields = ['activo', 'nombre', 'empresa', 'modelo', 'esfuerzo', 'instrucciones', 'criterios', 'campos_base',
                   'campos', 'campos_obligatorios', 'leer_recibos', 'embudo', 'etapa_calificando', 'etapa_derivado', 'etapa_pendiente', 'etapa_descartado',
-                  'tipificacion_descartado', 'derivar_destino', 'derivar_url', 'derivar_token', 'mensaje_derivacion', 'demora_segundos',
+                  'tipificacion_descartado', 'derivar_destino', 'derivar_url', 'derivar_token', 'rescatar_chats', 'rescate_dias', 'mensaje_rescate', 'mensaje_derivacion', 'demora_segundos',
                   'max_turnos', 'presupuesto_diario']
         widgets = {'instrucciones': forms.Textarea(attrs={'rows': 9}), 'criterios': forms.Textarea(attrs={'rows': 5}),
+                   'mensaje_rescate': forms.Textarea(attrs={'rows': 3}),
                    'mensaje_derivacion': forms.Textarea(attrs={'rows': 2}), 'campos': forms.CheckboxSelectMultiple,
                    'derivar_token': forms.PasswordInput(render_value=True)}
 
@@ -77,10 +78,15 @@ class ConfigForm(forms.ModelForm):
             self.fields[k].queryset = etapas
             self.fields[k].label_from_instance = lambda e: f'{e.embudo} · {e}'
         self.fields['tipificacion_descartado'].queryset = Tipificacion.objects.all()
+        self.fields['rescate_dias'].required = False
+        self.fields['mensaje_rescate'].required = False
         _bootstrap(self)
 
     def clean(self):
         d = super().clean()
+        d['rescate_dias'] = d.get('rescate_dias') or 7
+        if not (d.get('mensaje_rescate') or '').strip():
+            d['mensaje_rescate'] = ConfigAgente._meta.get_field('mensaje_rescate').default
         emb = d.get('embudo')
         for k in ('etapa_calificando', 'etapa_derivado', 'etapa_pendiente', 'etapa_descartado'):
             if d.get(k) and emb and d[k].embudo_id != emb.pk:

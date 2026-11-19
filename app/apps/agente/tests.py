@@ -704,3 +704,70 @@ class DifusionConAgenteTests(AgenteBase):
         self.cfg.save()
         dif = Difusion.objects.create(nombre='X', canal=Difusion.CANAL_AGENTE, texto_wa='Hola')
         self.assertIn('apagado', difusiones.validar(dif))
+
+
+class RescateLineaCaidaTests(AgenteBase):
+    def _chat(self, linea, tel, nombre, bot=True):
+        from apps.crm import services as crm
+        op = crm.ingresar_prospecto({'telefono': tel, 'nombre': nombre}, self.embudo, 'web').oportunidad
+        conv = Conversacion.objects.create(linea=linea, telefono='+549' + tel, contacto=op.contacto, bot_activo=bot,
+                                           ultimo_mensaje_at=timezone.now() - timedelta(hours=2))
+        return conv
+
+    def test_retoma_desde_otra_linea_con_todo_el_historial(self):
+        from apps.agente import tasks
+        from apps.agente.models import SeguimientoAgente
+        from apps.agente.services import linea_cambio_estado
+        caida = LineaWhatsApp.objects.create(nombre='Bloqueada', proveedor='evolution', agente_ia_activo=True,
+                                             estado='desconectada', telefono='5491140000009')
+        activo = self._chat(caida, '1150000101', 'Ana')
+        Mensaje.objects.create(conversacion=activo, direccion='in', contenido='Vivo en Lanús, somos 3')
+        Mensaje.objects.create(conversacion=activo, direccion='out', contenido='¡Genial! ¿Trabajás en relación de dependencia?', por_ia=True)
+        derivado = self._chat(caida, '1150000102', 'Beto', bot=False)
+        n = linea_cambio_estado(caida, 'conectada', 'desconectada')
+        nueva = Conversacion.objects.get(continua_de=activo)
+        self.assertEqual(nueva.linea, self.linea)
+        self.assertTrue(nueva.bot_activo)
+        activo.refresh_from_db()
+        self.assertFalse(activo.bot_activo)
+        self.assertFalse(Conversacion.objects.filter(continua_de=derivado).exists())  # el derivado no se toca
+        seg = SeguimientoAgente.objects.get(conversacion=nueva)
+        self.assertEqual(seg.tipo, 'rescate')
+        SeguimientoAgente.objects.filter(pk=seg.pk).update(cuando=timezone.now() - timedelta(minutes=1))
+        claude = ClaudeFalso(respuesta(texto('Hola Ana, te escribo desde el nuevo número de RAS. ¿Seguimos?')))
+        with mock.patch('apps.agente.motor._cliente', return_value=claude), \
+                mock.patch('django.conf.settings.ANTHROPIC_API_KEY', 'sk-test'):
+            tasks.seguimientos()
+        req = claude.llamadas[0]
+        textos = [b['text'] for m in req['messages'] if m['role'] != 'system' for b in m['content'] if b['type'] == 'text']
+        self.assertIn('Vivo en Lanús, somos 3', textos)  # el historial del número anterior
+        self.assertTrue(any(t.startswith('[Cambio de número') for t in textos))
+        self.assertIn('número nuevo', req['messages'][-1]['content'])
+        self.assertEqual(nueva.mensajes.filter(direccion='out', por_ia=True).count(), 1)
+        self.assertTrue(activo.contacto.actividades.filter(texto__contains='retoma el chat desde').exists())
+        self.assertIsNone(n)  # no había línea de reserva: igual se retomó por la otra línea del agente
+
+    def test_sin_cupo_en_la_linea_nueva_pasa_a_manana(self):
+        from apps.agente import lineas, tasks
+        from apps.agente.models import SeguimientoAgente
+        caida = LineaWhatsApp.objects.create(nombre='Bloqueada', proveedor='evolution', agente_ia_activo=True,
+                                             estado='desconectada')
+        self._chat(caida, '1150000103', 'Caro')
+        LineaWhatsApp.objects.filter(pk=self.linea.pk).update(max_salientes_dia=1)
+        self.linea.refresh_from_db()
+        lineas.reservar_inicio(self.linea)  # el cupo de hoy ya está usado
+        lineas.rescatar_chats(caida)
+        seg = SeguimientoAgente.objects.get(tipo='rescate')
+        SeguimientoAgente.objects.filter(pk=seg.pk).update(cuando=timezone.now() - timedelta(minutes=1))
+        tasks.seguimientos()
+        seg.refresh_from_db()
+        self.assertFalse(seg.hecho)
+        self.assertEqual(timezone.localtime(seg.cuando).date(), timezone.localdate() + timedelta(days=1))
+
+    def test_desactivado_no_retoma(self):
+        from apps.agente import lineas
+        self.cfg.rescatar_chats = False
+        self.cfg.save()
+        caida = LineaWhatsApp.objects.create(nombre='Bloqueada', proveedor='evolution', agente_ia_activo=True, estado='desconectada')
+        self._chat(caida, '1150000104', 'Dani')
+        self.assertEqual(lineas.rescatar_chats(caida), 0)
