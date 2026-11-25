@@ -366,6 +366,23 @@ class CorreoYDifusionesTests(TestCase):
         self.assertIn('Fallido: El número no tiene WhatsApp', contenido)
         self.assertIn('fallido', r['Content-Disposition'])
 
+    def test_tandas_de_difusion_sin_repetir(self):
+        from .models import Difusion
+        def tanda():
+            self.client.post('/oportunidades/masivas/', {'accion': 'difusion', 'todos_filtrados': '1',
+                                                         'filtros_qs': 'difusion=ninguna', 'cantidad': '2'})
+            dif = Difusion.objects.latest('pk')
+            dif.destinatarios.update(estado='enviado')
+            return set(dif.destinatarios.values_list('contacto_id', flat=True))
+        primera, segunda = tanda(), tanda()
+        self.assertEqual((len(primera), len(segunda)), (2, 2))
+        self.assertFalse(primera & segunda)  # la segunda tanda no repite a nadie
+        r = self.client.get('/oportunidades/', {'difusion': 'ninguna'})
+        self.assertEqual(r.context['page'].paginator.count, 0)
+        r = self.client.get('/oportunidades/', {'difusion': 'alguna'})
+        self.assertEqual(r.context['page'].paginator.count, 4)
+        self.assertContains(r, 'Ya recibió alguna difusión')
+
     def test_borrador_sin_mensaje_no_sale_y_cancelar(self):
         from .models import Difusion
         dif = self.crear_desde_lista()

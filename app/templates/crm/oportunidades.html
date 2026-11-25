@@ -55,6 +55,7 @@
       <input type="datetime-local" name="hasta" class="form-control form-control-sm opc opc-pausar" style="display:none;max-width:210px" title="Reactivar automáticamente el">
       <select name="destino_etiqueta" class="form-select form-select-sm opc opc-etiqueta" style="display:none;max-width:200px">{% for e in etiquetas %}<option value="{{ e.pk }}">{{ e }}</option>{% empty %}<option value="">No hay etiquetas</option>{% endfor %}</select>
       <select name="campania" class="form-select form-select-sm opc opc-campania" style="display:none;max-width:220px">{% for c in campanias %}<option value="{{ c.pk }}">{{ c.nombre }}</option>{% empty %}<option value="">No hay campañas</option>{% endfor %}</select>
+      <input type="number" min="1" name="cantidad" class="form-control form-control-sm opc opc-difusion" style="display:none;max-width:190px" placeholder="Solo los primeros… (vacío = todos)" title="Ej. 20: toma los primeros 20 de la selección, en el orden en que entraron">
       <input name="nota" class="form-control form-control-sm opc opc-reasignar opc-mover opc-cerrar opc-tarea" style="display:none;max-width:260px" placeholder="Nota (opcional)" id="notaMasiva">
       <button class="btn btn-primary btn-sm">Aplicar</button>
     </div>

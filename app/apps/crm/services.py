@@ -1224,6 +1224,7 @@ FILTROS_SEGUIMIENTO = {
                                 ('esperando', 'Esperando respuesta nuestra')]),
     'tareas': ('Tareas', [('vencida', 'Con tarea vencida'), ('sin_pendiente', 'Sin tarea pendiente'),
                           ('hoy', 'Recontactar hoy')]),
+    'difusion': ('Difusiones', [('ninguna', 'Nunca recibió una difusión'), ('alguna', 'Ya recibió alguna difusión')]),
     'contactable': ('Contacto', [('si', 'Contactable'), ('no_contactar', 'Pidió no contactar'),
                                  ('tel_invalido', 'Teléfono inválido'), ('sin_telefono', 'Sin teléfono'),
                                  ('sin_email', 'Sin email')]),
@@ -1236,6 +1237,13 @@ def _filtros_seguimiento(qs, params):
     from apps.whatsapp.models import Conversacion
     from .models import Tarea
     convs = Conversacion.objects.filter(contacto_id=OuterRef('contacto_id'))
+    difusion = params.get('difusion')
+    if difusion in ('ninguna', 'alguna'):
+        # Enviada o en cola en una difusión en curso: así una segunda tanda no toma a los mismos.
+        from apps.automatizaciones.models import DifusionDestinatario as DD
+        recibio = Exists(DD.objects.filter(contacto_id=OuterRef('contacto_id'), estado__in=[DD.ENVIADO, DD.PENDIENTE]))
+        qs = qs.filter(recibio) if difusion == 'alguna' else qs.exclude(recibio)
+
     chat = params.get('chat')
     if chat == 'bot':
         qs = qs.filter(Exists(convs.filter(bot_activo=True)))

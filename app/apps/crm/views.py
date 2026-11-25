@@ -411,6 +411,9 @@ class AccionesMasivasView(LoginRequiredMixin, View):
         else:
             qs = qs.filter(pk__in=[int(i) for i in request.POST.getlist('ids') if i.isdigit()])
         ids = list(qs.order_by('pk').values_list('pk', flat=True).distinct()[:masivas.LIMITE_TOTAL + 1])
+        cantidad = request.POST.get('cantidad', '').strip()
+        if accion == 'difusion' and cantidad.isdigit() and int(cantidad) > 0:
+            ids = ids[:int(cantidad)]  # "solo los primeros N" (en el orden en que entraron)
         if not ids:
             messages.warning(request, 'No hay oportunidades seleccionadas.')
             return redirect(volver)
