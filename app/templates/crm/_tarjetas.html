@@ -6,7 +6,14 @@
     {% if o.contacto.telefono %}<button class="call" data-llamar data-op="{{ o.pk }}" title="Llamar con Anura"><i class="bi bi-telephone"></i></button>{% endif %}
     {% if o.contacto.telefono %}<a class="wa" href="{% url 'crm:oportunidad_detalle' o.pk %}#whatsapp" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>{% endif %}
   </div>
+  {% if 'edad' in tarjeta and o.edad is not None %}<div class="tel"><span class="muted">Edad:</span> {{ o.edad }}</div>{% endif %}
+  {% if 'localidad' in tarjeta and o.contacto.localidad %}<div class="tel"><span class="muted">Localidad:</span> {{ o.contacto.localidad }}</div>{% endif %}
+  {% if 'email' in tarjeta and o.contacto.email and o.contacto.telefono %}<div class="tel">{{ o.contacto.email }}</div>{% endif %}
+  {% if 'campana' in tarjeta %}<div class="tel"><span class="muted">{% if o.pauta_id %}Campaña:</span> {{ o.pauta }}{% else %}Origen:</span> {{ o.get_origen_display }}{% endif %}</div>{% endif %}
+  {% if 'valor' in tarjeta and o.valor %}<div class="tel"><span class="muted">Valor:</span> {{ o.valor }}</div>{% endif %}
+  {% if 'ingreso' in tarjeta %}<div class="tel"><span class="muted">Ingresó:</span> {{ o.created_at|date:"d/m/Y" }}</div>{% endif %}
   {% for cp, val in o.campos_vista %}{% if val %}<div class="tel"><span class="muted">{{ cp.nombre }}:</span> {{ val }}</div>{% endif %}{% endfor %}
+  {% if 'etiquetas' in tarjeta and o.etiquetas_vista %}<div class="d-flex flex-wrap gap-1 mt-1">{% for nombre, color in o.etiquetas_vista %}<span class="chip" style="background:{{ color }};color:#fff;font-size:11px">{{ nombre }}</span>{% endfor %}</div>{% endif %}
   <div class="meta">
     {% if o.agente %}<span class="avatar-xs" title="{{ o.agente.display_name }}">{{ o.agente.iniciales }}</span>{% else %}<span class="chip warn">Sin asignar</span>{% endif %}
     <span title="Días en esta etapa"><i class="bi bi-clock"></i> {{ o.dias_en_etapa }}d</span>

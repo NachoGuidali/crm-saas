@@ -122,6 +122,11 @@ class Embudo(models.Model):
     dias_estancado_alerta = models.PositiveSmallIntegerField(
         default=7, verbose_name='Días en la misma etapa para avisar a supervisión', help_text='0 = desactivado')
     notificar_venta_supervisores = models.BooleanField(default=True, verbose_name='Avisar a supervisión cada venta')
+    # Datos fijos que muestran las tarjetas del tablero (los campos personalizados se eligen en cada campo).
+    TARJETA_OPCIONES = [('etiquetas', 'Etiquetas'), ('edad', 'Edad (por fecha de nacimiento)'), ('localidad', 'Localidad'),
+                        ('email', 'Email'), ('campana', 'Campaña / origen'), ('valor', 'Valor'),
+                        ('ingreso', 'Fecha de ingreso')]
+    tarjeta_datos = models.JSONField(default=list, blank=True, verbose_name='Qué mostrar en las tarjetas del tablero')
     crear_cuenta_al_ganar = models.BooleanField(
         default=False, verbose_name='Al ganar una venta, crear una cuenta de postventa',
         help_text='Solo si el módulo Clientes / Postventa está habilitado. El contacto pasa a ser una cuenta '

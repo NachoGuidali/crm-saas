@@ -92,6 +92,25 @@ def datos_extra_display(contacto, embudo=None):
     return filas
 
 
+def anotar_tarjeta(cards, embudo):
+    """Datos fijos elegidos en el embudo para las tarjetas: etiquetas (una consulta para todas) y edad."""
+    elegidos = set(embudo.tarjeta_datos or [])
+    if 'etiquetas' in elegidos and cards:
+        por_contacto = {}
+        for contacto_id, nombre, color in (Contacto.etiquetas.through.objects
+                                           .filter(contacto_id__in={o.contacto_id for o in cards})
+                                           .values_list('contacto_id', 'etiqueta__nombre', 'etiqueta__color')):
+            por_contacto.setdefault(contacto_id, []).append((nombre, color))
+        for o in cards:
+            o.etiquetas_vista = por_contacto.get(o.contacto_id, [])
+    if 'edad' in elegidos:
+        hoy = timezone.localdate()
+        for o in cards:
+            f = o.contacto.fecha_nacimiento
+            o.edad = (hoy.year - f.year - ((hoy.month, hoy.day) < (f.month, f.day))) if f else None
+    return cards
+
+
 def anotar_campos(objetos, campos, contacto_attr='contacto'):
     """Agrega a cada objeto `.campos_vista` = [(campo, valor_display)] para tarjetas y listas."""
     for o in objetos:
@@ -126,10 +145,11 @@ class TableroView(LoginRequiredMixin, View):
             # Venta / No venta: las cerradas en los últimos 30 días, la más reciente arriba
             total = base.filter(etapa=etapa, cerrada_at__gte=hace_30).count() if etapa.es_cierre \
                 else conteos.get(etapa.pk, 0)
-            cards = anotar_campos(list(self._cards(base, etapa)[:POR_COLUMNA]), campos_tarjeta)
+            cards = anotar_tarjeta(anotar_campos(list(self._cards(base, etapa)[:POR_COLUMNA]), campos_tarjeta), embudo)
             columnas.append({'etapa': etapa, 'total': total, 'cards': cards, 'cierre': etapa.es_cierre,
                              'hay_mas': total > POR_COLUMNA})
         return render(request, 'crm/tablero.html', {
+            'tarjeta': set(embudo.tarjeta_datos or []),
             'embudo': embudo, 'embudos': embudos, 'columnas': columnas, 'agentes': agentes_activos(),
             'tipificaciones': tipificaciones_de(embudo), 'filtros': request.GET,
             'origenes': Oportunidad.ORIGEN_CHOICES, 'pautas': Pauta.objects.filter(activa=True).order_by('nombre'),
@@ -149,10 +169,10 @@ class TableroView(LoginRequiredMixin, View):
     def _cards(base, etapa):
         if etapa.es_cierre:
             qs = (base.filter(etapa=etapa, cerrada_at__gte=timezone.now() - timedelta(days=30))
-                  .select_related('contacto', 'agente', 'tipificacion').order_by('-cerrada_at'))
+                  .select_related('contacto', 'agente', 'tipificacion', 'pauta').order_by('-cerrada_at'))
         else:
             qs = (base.filter(etapa=etapa, estado__in=Oportunidad.ESTADOS_ACTIVOS)
-                  .select_related('contacto', 'agente').order_by('-prioritaria', 'estado', '-ultima_actividad_at'))
+                  .select_related('contacto', 'agente', 'pauta').order_by('-prioritaria', 'estado', '-ultima_actividad_at'))
         return _con_marcas(qs)
 
 
@@ -166,7 +186,9 @@ class TableroColumnaView(LoginRequiredMixin, View):
         base = TableroView._base(request, embudo)
         cards = list(TableroView._cards(base, etapa)[offset:offset + POR_COLUMNA + 1])
         anotar_campos(cards, [c for c in CampoPersonalizado.activos(embudo) if c.mostrar_en_tarjeta])
-        html = render_to_string('crm/_tarjetas.html', {'cards': cards[:POR_COLUMNA]}, request=request)
+        anotar_tarjeta(cards, embudo)
+        html = render_to_string('crm/_tarjetas.html', {'cards': cards[:POR_COLUMNA], 'tarjeta': set(embudo.tarjeta_datos or [])},
+                                request=request)
         return JsonResponse({'html': html, 'hay_mas': len(cards) > POR_COLUMNA})
 
 

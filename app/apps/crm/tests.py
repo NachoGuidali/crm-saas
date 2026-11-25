@@ -936,3 +936,33 @@ class FiltrosSeguimientoTests(BaseCRM):
         self.assertContains(r, 'WhatsApp: El bot derivó (falta tomar)')
         self.assertContains(r, 'En la etapa hace ≥ 3 días')
         self.assertContains(self.client.get('/tablero/', {'chat': 'bot'}), f'/oportunidades/{self.ops["Bot"].pk}/')
+
+
+class TarjetasTableroTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        from django.core.management import call_command
+        call_command('setup_inicial', '--sin-admin', verbosity=0)
+        from apps.crm.models import Embudo
+        cls.embudo = Embudo.objects.get()
+        cls.admin = User.objects.create_superuser('root_t', 'r@x.com', 'x', rol=User.ROL_ADMIN)
+
+    def test_muestra_edad_localidad_y_etiquetas_si_se_eligen(self):
+        from datetime import date
+        from apps.crm.models import Etiqueta
+        from apps.crm import services as crm
+        op = crm.ingresar_prospecto({'telefono': '1150000201', 'nombre': 'Lucía', 'localidad': 'Canning',
+                                     'fecha_nacimiento': date(1990, 1, 1)}, self.embudo, 'web').oportunidad
+        op.contacto.etiquetas.add(Etiqueta.objects.create(nombre='Campaña empresas', color='#2563EB'))
+        self.client.force_login(self.admin)
+        chip = 'style="background:#2563EB;color:#fff;font-size:11px">Campaña empresas'
+        r = self.client.get('/tablero/')
+        self.assertNotContains(r, chip)
+        self.assertNotContains(r, 'Localidad:</span> Canning')
+        self.embudo.tarjeta_datos = ['edad', 'localidad', 'etiquetas']
+        self.embudo.save()
+        r = self.client.get('/tablero/')
+        edad = date.today().year - 1990 - ((date.today().month, date.today().day) < (1, 1))
+        self.assertContains(r, f'Edad:</span> {edad}')
+        self.assertContains(r, 'Localidad:</span> Canning')
+        self.assertContains(r, chip)

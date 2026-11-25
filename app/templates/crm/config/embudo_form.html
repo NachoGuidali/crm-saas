@@ -52,6 +52,9 @@
       <div class="col-6"><label class="form-label">{{ form.dias_estancado_alerta.label }}</label>{{ form.dias_estancado_alerta }}</div>
       <div class="col-12"><label class="form-label">{{ form.reingreso_perdidos.label }}</label>{{ form.reingreso_perdidos }}</div>
       <div class="col-12"><label class="d-flex gap-2 small">{{ form.notificar_venta_supervisores }} {{ form.notificar_venta_supervisores.label }}</label></div>
+      <div class="col-12"><label class="form-label">Qué mostrar en las tarjetas del tablero</label>
+        <div class="checks-grid">{% for c in form.tarjeta_datos %}<label>{{ c.tag }} {{ c.choice_label }}</label>{% endfor %}</div>
+        <div class="form-text">Además de nombre y teléfono. Los campos personalizados se agregan desde Configuración → Campos ("Mostrar en la tarjeta del tablero").</div></div>
       {% if 'postventa' in funciones_cliente %}
       <div class="col-12"><label class="d-flex gap-2 small">{{ form.crear_cuenta_al_ganar }} {{ form.crear_cuenta_al_ganar.label }}</label><div class="form-text">{{ form.crear_cuenta_al_ganar.help_text }}</div></div>
       {% endif %}
