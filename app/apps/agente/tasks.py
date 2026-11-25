@@ -249,6 +249,9 @@ def payload_derivacion(conv, resumen, motivo):
     return {
         'evento': 'lead_derivado',
         'fecha': timezone.now().isoformat(),
+        # Para que el CRM de destino distinga estos leads de los que cargan sus vendedores.
+        'canal': 'agente_ia',
+        'canal_detalle': f'Agente IA ({ConfigAgente.get().nombre or "asistente virtual"}) - SupReg',
         'lead': {'nombre': c.nombre if c else conv.nombre_mostrar, 'telefono': conv.telefono,
                  'email': c.email if c else '', 'dni': c.dni if c else ''},
         'campos': campos,

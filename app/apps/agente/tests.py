@@ -794,3 +794,14 @@ class DifusionAgenteConImagenTests(AgenteBase):
         self.assertEqual((msgs[0].tipo, msgs[0].contenido), ('image', 'Hola Lucas, te paso nuestro flyer 👇'))
         self.assertIn('flyer', msgs[0].media_url)
         self.assertEqual((msgs[1].tipo, msgs[1].media_url), ('text', ''))
+
+
+class PayloadDerivacionTests(AgenteBase):
+    def test_identifica_que_viene_del_agente_y_trae_url_de_resultado(self):
+        from .tasks import payload_derivacion
+        conv = self.entrante(ClaudeFalso(respuesta(texto('Hola'))))
+        p = payload_derivacion(conv, 'Resumen', 'Apto')
+        self.assertEqual(p['canal'], 'agente_ia')
+        self.assertIn('Clara', p['canal_detalle'])
+        self.assertEqual(p['callback']['eventos'], ['venta', 'no_venta'])
+        self.assertIn('/api/v1/eventos/', p['callback']['url'])
