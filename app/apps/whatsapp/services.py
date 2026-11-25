@@ -364,7 +364,7 @@ def _oportunidad_de(contacto):
     return oportunidad_activa_de(contacto)
 
 
-def enviar_automatico(oportunidad, plantilla=None, texto='', linea=None, accion=None):
+def enviar_automatico(oportunidad, plantilla=None, texto='', linea=None, accion=None, adjunto=None):
     """
     Mensaje disparado por una automatización. Respeta 'no contactar', la ventana de 24 h
     (si no hay plantilla y la ventana está cerrada, no se envía) y el ritmo anti-bloqueo de la línea.
@@ -387,9 +387,12 @@ def enviar_automatico(oportunidad, plantilla=None, texto='', linea=None, accion=
             return None, f'Omitido: la plantilla "{plantilla}" no está aprobada para {linea}.'
     if plantilla is None:
         texto = reemplazar_variables_texto(texto, contacto, oportunidad)
+    if adjunto and linea.es_oficial:
+        return None, f'Omitido: la línea {linea} es oficial: no se pueden mandar imágenes fuera de una plantilla.'
     demora = demora_para(linea)
+    extra = {'archivo_url': adjunto[0], 'archivo_mime': adjunto[1], 'archivo_nombre': adjunto[2]} if adjunto else {}
     try:
-        msg = enviar_mensaje(conv, texto=texto, plantilla=plantilla, automatico=True, demora_segundos=demora)
+        msg = enviar_mensaje(conv, texto=texto, plantilla=plantilla, automatico=True, demora_segundos=demora, **extra)
     except ErrorEnvio as e:
         return None, f'Omitido: {e}'
     if accion is not None:

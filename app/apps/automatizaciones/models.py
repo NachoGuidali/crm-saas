@@ -534,6 +534,8 @@ class Difusion(models.Model):
     plantilla_wa = models.ForeignKey('whatsapp.Plantilla', null=True, blank=True, on_delete=models.SET_NULL,
                                      related_name='+', verbose_name='Plantilla de WhatsApp')
     texto_wa = models.TextField(blank=True, verbose_name='Texto (solo líneas no oficiales, sin plantilla)')
+    adjunto = models.FileField(upload_to='difusiones/%Y/%m/', blank=True, verbose_name='Imagen o PDF (opcional)',
+                               help_text='Sale junto con el texto (como descripción de la imagen). Solo líneas por QR.')
     linea = models.ForeignKey('whatsapp.LineaWhatsApp', null=True, blank=True, on_delete=models.SET_NULL, related_name='+',
                               help_text='Vacío = la del chat existente o la del embudo de cada lead.')
     estado = models.CharField(max_length=12, choices=ESTADOS, default=BORRADOR, db_index=True)

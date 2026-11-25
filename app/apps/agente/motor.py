@@ -430,7 +430,7 @@ def puede_atender(conv, config):
     return True, ''
 
 
-def atender(conv, modo=TurnoAgente.MODO_RESPUESTA, motivo=''):
+def atender(conv, modo=TurnoAgente.MODO_RESPUESTA, motivo='', adjunto=None):
     """Un turno del agente en un chat real. Devuelve el TurnoAgente (o None si no correspondía)."""
     from apps.crm.services import oportunidad_activa_de
     from apps.whatsapp import services as wa
@@ -478,8 +478,11 @@ def atender(conv, modo=TurnoAgente.MODO_RESPUESTA, motivo=''):
     for i, texto in enumerate(partes):
         demora += min(max(len(texto) / 18, 2), 10) if i else 1  # "escribiendo…": proporcional al largo
         try:
+            # Difusión con imagen: va en el primer mensaje, con el texto del agente como descripción.
+            extra = ({'archivo_url': adjunto[0], 'archivo_mime': adjunto[1], 'archivo_nombre': adjunto[2]}
+                     if adjunto and i == 0 and not conv.linea.es_oficial else {})
             turno.mensajes.add(wa.enviar_mensaje(conv, texto=texto, automatico=True, demora_segundos=int(demora),
-                                                 por_ia=True))
+                                                 por_ia=True, **extra))
         except wa.ErrorEnvio as e:
             logger.warning('Agente IA no pudo enviar en conv %s: %s', conv.pk, e)
             break

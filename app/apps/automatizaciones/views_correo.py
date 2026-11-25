@@ -141,7 +141,7 @@ class ConfigEmailView(PermisoRequeridoMixin, View):
 class DifusionForm(forms.ModelForm):
     class Meta:
         model = Difusion
-        fields = ['nombre', 'canal', 'plantilla_email', 'plantilla_wa', 'texto_wa', 'linea']
+        fields = ['nombre', 'canal', 'plantilla_email', 'plantilla_wa', 'texto_wa', 'adjunto', 'linea']
         widgets = {'texto_wa': forms.Textarea(attrs={'rows': 4})}
 
     def __init__(self, *a, **kw):
@@ -154,6 +154,17 @@ class DifusionForm(forms.ModelForm):
         if not agente_habilitado() and (self.instance.canal != Difusion.CANAL_AGENTE):
             self.fields['canal'].choices = [c for c in self.fields['canal'].choices if c[0] != Difusion.CANAL_AGENTE]
         _estilizar(self)
+
+    def clean_adjunto(self):
+        f = self.cleaned_data.get('adjunto')
+        if f and hasattr(f, 'size') and not isinstance(getattr(f, 'url', None), str):
+            ext = f.name.lower().rsplit('.', 1)[-1] if '.' in f.name else ''
+            if ext not in ('jpg', 'jpeg', 'png', 'webp', 'pdf'):
+                raise forms.ValidationError('Subí una imagen (JPG, PNG, WEBP) o un PDF.')
+            limite = 10 if ext == 'pdf' else 5
+            if f.size > limite * 1024 * 1024:
+                raise forms.ValidationError(f'Máximo {limite} MB.')
+        return f
 
 
 class DifusionListView(PermisoRequeridoMixin, View):
@@ -186,7 +197,7 @@ class DifusionDetalleView(PermisoRequeridoMixin, View):
         if dif.estado != Difusion.BORRADOR:
             messages.error(request, 'La difusión ya se programó o envió: no se puede editar.')
             return redirect('automatizaciones:difusion', pk=dif.pk)
-        form = DifusionForm(request.POST, instance=dif)
+        form = DifusionForm(request.POST, request.FILES, instance=dif)
         if not form.is_valid():
             return self._render(request, dif, form)
         dif = form.save()

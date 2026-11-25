@@ -22,13 +22,15 @@
 </div>
 
 {% if dif.estado == 'borrador' %}
-<form method="post" class="card mb-3"><div class="card-header">Mensaje</div><div class="card-body">{% csrf_token %}
+<form method="post" enctype="multipart/form-data" class="card mb-3"><div class="card-header">Mensaje</div><div class="card-body">{% csrf_token %}
   {% if form.non_field_errors %}<div class="alert alert-danger py-2">{{ form.non_field_errors|join:" " }}</div>{% endif %}
   <div class="row g-2">
     <div class="col-md-6"><label class="form-label">Nombre</label>{{ form.nombre }}</div>
     <div class="col-md-6"><label class="form-label">Canal</label>{{ form.canal }}</div>
     <div class="col-md-6 cnl cnl-email"><label class="form-label">Plantilla de email</label>{{ form.plantilla_email }}<div class="form-text"><a href="{% url 'automatizaciones:plantillas_email' %}" target="_blank">Crear o editar plantillas de email</a></div></div>
     <div class="col-md-6 cnl cnl-whatsapp"><label class="form-label">Plantilla de WhatsApp</label>{{ form.plantilla_wa }}<div class="form-text">En líneas oficiales es obligatoria (y aprobada).</div></div>
+    <div class="col-md-6 cnl cnl-whatsapp cnl-agente"><label class="form-label">{{ form.adjunto.label }}</label>{{ form.adjunto }}{{ form.adjunto.errors }}
+      <div class="form-text">{{ form.adjunto.help_text }} JPG/PNG hasta 5 MB o PDF hasta 10 MB.<span class="cnl cnl-agente"> Con el agente, va en su primer mensaje.</span></div></div>
     <div class="col-md-6 cnl cnl-whatsapp"><label class="form-label">Línea</label>{{ form.linea }}<div class="form-text">{{ form.linea.help_text }}</div></div>
     <div class="col-12 cnl cnl-whatsapp cnl-agente"><label class="form-label"><span class="cnl cnl-whatsapp">{{ form.texto_wa.label }}</span><span class="cnl cnl-agente">Objetivo del mensaje (el agente escribe uno distinto para cada persona)</span></label>{{ form.texto_wa }}
       <div class="form-text cnl cnl-agente">Ej.: "Presentate, contale que con sus aportes puede atenderse en sanatorios de su zona sin pagar extra y ofrecele las opciones 1, 2 y 3". Sale por las líneas del agente con sus pausas, el tope diario y el calentamiento; lo que no entra hoy sigue mañana. Si contestan, sigue el agente.</div></div>
@@ -48,6 +50,7 @@
 <div class="card mb-3"><div class="card-body small d-flex gap-3 flex-wrap align-items-center">
   <span><b>Canal:</b> {{ dif.get_canal_display }}</span>
   <span><b>Mensaje:</b> {{ dif.plantilla_email|default:dif.plantilla_wa|default:"texto libre" }}</span>
+  {% if dif.adjunto %}<span><b>Adjunto:</b> <a href="{{ dif.adjunto.url }}" target="_blank">{{ dif.adjunto.name|cut:"difusiones/" }}</a></span>{% endif %}
   {% if dif.programada_para %}<span><b>{% if dif.estado == 'programada' %}Sale el{% else %}Empezó{% endif %}:</b> {{ dif.programada_para|date:"d/m H:i" }}</span>{% endif %}
   {% if dif.finalizada_at %}<span><b>Terminó:</b> {{ dif.finalizada_at|date:"d/m H:i" }}</span>{% endif %}
   {% if dif.estado == 'programada' or dif.estado == 'enviando' %}<form method="post" class="ms-auto">{% csrf_token %}<button name="accion" value="cancelar" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Frenar la difusión? Lo ya enviado no se puede deshacer.')">Frenar envío</button></form>{% endif %}

@@ -771,3 +771,26 @@ class RescateLineaCaidaTests(AgenteBase):
         caida = LineaWhatsApp.objects.create(nombre='Bloqueada', proveedor='evolution', agente_ia_activo=True, estado='desconectada')
         self._chat(caida, '1150000104', 'Dani')
         self.assertEqual(lineas.rescatar_chats(caida), 0)
+
+
+class DifusionAgenteConImagenTests(AgenteBase):
+    def test_la_imagen_va_en_el_primer_mensaje_del_agente(self):
+        from django.core.files.base import ContentFile
+        from apps.automatizaciones.models import Difusion, DifusionDestinatario as D
+        from apps.automatizaciones import difusiones
+        from apps.crm import services as crm
+        op = crm.ingresar_prospecto({'telefono': '1150000301', 'nombre': 'Lucas'}, self.embudo, 'importacion').oportunidad
+        dif = Difusion.objects.create(nombre='Con flyer', canal=Difusion.CANAL_AGENTE, texto_wa='Presentate')
+        dif.adjunto.save('flyer.png', ContentFile(b'png'), save=True)
+        D.objects.create(difusion=dif, contacto=op.contacto, oportunidad=op)
+        difusiones.iniciar(dif)
+        claude = ClaudeFalso(respuesta(texto('Hola Lucas, te paso nuestro flyer 👇\n---\n¿Te interesa?')))
+        with mock.patch('apps.agente.motor._cliente', return_value=claude), \
+                mock.patch('django.conf.settings.ANTHROPIC_API_KEY', 'sk-test'), \
+                self.captureOnCommitCallbacks(execute=True):
+            difusiones.tick()
+        msgs = list(Mensaje.objects.filter(direccion='out').order_by('pk'))
+        self.assertEqual(len(msgs), 2)
+        self.assertEqual((msgs[0].tipo, msgs[0].contenido), ('image', 'Hola Lucas, te paso nuestro flyer 👇'))
+        self.assertIn('flyer', msgs[0].media_url)
+        self.assertEqual((msgs[1].tipo, msgs[1].media_url), ('text', ''))

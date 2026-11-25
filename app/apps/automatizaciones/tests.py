@@ -383,6 +383,45 @@ class CorreoYDifusionesTests(TestCase):
         self.assertEqual(r.context['page'].paginator.count, 4)
         self.assertContains(r, 'Ya recibió alguna difusión')
 
+    def test_difusion_con_imagen(self):
+        import io
+        from PIL import Image
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from apps.whatsapp.models import LineaWhatsApp, Mensaje
+        from .difusiones import tick
+        LineaWhatsApp.objects.create(nombre='Demo', proveedor='demo')
+        buf = io.BytesIO()
+        Image.new('RGB', (40, 40), (20, 120, 220)).save(buf, 'PNG')
+        dif = self.crear_desde_lista()
+        url = f'/automatizaciones/difusiones/{dif.pk}/'
+        r = self.client.post(url, {'accion': 'enviar', 'nombre': 'Promo', 'canal': 'whatsapp', 'texto_wa': 'Hola {primer_nombre}!',
+                                   'adjunto': SimpleUploadedFile('promo.exe', b'xx')})
+        self.assertContains(r, 'Subí una imagen')
+        r = self.client.post(url, {'accion': 'enviar', 'nombre': 'Promo', 'canal': 'whatsapp', 'texto_wa': 'Hola {primer_nombre}!',
+                                   'adjunto': SimpleUploadedFile('promo.png', buf.getvalue(), content_type='image/png')})
+        self.assertEqual(r.status_code, 302)
+        with mock.patch('apps.whatsapp.proveedores.demo.ProveedorDemo._quizas_responder'):
+            tick()
+        msgs = Mensaje.objects.filter(direccion='out')
+        self.assertEqual(msgs.count(), 4)
+        m = msgs.get(contenido='Hola Persona1!')
+        self.assertEqual((m.tipo, m.media_mime), ('image', 'image/png'))
+        self.assertIn('promo', m.media_url)
+
+    def test_imagen_no_va_con_plantilla_ni_linea_oficial(self):
+        from django.core.files.base import ContentFile
+        from apps.whatsapp.models import LineaWhatsApp, Plantilla
+        from .difusiones import validar
+        dif = self.crear_desde_lista()
+        dif.canal = 'whatsapp'
+        dif.adjunto.save('promo.png', ContentFile(b'png'), save=True)
+        dif.plantilla_wa = Plantilla.objects.create(nombre='p1', cuerpo='Hola')
+        self.assertIn('texto libre', validar(dif))
+        dif.plantilla_wa = None
+        dif.texto_wa = 'Hola'
+        dif.linea = LineaWhatsApp.objects.create(nombre='Oficial', proveedor='meta', meta_phone_number_id='1')
+        self.assertIn('es oficial', validar(dif))
+
     def test_borrador_sin_mensaje_no_sale_y_cancelar(self):
         from .models import Difusion
         dif = self.crear_desde_lista()

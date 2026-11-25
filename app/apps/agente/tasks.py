@@ -49,7 +49,7 @@ def atender(self, conv_pk, mensaje_pk):
 
 
 @shared_task(name='agente.atender_modo', bind=True, max_retries=3, default_retry_delay=60)
-def atender_modo(self, conv_pk, modo, motivo='', destinatario_difusion=None):
+def atender_modo(self, conv_pk, modo, motivo='', destinatario_difusion=None, adjunto=None):
     """Primer contacto o seguimiento (el agente escribe sin que el lead haya escrito recién)."""
     from apps.whatsapp.models import Conversacion
     from . import motor
@@ -59,7 +59,7 @@ def atender_modo(self, conv_pk, modo, motivo='', destinatario_difusion=None):
 
     def correr():
         try:
-            turno = motor.atender(conv, modo=modo, motivo=motivo)
+            turno = motor.atender(conv, modo=modo, motivo=motivo, adjunto=adjunto)
         except motor.ErrorAgente as e:
             _avisar_error(str(e))
             _difusion(destinatario_difusion, None, f'El agente no pudo escribir: {e}')

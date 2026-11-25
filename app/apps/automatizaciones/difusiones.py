@@ -39,6 +39,10 @@ def validar(dif):
         return 'Elegí la plantilla de email.'
     if dif.canal == Difusion.CANAL_WHATSAPP and dif.plantilla_wa is None and not dif.texto_wa.strip():
         return 'Elegí una plantilla de WhatsApp o escribí el texto.'
+    if dif.adjunto and dif.canal == Difusion.CANAL_WHATSAPP and dif.plantilla_wa is not None:
+        return 'La imagen va con texto libre: sacá la plantilla o sacá la imagen.'
+    if dif.adjunto and dif.linea_id and dif.linea.es_oficial:
+        return f'La línea {dif.linea} es oficial: no puede mandar imágenes en una difusión (solo plantillas aprobadas).'
     if dif.canal == Difusion.CANAL_AGENTE:
         from apps.agente.models import ConfigAgente
         from apps.agente.services import habilitado
@@ -64,6 +68,16 @@ def iniciar(dif, cuando=None):
 
 def _omitir(dest, motivo):
     DifusionDestinatario.objects.filter(pk=dest.pk).update(estado=DifusionDestinatario.OMITIDO, detalle=motivo[:300])
+
+
+def adjunto_de(dif):
+    """(url, mime, nombre) del adjunto de la difusión, o None."""
+    if not dif.adjunto:
+        return None
+    import mimetypes
+    import os
+    nombre = os.path.basename(dif.adjunto.name)
+    return dif.adjunto.url, mimetypes.guess_type(nombre)[0] or 'application/octet-stream', nombre
 
 
 SIN_CUPO = 'sin_cupo'
@@ -93,7 +107,8 @@ def _enviar_uno(dif, dest, conexion=None):
     if dif.canal == Difusion.CANAL_AGENTE:
         # El agente escribe un mensaje propio para cada uno, con las pausas, topes y reparto de líneas del agente.
         from apps.agente.services import iniciar_chat
-        ok, detalle, reintentar = iniciar_chat(op, objetivo=dif.texto_wa, destinatario_difusion=dest.pk)
+        ok, detalle, reintentar = iniciar_chat(op, objetivo=dif.texto_wa, destinatario_difusion=dest.pk,
+                                               adjunto=adjunto_de(dif))
         if reintentar:
             return SIN_CUPO  # hoy no hay cupo en las líneas: queda pendiente y se sigue en la próxima vuelta
         if not ok:
@@ -102,7 +117,8 @@ def _enviar_uno(dif, dest, conexion=None):
                                                                enviado_at=timezone.now(), detalle='')
         return None
     from apps.whatsapp.services import enviar_automatico
-    msg, detalle = enviar_automatico(op, plantilla=dif.plantilla_wa, texto=dif.texto_wa, linea=dif.linea)
+    msg, detalle = enviar_automatico(op, plantilla=dif.plantilla_wa, texto=dif.texto_wa, linea=dif.linea,
+                                     adjunto=adjunto_de(dif))
     if msg is None:
         return _omitir(dest, detalle)
     DifusionDestinatario.objects.filter(pk=dest.pk).update(estado=DifusionDestinatario.ENVIADO, mensaje=msg,
